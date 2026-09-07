@@ -1,0 +1,12 @@
+{
+  "PNG": {
+    "directory": "assets/sprites/idle",
+    "fps": 4
+  },
+  "GIF": {
+    "src": "assets/sprites/idle.gif"
+  },
+  "APNG": {
+    "src": "assets/sprites/idle.apng"
+  }
+}

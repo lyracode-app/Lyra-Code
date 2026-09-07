@@ -1,0 +1,8 @@
+[pet]
+size = 96
+autoDock = true
+dockDelayMs = 5000
+[controls]
+animation = "PNG"
+fps = 4
+greeting = "你好！"

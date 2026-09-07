@@ -69,6 +69,9 @@ data class SemanticNode(
     val password: Boolean,
     val accessibilityDataSensitive: Boolean,
     val redacted: Boolean,
+    val hintText: String? = null,
+    val inputType: Int = 0,
+    val textFingerprint: String? = null,
 )
 
 data class ScreenBounds(

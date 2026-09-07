@@ -28,6 +28,13 @@ internal object ManualControlOverlayProtocol {
     const val COMMAND_CONFIRM = "com.yukisoffd.lyracode.command.CONFIRM_MANUAL_CONTROL"
     const val COMMAND_CLEAR_SELECTION = "com.yukisoffd.lyracode.command.CLEAR_MANUAL_CONTROL_SELECTION"
     const val COMMAND_STOP = "com.yukisoffd.lyracode.command.STOP_MANUAL_CONTROL"
+    const val COMMAND_SUBMIT = "com.yukisoffd.lyracode.command.SUBMIT_DEVICE_TASK"
+    const val COMMAND_APPROVAL = "com.yukisoffd.lyracode.command.DEVICE_APPROVAL"
+    const val COMMAND_CLEAR_CONTEXT = "com.yukisoffd.lyracode.command.CLEAR_DEVICE_CONTEXT"
+    const val COMMAND_PAUSE = "com.yukisoffd.lyracode.command.PAUSE_DEVICE_TASK"
+    const val EXTRA_INPUT = "task_input"
+    const val EXTRA_REQUEST_ID = "confirmation_request_id"
+    const val EXTRA_SNAPSHOT_ID = "confirmation_snapshot_id"
     const val SERVICE_STATE = "com.yukisoffd.lyracode.state.MANUAL_CONTROL_SERVICE"
 
     const val EXTRA_STATE = "manual_control_state"
@@ -88,6 +95,19 @@ internal object ManualControlOverlayProtocol {
     private const val KEY_AFTER_FINGERPRINT = "after_fingerprint"
 
     fun encode(state: ManualControlState): Bundle = Bundle().apply {
+        putString("pet_event", state.petEvent)
+        putLong("session_id", state.sessionId)
+        state.approval?.let { a -> putBundle("approval", Bundle().apply {
+            putString("id", a.id); putString("title", a.title); putString("detail", a.detail)
+            putString("package", a.packageName); putBoolean("twice", a.secondConfirmation); putInt("stage", a.stage)
+        }) }
+        putBoolean("chat_running", state.chat.running)
+        putString("chat_status", state.chat.status.take(240))
+        putString("chat_provider", state.chat.providerLabel.take(240))
+        putString("agent_target", state.agentTargetPackage)
+        putParcelableArrayList("chat_messages", ArrayList(state.chat.messages.takeLast(16).map { message ->
+            Bundle().apply { putLong("id", message.id); putString("role", message.role); putString("text", message.text.takeLast(4000)); putString("thinking", message.thinking.takeLast(4000)); putString("tool_name", message.toolName.take(100)); putLong("created_at", message.createdAt) }
+        }))
         putLong(EXTRA_ACTIVE_UNTIL, state.activeUntilEpochMillis)
         putString(KEY_STATUS, state.status.name)
         putString(KEY_TARGET_PACKAGE, state.targetPackage)
@@ -99,6 +119,18 @@ internal object ManualControlOverlayProtocol {
     fun decode(bundle: Bundle): ManualControlState? {
         val status = enumValueOrNull<ManualControlStatus>(bundle.getString(KEY_STATUS)) ?: return null
         return ManualControlState(
+            petEvent = bundle.getString("pet_event"),
+            sessionId = bundle.getLong("session_id"),
+            approval = bundle.getBundle("approval")?.let { a -> com.yukisoffd.lyracode.interaction.session.DeviceApproval(
+                a.getString("id").orEmpty(), a.getString("title").orEmpty(), a.getString("detail").orEmpty().take(16000),
+                a.getString("package"), a.getBoolean("twice"), a.getInt("stage", 1)) },
+            agentTargetPackage = bundle.getString("agent_target"),
+            chat = com.yukisoffd.lyracode.interaction.session.DeviceChatState(
+                running = bundle.getBoolean("chat_running"),
+                status = bundle.getString("chat_status").orEmpty(),
+                providerLabel = bundle.getString("chat_provider").orEmpty(),
+                messages = decodeMessages(bundle),
+            ),
             activeUntilEpochMillis = bundle.getLong(EXTRA_ACTIVE_UNTIL),
             status = status,
             targetPackage = bundle.getString(KEY_TARGET_PACKAGE),
@@ -113,15 +145,27 @@ internal object ManualControlOverlayProtocol {
         command: String,
         handle: String? = null,
         action: ManualDeviceAction? = null,
+        input: String? = null,
+        snapshotId: String? = null,
+        requestId: String? = null,
     ) {
         context.sendBroadcast(
             Intent(context, ManualControlActionReceiver::class.java)
                 .setAction(command)
                 .putExtra(EXTRA_HANDLE, handle)
                 .putExtra(EXTRA_ACTION, action?.name)
+                .putExtra(EXTRA_INPUT, input?.take(2000))
+                .putExtra(EXTRA_SNAPSHOT_ID, snapshotId)
+                .putExtra(EXTRA_REQUEST_ID, requestId)
                 .putExtra(EXTRA_SENT_AT_ELAPSED, SystemClock.elapsedRealtime()),
         )
     }
+
+    @Suppress("DEPRECATION")
+    private fun decodeMessages(bundle: Bundle) = bundle.getParcelableArrayList<Bundle>("chat_messages").orEmpty()
+        .takeLast(16).map { com.yukisoffd.lyracode.interaction.session.DeviceChatMessage(
+            it.getLong("id"), it.getString("role").orEmpty(), it.getString("text").orEmpty().takeLast(4000), it.getString("thinking").orEmpty().takeLast(4000), it.getString("tool_name").orEmpty().take(100), it.getLong("created_at", System.currentTimeMillis()),
+        ) }
 
     fun reportServiceState(context: Context, running: Boolean) {
         context.sendBroadcast(
@@ -149,6 +193,7 @@ internal object ManualControlOverlayProtocol {
                     DeviceActionPolicy.evaluate(snapshot.activePackage.orEmpty(), node, action) is DevicePolicyDecision.Allowed
                 }
             }
+            .sortedByDescending { it.handle == selection?.elementHandle }
             .take(MAX_REMOTE_NODES)
             .map(::encodeNode)
             .toCollection(ArrayList())
@@ -195,6 +240,9 @@ internal object ManualControlOverlayProtocol {
         putBoolean(KEY_ENABLED, node.enabled)
         putBoolean(KEY_VISIBLE, node.visible)
         putBoolean(KEY_EDITABLE, node.editable)
+        putString("hint_text", node.hintText)
+        putInt("input_type", node.inputType)
+        putString("text_fingerprint", node.textFingerprint)
         putBoolean(KEY_CLICKABLE, node.clickable)
         putBoolean(KEY_LONG_CLICKABLE, node.longClickable)
         putBoolean(KEY_SCROLLABLE, node.scrollable)
@@ -232,6 +280,9 @@ internal object ManualControlOverlayProtocol {
             enabled = bundle.getBoolean(KEY_ENABLED),
             visible = bundle.getBoolean(KEY_VISIBLE),
             editable = bundle.getBoolean(KEY_EDITABLE),
+            hintText = bundle.getString("hint_text"),
+            inputType = bundle.getInt("input_type"),
+            textFingerprint = bundle.getString("text_fingerprint"),
             clickable = bundle.getBoolean(KEY_CLICKABLE),
             longClickable = bundle.getBoolean(KEY_LONG_CLICKABLE),
             scrollable = bundle.getBoolean(KEY_SCROLLABLE),
@@ -247,27 +298,43 @@ internal object ManualControlOverlayProtocol {
 
     private fun encodeSelection(selection: ManualActionSelection): Bundle = Bundle().apply {
         putString(KEY_SNAPSHOT_ID, selection.snapshotId)
+        putString(EXTRA_REQUEST_ID, selection.requestId)
         putString(KEY_HANDLE, selection.elementHandle)
         putString(EXTRA_ACTION, selection.action.name)
         putString(KEY_EXPECTED_PACKAGE, selection.expectedPackage)
+        putBoolean("automatic", selection.automatic)
+        putInt("confirmation_stage", selection.confirmationStage)
+        putString("confirmation_token", selection.confirmationToken)
+        putString("input_text", selection.inputText)
     }
 
     private fun decodeSelection(bundle: Bundle): ManualActionSelection? {
         val action = enumValueOrNull<ManualDeviceAction>(bundle.getString(EXTRA_ACTION)) ?: return null
+        val inputText = bundle.getString("input_text")
+        if (action == ManualDeviceAction.SET_TEXT &&
+            !com.yukisoffd.lyracode.interaction.policy.TextInputPolicy.isValidText(inputText)) return null
+        if (action != ManualDeviceAction.SET_TEXT && inputText != null) return null
         return ManualActionSelection(
             snapshotId = bundle.getString(KEY_SNAPSHOT_ID) ?: return null,
+            requestId = bundle.getString(EXTRA_REQUEST_ID) ?: return null,
             elementHandle = bundle.getString(KEY_HANDLE) ?: return null,
             action = action,
             expectedPackage = bundle.getString(KEY_EXPECTED_PACKAGE) ?: return null,
+            inputText = inputText,
+            confirmationStage = bundle.getInt("confirmation_stage", 1),
+            automatic = bundle.getBoolean("automatic"),
+            confirmationToken = bundle.getString("confirmation_token") ?: bundle.getString(EXTRA_REQUEST_ID) ?: return null,
         )
     }
 
     private fun encodeResult(result: DeviceActionResult): Bundle = Bundle().apply {
+        putString(EXTRA_REQUEST_ID, result.requestId)
         putString(KEY_STATUS, result.status.name)
         putString(EXTRA_ACTION, result.action.name)
         putString(KEY_EXPECTED_PACKAGE, result.expectedPackage)
         putString(KEY_ACTUAL_PACKAGE, result.actualPackage)
         putString(KEY_HANDLE, result.elementHandle)
+        putString("block_reason", result.blockReason)
         putString(KEY_EXECUTION_METHOD, result.executionMethod)
         putString(KEY_BEFORE_FINGERPRINT, result.beforeFingerprint)
         putString(KEY_AFTER_FINGERPRINT, result.afterFingerprint)
@@ -283,7 +350,9 @@ internal object ManualControlOverlayProtocol {
             actualPackage = bundle.getString(KEY_ACTUAL_PACKAGE),
             elementHandle = bundle.getString(KEY_HANDLE) ?: return null,
             executionMethod = bundle.getString(KEY_EXECUTION_METHOD),
+            blockReason = bundle.getString("block_reason"),
             beforeFingerprint = bundle.getString(KEY_BEFORE_FINGERPRINT).orEmpty(),
+            requestId = bundle.getString(EXTRA_REQUEST_ID),
             afterFingerprint = bundle.getString(KEY_AFTER_FINGERPRINT),
         )
     }

@@ -78,6 +78,7 @@ class LyraAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         AccessibilityConnection.markConnected()
+        com.yukisoffd.lyracode.interaction.perception.DeviceScreenshotSource.service = this
         ManualControlCommandBridge.attach(::executeSelectedAction)
         serviceScope.launch {
             ManualControlController.state
@@ -127,6 +128,7 @@ class LyraAccessibilityService : AccessibilityService() {
         }
         ManualControlController.stop()
         ManualControlCommandBridge.detach()
+        com.yukisoffd.lyracode.interaction.perception.DeviceScreenshotSource.service = null
         AccessibilityConnection.markDisconnected()
         return super.onUnbind(intent)
     }
@@ -136,6 +138,7 @@ class LyraAccessibilityService : AccessibilityService() {
         captureScheduled.set(false)
         ManualControlController.stop()
         ManualControlCommandBridge.detach()
+        com.yukisoffd.lyracode.interaction.perception.DeviceScreenshotSource.service = null
         serviceScope.cancel()
         captureDispatcher.close()
         actionDispatcher.close()
@@ -184,22 +187,29 @@ class LyraAccessibilityService : AccessibilityService() {
             }
             is SnapshotCaptureResult.Failure -> {
                 if (ScreenProbeController.isActive()) ScreenProbeController.fail(result.code)
+                ManualControlController.invalidateObservation()
             }
         }
     }
 
-    private fun executeSelectedAction() {
+    private fun executeSelectedAction(snapshotId: String, handle: String, requestId: String) {
         if (Build.VERSION.SDK_INT < DeviceInteractionAvailability.MIN_SUPPORTED_SDK || !probeIsAllowed()) return
         val confirmReceivedAt = SystemClock.elapsedRealtime()
-        val (selection, before) = ManualControlController.beginExecution() ?: return
+        val (selection, before) = ManualControlController.beginExecution(snapshotId, handle, requestId) ?: return
         Log.i(LOG_TAG, "confirm_received action=${selection.action.name}")
         val expectedNode = before.nodes.firstOrNull { it.handle == selection.elementHandle }
+        if (selection.action == com.yukisoffd.lyracode.interaction.model.ManualDeviceAction.SET_TEXT &&
+            !com.yukisoffd.lyracode.interaction.policy.TextInputPolicy.isValidText(selection.inputText)) {
+            finishWithStatus(selection, before, DeviceActionStatus.BLOCKED)
+            return
+        }
         if (expectedNode == null) {
             finishWithStatus(selection, before, DeviceActionStatus.STALE)
             return
         }
-        if (DeviceActionPolicy.evaluate(selection.expectedPackage, expectedNode, selection.action) !is DevicePolicyDecision.Allowed) {
-            finishWithStatus(selection, before, DeviceActionStatus.BLOCKED)
+        val policy = DeviceActionPolicy.evaluate(selection.expectedPackage, expectedNode, selection.action, before.nodes)
+        if (policy is DevicePolicyDecision.Blocked) {
+            finishWithStatus(selection, before, DeviceActionStatus.BLOCKED, blockReason = policy.reason.name)
             return
         }
         mainHandler.removeCallbacks(captureRunnable)
@@ -215,6 +225,12 @@ class LyraAccessibilityService : AccessibilityService() {
                 return@launch
             }
 
+            val fresh = (ActionSnapshotSource(this@LyraAccessibilityService).capture() as? SnapshotCaptureResult.Success)?.snapshot
+            if (fresh == null || fresh.uiFingerprint != before.uiFingerprint) {
+                finishWithStatus(selection, before, DeviceActionStatus.STALE)
+                fresh?.let(ManualControlController::publish)
+                return@launch
+            }
             val resolutionStartedAt = SystemClock.elapsedRealtime()
             when (val resolution = SemanticNodeResolver(this@LyraAccessibilityService).resolve(
                 expectedNode,
@@ -239,7 +255,15 @@ class LyraAccessibilityService : AccessibilityService() {
                     finishWithStatus(selection, before, DeviceActionStatus.AMBIGUOUS)
                 }
                 is NodeResolution.Resolved -> {
-                    val accepted = runCatching { resolution.node.performAction(resolution.actionId) }.getOrDefault(false)
+                    val accepted = ManualControlController.dispatchIfCurrent(selection) {
+                        if (!probeIsAllowed() || !getSystemService(android.os.PowerManager::class.java).isInteractive ||
+                            getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked) false
+                        else runCatching {
+                            if (selection.action == com.yukisoffd.lyracode.interaction.model.ManualDeviceAction.SET_TEXT)
+                                com.yukisoffd.lyracode.interaction.action.NativeTextAction.perform(resolution.node, selection.inputText!!)
+                            else resolution.node.performAction(resolution.actionId)
+                        }.getOrDefault(false)
+                    }
                     Log.i(
                         LOG_TAG,
                         "action_dispatched accepted=$accepted resolution_ms=${SystemClock.elapsedRealtime() - resolutionStartedAt} " +
@@ -248,7 +272,7 @@ class LyraAccessibilityService : AccessibilityService() {
                     if (!accepted) {
                         finishWithStatus(selection, before, DeviceActionStatus.SYSTEM_REJECTED)
                     } else {
-                        ManualControlController.markVerifying()
+                        ManualControlController.markVerifying(selection)
                         serviceScope.launch {
                             delay(ACTION_SETTLE_MILLIS)
                             verifyAction(selection, before, resolution.actionId)
@@ -276,7 +300,9 @@ class LyraAccessibilityService : AccessibilityService() {
                 )
                 is SnapshotCaptureResult.Success -> {
                     val after = capture.snapshot
-                    val status = ActionVerifier.verify(before, after, selection.expectedPackage)
+                    val status = if (selection.action == com.yukisoffd.lyracode.interaction.model.ManualDeviceAction.SET_TEXT) {
+                        com.yukisoffd.lyracode.interaction.action.TextActionVerifier.verify(selection, before, after)
+                    } else ActionVerifier.verify(before, after, selection.expectedPackage)
                     ManualControlController.finish(
                         actionResult(
                             selection = selection,
@@ -300,9 +326,10 @@ class LyraAccessibilityService : AccessibilityService() {
         status: DeviceActionStatus,
         actualPackage: String? = before.activePackage,
         executionMethod: String? = null,
+        blockReason: String? = null,
     ) {
         ManualControlController.finish(
-            actionResult(selection, before, status, actualPackage, executionMethod = executionMethod),
+            actionResult(selection, before, status, actualPackage, executionMethod = executionMethod).copy(blockReason = blockReason),
         )
     }
 
@@ -315,6 +342,7 @@ class LyraAccessibilityService : AccessibilityService() {
         executionMethod: String? = null,
     ) = DeviceActionResult(
         status = status,
+        requestId = selection.requestId,
         action = selection.action,
         expectedPackage = selection.expectedPackage,
         actualPackage = actualPackage,

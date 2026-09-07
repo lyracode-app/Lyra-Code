@@ -21,8 +21,15 @@ internal sealed interface NodeResolution {
 
 /** Re-resolves an immutable semantic target immediately before one native node action. */
 internal class SemanticNodeResolver(
-    private val service: AccessibilityService,
+    private val rootsProvider: () -> List<AccessibilityNodeInfo>,
 ) {
+    constructor(service: AccessibilityService) : this({
+        listOfNotNull(service.rootInActiveWindow).ifEmpty {
+            service.windows.orEmpty()
+                .filter { it.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }
+                .mapNotNull { window -> kotlin.runCatching { window.root }.getOrNull() }
+        }
+    })
     fun resolve(
         expected: SemanticNode,
         expectedPackage: String,
@@ -33,11 +40,7 @@ internal class SemanticNodeResolver(
         val roots = if (preferredRoot != null) {
             listOf(preferredRoot)
         } else {
-            listOfNotNull(service.rootInActiveWindow).ifEmpty {
-                service.windows.orEmpty()
-                    .filter { it.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }
-                    .mapNotNull { window -> runCatching { window.root }.getOrNull() }
-            }
+            rootsProvider()
         }
 
         expected.resourceId?.let { resourceId ->
@@ -100,6 +103,19 @@ internal class SemanticNodeResolver(
         action: ManualDeviceAction,
     ): Candidate? {
         if (node.packageName?.toString() != expectedPackage) return null
+        if (node.windowId != expected.windowId) return null
+        if (node.isPassword || (android.os.Build.VERSION.SDK_INT >= 34 && node.isAccessibilityDataSensitive)) return null
+        if (action == ManualDeviceAction.SET_TEXT) {
+            if (expected.textFingerprint == null || expected.textFingerprint !=
+                com.yukisoffd.lyracode.interaction.policy.TextInputPolicy.fingerprint(node.text)) return null
+            if (node.inputType != expected.inputType || !node.isEditable) return null
+        } else if (expected.text != null && node.text?.toString() != expected.text) return null
+        if (expected.contentDescription != null && node.contentDescription?.toString() != expected.contentDescription) return null
+        if (expected.resourceId != null && node.viewIdResourceName != expected.resourceId) return null
+        if (com.yukisoffd.lyracode.interaction.policy.DeviceActionPolicy.evaluate(expectedPackage,
+                expected.copy(text = node.text?.toString(), contentDescription = node.contentDescription?.toString(),
+                    hintText = node.hintText?.toString(), inputType = node.inputType, editable = node.isEditable), action)
+            !is com.yukisoffd.lyracode.interaction.policy.DevicePolicyDecision.Allowed) return null
         if (!runCatching { node.isEnabled }.getOrDefault(false)) return null
         if (!runCatching { node.isVisibleToUser }.getOrDefault(false)) return null
         val actionId = resolveActionId(node, action) ?: return null
@@ -143,6 +159,7 @@ internal class SemanticNodeResolver(
     private fun resolveActionId(node: AccessibilityNodeInfo, action: ManualDeviceAction): Int? {
         val available = node.actionList.orEmpty().mapTo(mutableSetOf()) { it.id }
         return when (action) {
+            ManualDeviceAction.SET_TEXT -> AccessibilityNodeInfo.ACTION_SET_TEXT.takeIf(available::contains)
             ManualDeviceAction.ACTIVATE -> AccessibilityNodeInfo.ACTION_CLICK.takeIf(available::contains)
             ManualDeviceAction.SCROLL_FORWARD -> firstAvailable(
                 available,

@@ -1,0 +1,48 @@
+{
+  "apiVersion": 2,
+  "id": "lyra.starcat",
+  "name": "Lyra 星猫",
+  "version": "2.0.0",
+  "author": "Lyra Code",
+  "entry": "scripts/main.js",
+  "config": "config.toml",
+  "controls": [
+    {
+      "key": "color",
+      "label": "毛色",
+      "type": "color",
+      "default": "#70A4FF"
+    },
+    {
+      "key": "speed",
+      "label": "呼吸 / 思考动作周期（秒）",
+      "type": "range",
+      "min": 0.5,
+      "max": 4,
+      "default": 1.5
+    },
+    {
+      "key": "roam",
+      "label": "等待时随机爬动",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "greeting",
+      "label": "问候语",
+      "type": "text",
+      "default": "你好！"
+    },
+    {
+      "key": "motion",
+      "label": "待机动作",
+      "type": "select",
+      "options": [
+        "呼吸",
+        "摇摆",
+        "静止"
+      ],
+      "default": "呼吸"
+    }
+  ]
+}

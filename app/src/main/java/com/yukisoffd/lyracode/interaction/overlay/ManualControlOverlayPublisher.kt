@@ -9,7 +9,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Publishes immutable UI state to the isolated overlay process. */
@@ -21,9 +22,9 @@ internal object ManualControlOverlayPublisher {
         if (!started.compareAndSet(false, true)) return
         val appContext = context.applicationContext
         scope.launch {
-            ManualControlController.state.collectLatest { state ->
+            ManualControlController.state.collect { state ->
                 if (!state.isActive() && ManualControlForegroundConnection.state.value == ManualControlForegroundState.STOPPED) {
-                    return@collectLatest
+                    return@collect
                 }
                 val action = if (state.isActive()) {
                     ManualControlOverlayProtocol.ACTION_RENDER
@@ -46,6 +47,8 @@ internal object ManualControlOverlayPublisher {
                 }.onFailure { error ->
                     Log.w(LOG_TAG, "Unable to publish overlay state", error)
                 }
+                // StateFlow conflates streaming deltas while keeping the latest stop/approval state.
+                delay(80)
             }
         }
     }

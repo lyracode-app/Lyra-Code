@@ -2178,14 +2178,14 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="accessibility_service_description">明确启用后，此实验服务可为用户主动发起的设备任务读取界面内容并执行操作；不会绕过受保护页面或安全窗口。</string>
     <string name="detail_manual_control">悬浮控制</string>
     <string name="device_interaction_open_manual_control">打开悬浮控制测试</string>
-    <string name="manual_control_title">语义悬浮控制</string>
-    <string name="manual_control_instructions">启动两分钟会话后切换到其他应用，在 Lyra 悬浮面板中选择一项安全操作。目标节点会先高亮，并要求再次确认。</string>
+    <string name="manual_control_title">设备 Agent 悬浮对话</string>
+    <string name="manual_control_instructions">启动会话后手动打开目标应用，在悬浮对话中描述任务。脱敏界面文字会发送至当前所选模型；点击、滚动和填写文本均需逐次确认。可随时暂停或停止。</string>
     <string name="manual_control_service_required">请先连接无障碍服务。</string>
     <string name="manual_control_idle">控制会话未运行。</string>
-    <string name="manual_control_active">控制会话运行中 · 剩余 %1$d 秒 · %2$s</string>
-    <string name="manual_control_start">启动 2 分钟</string>
+    <string name="manual_control_active">控制会话运行中 · %1$s</string>
+    <string name="manual_control_start">启动会话</string>
     <string name="manual_control_stop">停止</string>
-    <string name="manual_control_scope_notice">本轮仅支持目标节点声明的点击及前后滚动操作；不使用任意坐标、不输入文字，也不会执行高风险控件。</string>
+    <string name="manual_control_scope_notice">支持跨应用任务、UI 树、视觉模型截图识别、工作区工具和受控 Shell/Root。删除、卸载需二次确认。密码、验证码与财产安全相关操作仍禁止；可随时停止。</string>
     <string name="manual_control_overlay_title">Lyra 控制 · 拖动 / 点击折叠</string>
     <string name="manual_control_overlay_status">%1$s · %2$s</string>
     <string name="manual_control_waiting_target">等待切换到外部应用</string>
@@ -2213,7 +2213,7 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="manual_control_notification_required">请允许通知，以便 Lyra 进入后台后前台控制服务仍保持可见。</string>
     <string name="manual_control_foreground_starting">正在启动前台控制服务…</string>
     <string name="manual_control_notification_channel">悬浮控制会话</string>
-    <string name="manual_control_notification_title">Lyra 悬浮控制正在运行</string>
+    <string name="manual_control_notification_title">Lyra 设备悬浮对话正在运行</string>
     <string name="manual_control_notification_text">正在维持用户主动启动的后台控制会话响应。</string>
     <string name="manual_control_notification_stop">停止</string>
 </resources>

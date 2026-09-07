@@ -38,11 +38,11 @@ class ManualDeviceActionTest {
     @Test
     fun policyBlocksRiskySensitiveAndSystemControls() {
         assertBlockedReason(
-            DevicePolicyBlockReason.HIGH_RISK_CONTROL,
-            DeviceActionPolicy.evaluate("example.app", node(text = "Delete account"), ManualDeviceAction.ACTIVATE),
+            DevicePolicyBlockReason.FINANCIAL_OPERATION,
+            DeviceActionPolicy.evaluate("example.app", node(text = "Pay now"), ManualDeviceAction.ACTIVATE),
         )
         assertBlockedReason(
-            DevicePolicyBlockReason.SENSITIVE_NODE,
+            DevicePolicyBlockReason.PASSWORD_OR_CODE,
             DeviceActionPolicy.evaluate(
                 "example.app",
                 node(text = "[REDACTED]", password = true, redacted = true),
@@ -67,23 +67,14 @@ class ManualDeviceActionTest {
     }
 
     @Test
-    fun ordinaryFinancialAppsCanBeExploredWhileRiskyControlsStayBlocked() {
-        assertTrue(DeviceActionPolicy.isPackageAllowed("com.example.bank.wallet"))
-        assertTrue(
-            DeviceActionPolicy.evaluate(
-                "com.example.bank.wallet",
-                node(packageName = "com.example.bank.wallet", text = "View transactions"),
-                ManualDeviceAction.ACTIVATE,
-            ) is DevicePolicyDecision.Allowed,
-        )
-        assertBlockedReason(
-            DevicePolicyBlockReason.HIGH_RISK_CONTROL,
-            DeviceActionPolicy.evaluate(
-                "com.example.bank.wallet",
-                node(packageName = "com.example.bank.wallet", text = "Transfer money"),
-                ManualDeviceAction.ACTIVATE,
-            ),
-        )
+    fun financialReadingAllowedWhileTransfersRemainBlocked() {
+        assertTrue(com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.isAgentPackageAllowed("com.example.bank.wallet"))
+        for (label in listOf("View transactions", "转账记录", "查看支付明细")) {
+            assertTrue(DeviceActionPolicy.evaluate("com.example.bank.wallet",
+                node(packageName = "com.example.bank.wallet", text = label), ManualDeviceAction.ACTIVATE) is DevicePolicyDecision.Allowed)
+        }
+        assertTrue(DeviceActionPolicy.evaluate("com.example.bank.wallet",
+            node(packageName = "com.example.bank.wallet", text = "Transfer money"), ManualDeviceAction.ACTIVATE) is DevicePolicyDecision.Blocked)
     }
 
     @Test
@@ -169,8 +160,9 @@ class ManualDeviceActionTest {
         assertFalse(overlaySource.contains("WindowManager.LayoutParams.MATCH_PARENT"))
         assertTrue(foregroundServiceSource.contains("context = applicationContext"))
         assertTrue(foregroundServiceSource.contains("PowerManager.PARTIAL_WAKE_LOCK"))
-        assertTrue(foregroundServiceSource.contains("acquire(MAX_WAKE_LOCK_MILLIS)"))
-        assertTrue(foregroundServiceSource.contains("HandlerThread(OVERLAY_THREAD_NAME, Process.THREAD_PRIORITY_DISPLAY)"))
+        assertTrue(foregroundServiceSource.contains("acquire()"))
+        // IME toolbar hide callbacks run on the main looper; the ViewRoot must share it.
+        assertTrue(foregroundServiceSource.contains("Handler(Looper.getMainLooper())"))
         assertTrue(foregroundServiceSource.contains("ManualControlOverlayProtocol.ACTION_RENDER"))
         assertTrue(foregroundServiceSource.contains("ManualControlOverlayProtocol.sendCommand"))
         assertTrue(foregroundServiceSource.contains("Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT"))

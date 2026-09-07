@@ -1,0 +1,7 @@
+<resources>
+    <item name="device_fixture_draft" type="id" />
+    <item name="device_fixture_filtered" type="id" />
+    <item name="device_fixture_password" type="id" />
+    <item name="device_fixture_otp" type="id" />
+    <item name="device_fixture_disabled" type="id" />
+</resources>

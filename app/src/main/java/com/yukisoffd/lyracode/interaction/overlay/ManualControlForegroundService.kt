@@ -12,7 +12,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
-import android.os.HandlerThread
+import android.os.Looper
 import android.os.IBinder
 import android.os.Message
 import android.os.Messenger
@@ -24,7 +24,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.yukisoffd.lyracode.MainActivity
 import com.yukisoffd.lyracode.R
-import com.yukisoffd.lyracode.interaction.model.ManualActionSelection
 import com.yukisoffd.lyracode.interaction.model.ManualDeviceAction
 import com.yukisoffd.lyracode.interaction.service.ManualControlCommandService
 import com.yukisoffd.lyracode.interaction.session.ManualControlController
@@ -33,11 +32,23 @@ import com.yukisoffd.lyracode.interaction.session.ManualControlStatus
 
 /** Hosts the overlay in a process that has no background Activity or Compose runtime. */
 class ManualControlForegroundService : Service() {
-    private lateinit var overlayThread: HandlerThread
     private lateinit var overlayHandler: Handler
     private var taskHud: TaskHudController? = null
     private var lastRenderedState: ManualControlState? = null
     private var sessionWakeLock: PowerManager.WakeLock? = null
+    private var screenReceiverRegistered = false
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (destroyed) return
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    sendControlCommand(ManualControlCommandService.PAUSE, ManualControlOverlayProtocol.COMMAND_PAUSE)
+                    sessionWakeLock?.takeIf { it.isHeld }?.release()
+                }
+                Intent.ACTION_SCREEN_ON -> acquireSessionWakeLock()
+            }
+        }
+    }
 
     @Volatile
     private var commandMessenger: Messenger? = null
@@ -67,13 +78,19 @@ class ManualControlForegroundService : Service() {
         try {
             startAsForeground()
             acquireSessionWakeLock()
+            androidx.core.content.ContextCompat.registerReceiver(applicationContext, screenReceiver,
+                android.content.IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON) },
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+            screenReceiverRegistered = true
         } catch (error: RuntimeException) {
             ManualControlOverlayProtocol.reportServiceState(applicationContext, running = false)
             stopSelf()
             throw error
         }
-        overlayThread = HandlerThread(OVERLAY_THREAD_NAME, Process.THREAD_PRIORITY_DISPLAY).apply { start() }
-        overlayHandler = Handler(overlayThread.looper)
+        // IME-initiated hide requests reach InputMethodManager on the process main looper.
+        // A ViewRoot on a HandlerThread crashes when that path starts its insets animation.
+        // This process is already isolated from the Activity/agent, so keep all overlay UI here.
+        overlayHandler = Handler(Looper.getMainLooper())
         bindCommandChannel()
         ManualControlOverlayProtocol.reportServiceState(applicationContext, running = true)
         Log.i(LOG_TAG, "overlay_process_started pid=${Process.myPid()}")
@@ -113,14 +130,12 @@ class ManualControlForegroundService : Service() {
 
     override fun onDestroy() {
         destroyed = true
+        if (screenReceiverRegistered) { applicationContext.unregisterReceiver(screenReceiver); screenReceiverRegistered = false }
         if (::overlayHandler.isInitialized) {
             overlayHandler.removeCallbacksAndMessages(null)
-            overlayHandler.postAtFrontOfQueue {
-                taskHud?.destroy()
-                taskHud = null
-                lastRenderedState = null
-                overlayThread.quitSafely()
-            }
+            taskHud?.destroy()
+            taskHud = null
+            lastRenderedState = null
         }
         sessionWakeLock?.let { wakeLock ->
             if (wakeLock.isHeld) wakeLock.release()
@@ -150,26 +165,19 @@ class ManualControlForegroundService : Service() {
         lastRenderedState = state
         val hud = taskHud ?: TaskHudController(
             context = applicationContext,
-            onSelect = { handle, action ->
-                selectLocally(handle, action)
-                sendControlCommand(
-                    ManualControlCommandService.SELECT,
-                    ManualControlOverlayProtocol.COMMAND_SELECT,
-                    handle,
-                    action,
-                )
-            },
-            onConfirm = {
+            onConfirm = { selection ->
                 sendControlCommand(
                     ManualControlCommandService.CONFIRM,
                     ManualControlOverlayProtocol.COMMAND_CONFIRM,
+                    handle = selection.elementHandle, snapshotId = selection.snapshotId, requestId = selection.confirmationToken,
                 )
             },
-            onCancelSelection = {
+            onCancelSelection = { selection ->
                 clearSelectionLocally()
                 sendControlCommand(
                     ManualControlCommandService.CLEAR_SELECTION,
                     ManualControlOverlayProtocol.COMMAND_CLEAR_SELECTION,
+                    handle = selection.elementHandle, snapshotId = selection.snapshotId, requestId = selection.confirmationToken,
                 )
             },
             onStop = {
@@ -180,6 +188,18 @@ class ManualControlForegroundService : Service() {
                 taskHud?.destroy()
                 taskHud = null
                 stopSelf()
+            },
+            onSubmit = { input ->
+                sendControlCommand(ManualControlCommandService.SUBMIT, ManualControlOverlayProtocol.COMMAND_SUBMIT, input = input)
+            },
+            onApproval = { id, approved ->
+                sendControlCommand(ManualControlCommandService.APPROVAL, ManualControlOverlayProtocol.COMMAND_APPROVAL, requestId = id, input = if (approved) "approve" else "reject")
+            },
+            onClearContext = {
+                sendControlCommand(ManualControlCommandService.CLEAR_CONTEXT, ManualControlOverlayProtocol.COMMAND_CLEAR_CONTEXT)
+            },
+            onPause = {
+                sendControlCommand(ManualControlCommandService.PAUSE, ManualControlOverlayProtocol.COMMAND_PAUSE)
             },
         ).also { taskHud = it }
         hud.render(state)
@@ -200,12 +220,18 @@ class ManualControlForegroundService : Service() {
         fallbackCommand: String,
         handle: String? = null,
         action: ManualDeviceAction? = null,
+        input: String? = null,
+        snapshotId: String? = null,
+        requestId: String? = null,
     ) {
         val sentAt = SystemClock.elapsedRealtime()
         val message = Message.obtain(null, what).apply {
             data = Bundle().apply {
                 putString(ManualControlOverlayProtocol.EXTRA_HANDLE, handle)
                 putString(ManualControlOverlayProtocol.EXTRA_ACTION, action?.name)
+                putString(ManualControlOverlayProtocol.EXTRA_INPUT, input?.take(2000))
+                putString(ManualControlOverlayProtocol.EXTRA_SNAPSHOT_ID, snapshotId)
+                putString(ManualControlOverlayProtocol.EXTRA_REQUEST_ID, requestId)
                 putLong(ManualControlOverlayProtocol.EXTRA_SENT_AT_ELAPSED, sentAt)
             }
         }
@@ -216,22 +242,8 @@ class ManualControlForegroundService : Service() {
         }.getOrDefault(false)
         if (!delivered) {
             Log.w(LOG_TAG, "command_channel_fallback what=$what")
-            ManualControlOverlayProtocol.sendCommand(applicationContext, fallbackCommand, handle, action)
+            ManualControlOverlayProtocol.sendCommand(applicationContext, fallbackCommand, handle, action, input, snapshotId, requestId)
         }
-    }
-
-    /** Make selection/highlight feedback immediate; the main process still revalidates the command. */
-    private fun selectLocally(handle: String, action: ManualDeviceAction) {
-        val state = lastRenderedState ?: return
-        val snapshot = state.latestSnapshot ?: return
-        val targetPackage = state.targetPackage ?: return
-        if (snapshot.nodes.none { it.handle == handle }) return
-        renderOverlayState(
-            state.copy(
-                status = ManualControlStatus.TARGET_SELECTED,
-                selection = ManualActionSelection(snapshot.snapshotId, handle, action, targetPackage),
-            ),
-        )
     }
 
     private fun clearSelectionLocally() {
@@ -250,6 +262,7 @@ class ManualControlForegroundService : Service() {
 
     private fun scheduleExpiry(activeUntilEpochMillis: Long) {
         overlayHandler.removeCallbacks(expireSession)
+        if (activeUntilEpochMillis == Long.MAX_VALUE) return
         val remainingMillis = activeUntilEpochMillis - System.currentTimeMillis()
         if (remainingMillis <= 0L) {
             expireSession.run()
@@ -300,18 +313,18 @@ class ManualControlForegroundService : Service() {
     }
 
     private fun acquireSessionWakeLock() {
+        if (!getSystemService(PowerManager::class.java).isInteractive || sessionWakeLock?.isHeld == true) return
         sessionWakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:manual-control")
             .apply {
                 setReferenceCounted(false)
-                acquire(MAX_WAKE_LOCK_MILLIS)
+                acquire()
             }
     }
 
     internal companion object {
         private const val CHANNEL_ID = "lyra_manual_control"
         private const val NOTIFICATION_ID = 7314
-        private const val OVERLAY_THREAD_NAME = "lyra-overlay-ui"
         private const val LOG_TAG = "LyraManualControl"
 
         fun start(context: Context): Boolean {
@@ -337,6 +350,5 @@ class ManualControlForegroundService : Service() {
             }.isSuccess
         }
 
-        private const val MAX_WAKE_LOCK_MILLIS = 185_000L
     }
 }

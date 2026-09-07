@@ -15,6 +15,7 @@ import com.yukisoffd.lyracode.interaction.model.SemanticWindow
 import com.yukisoffd.lyracode.interaction.model.SemanticWindowType
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicLong
+import com.yukisoffd.lyracode.interaction.policy.TextInputPolicy
 
 /**
  * Low-latency snapshot used by the floating controller. It inspects only the active window,
@@ -22,8 +23,10 @@ import java.util.concurrent.atomic.AtomicLong
  */
 @RequiresApi(35)
 internal class ActionSnapshotSource(
-    private val service: AccessibilityService,
+    private val context: android.content.Context,
+    private val activeRoot: () -> AccessibilityNodeInfo?,
 ) {
+    constructor(service: AccessibilityService) : this(service, { service.rootInActiveWindow })
     fun capture(): SnapshotCaptureResult = try {
         captureInternal()
     } catch (_: SecurityException) {
@@ -33,7 +36,7 @@ internal class ActionSnapshotSource(
     }
 
     private fun captureInternal(): SnapshotCaptureResult {
-        val root = service.rootInActiveWindow
+        val root = activeRoot()
             ?: return SnapshotCaptureResult.Failure(ScreenProbeFailureCode.NO_ROOT_NODES)
         val packageName = root.packageName?.toString()
         val capturedAt = System.currentTimeMillis()
@@ -52,10 +55,14 @@ internal class ActionSnapshotSource(
             val node = frame.node
             visited++
             val actions = semanticActions(node)
-            val manualActionable = actions.any(MANUAL_ACTIONS::contains)
+            // Disabled/empty editors may expose no actions or text. Retain their identity and
+            // safety metadata so the policy can explicitly reject them (and sensitive forms).
+            val manualActionable = actions.any(MANUAL_ACTIONS::contains) || safeBoolean { node.isEditable }
             val visible = safeBoolean { node.isVisibleToUser }
             val password = safeBoolean { node.isPassword }
-            val sensitive = safeBoolean { node.isAccessibilityDataSensitive }
+            val sensitive = safeBoolean { node.isAccessibilityDataSensitive } ||
+                (node.isEditable && TextInputPolicy.isSensitive(node.inputType, node.hintText?.toString(),
+                    node.contentDescription?.toString(), node.viewIdResourceName?.substringAfterLast('/')))
             val nodePackage = node.packageName?.toString() ?: packageName
             val redacted = password || sensitive || nodePackage == SYSTEM_UI_PACKAGE
             val rawText = if (redacted) null else node.text?.toString()
@@ -64,7 +71,7 @@ internal class ActionSnapshotSource(
             val retain =
                 (manualActionable && actionNodes < MAX_ACTION_NODES) ||
                     (hasContext && contextNodes < MAX_CONTEXT_NODES) ||
-                    visited == 1
+                    redacted || visited == 1
 
             if (retain) {
                 if (manualActionable) actionNodes++ else contextNodes++
@@ -95,6 +102,10 @@ internal class ActionSnapshotSource(
                     password = password,
                     accessibilityDataSensitive = sensitive,
                     redacted = redacted,
+                    hintText = if (redacted) null else textBudget.take(node.hintText),
+                    inputType = node.inputType,
+                    textFingerprint = if (!redacted && SemanticAction.SET_TEXT in actions)
+                        TextInputPolicy.fingerprint(rawText) else null,
                 )
             }
 
@@ -148,6 +159,7 @@ internal class ActionSnapshotSource(
         node.actionList.orEmpty().forEach { action ->
             when (action.id) {
                 AccessibilityNodeInfo.ACTION_CLICK -> add(SemanticAction.ACTIVATE)
+                AccessibilityNodeInfo.ACTION_SET_TEXT -> add(SemanticAction.SET_TEXT)
                 AccessibilityNodeInfo.ACTION_SCROLL_FORWARD -> add(SemanticAction.SCROLL_FORWARD)
                 AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD -> add(SemanticAction.SCROLL_BACKWARD)
                 AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.id -> add(SemanticAction.SCROLL_UP)
@@ -161,6 +173,7 @@ internal class ActionSnapshotSource(
     private fun semanticRole(className: String?, node: AccessibilityNodeInfo): String {
         val simpleName = className.orEmpty().substringAfterLast('.').lowercase()
         return when {
+            safeBoolean { node.isEditable } -> "text_input"
             "button" in simpleName -> "button"
             "checkbox" in simpleName -> "checkbox"
             "switch" in simpleName -> "switch"
@@ -178,8 +191,8 @@ internal class ActionSnapshotSource(
     }
 
     private fun displayInfo(): ScreenDisplay {
-        val metrics = service.resources.displayMetrics
-        val display = service.getSystemService(DisplayManager::class.java)?.getDisplay(0)
+        val metrics = context.resources.displayMetrics
+        val display = context.getSystemService(DisplayManager::class.java)?.getDisplay(0)
         return ScreenDisplay(0, display?.rotation ?: 0, metrics.widthPixels, metrics.heightPixels)
     }
 
@@ -202,6 +215,7 @@ internal class ActionSnapshotSource(
         const val MAX_TEXT_PER_VALUE = 120
         const val SYSTEM_UI_PACKAGE = "com.android.systemui"
         val MANUAL_ACTIONS = setOf(
+            SemanticAction.SET_TEXT,
             SemanticAction.ACTIVATE,
             SemanticAction.SCROLL_FORWARD,
             SemanticAction.SCROLL_BACKWARD,

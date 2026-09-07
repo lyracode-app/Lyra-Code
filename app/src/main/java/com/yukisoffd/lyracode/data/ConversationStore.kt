@@ -76,9 +76,9 @@ data class UsageModelRequest(
     val model: String = "",
 )
 
-class ConversationStore(private val appContext: Context) : SQLiteOpenHelper(
+class ConversationStore(private val appContext: Context, inMemory: Boolean = false) : SQLiteOpenHelper(
     appContext.applicationContext,
-    "lyra_conversations.db",
+    if (inMemory) null else "lyra_conversations.db",
     null,
     11,
 ) {

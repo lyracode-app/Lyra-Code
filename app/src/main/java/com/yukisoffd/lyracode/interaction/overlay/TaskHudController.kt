@@ -5,37 +5,41 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TextView
-import com.yukisoffd.lyracode.R
-import com.yukisoffd.lyracode.interaction.model.ManualDeviceAction
 import com.yukisoffd.lyracode.interaction.model.ScreenBounds
-import com.yukisoffd.lyracode.interaction.model.SemanticNode
-import com.yukisoffd.lyracode.interaction.policy.DeviceActionPolicy
-import com.yukisoffd.lyracode.interaction.policy.DevicePolicyDecision
 import com.yukisoffd.lyracode.interaction.session.ManualControlState
 import com.yukisoffd.lyracode.interaction.session.ManualControlStatus
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Small, user-driven application overlay for one confirmed semantic action at a time. */
+/** Draggable conversation overlay with a separate non-touchable target highlight. */
 internal class TaskHudController(
     private val context: Context,
-    private val onSelect: (String, ManualDeviceAction) -> Unit,
-    private val onConfirm: () -> Unit,
-    private val onCancelSelection: () -> Unit,
+    private val onConfirm: (com.yukisoffd.lyracode.interaction.model.ManualActionSelection) -> Unit,
+    private val onCancelSelection: (com.yukisoffd.lyracode.interaction.model.ManualActionSelection) -> Unit,
     private val onStop: () -> Unit,
+    private val onSubmit: (String) -> Unit,
+    private val onPause: () -> Unit,
+    private val onApproval: (String, Boolean) -> Unit = { _, _ -> },
+    private val onClearContext: () -> Unit = {},
 ) {
+    init {
+        check(android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            "Overlay views must share the main looper with InputMethodManager"
+        }
+    }
+
     private val windowManager = context.getSystemService(WindowManager::class.java)
+    private var pet: com.yukisoffd.lyracode.interaction.pet.DesktopPetWindow? = null
+    private var chatVisible = true
     private var panelHost: FrameLayout? = null
+    private var chatPanel: DeviceChatPanel? = null
+    private var inputFocused = false
     private var highlight: HighlightView? = null
     private var highlightedBounds: ScreenBounds? = null
     private var latestState: ManualControlState? = null
@@ -45,6 +49,34 @@ internal class TaskHudController(
     private var expanded = true
     private var panelX = dp(12)
     private var panelY = dp(96)
+    private var panelWidth = minOf(dp(340), context.resources.displayMetrics.widthPixels - dp(24))
+    private var panelHeight = minOf(dp(480), (context.resources.displayMetrics.heightPixels * .55f).roundToInt())
+    private var keyboardTop: Int? = null
+    private var bars = android.graphics.Insets.NONE
+
+    private fun availableArea(): OverlayRect {
+        val bounds = windowManager.currentWindowMetrics.bounds
+        val top = bars.top + dp(6)
+        val bottom = minOf(bounds.height() - bars.bottom, keyboardTop ?: bounds.height()) - dp(8)
+        return OverlayRect(bars.left + dp(6), top,
+            (bounds.width() - bars.left - bars.right - dp(12)).coerceAtLeast(1), (bottom - top).coerceAtLeast(1))
+    }
+
+    private fun visibleRect() = OverlayGeometry.fit(OverlayRect(panelX, panelY, panelWidth, panelHeight), availableArea())
+
+    private fun updatePanelGeometry() {
+        panelHost?.takeIf(View::isAttachedToWindow)?.let { host ->
+            val next = panelLayoutParams()
+            val old = host.layoutParams as WindowManager.LayoutParams
+            if (old.x != next.x || old.y != next.y || old.width != next.width || old.height != next.height || old.flags != next.flags)
+                windowManager.updateViewLayout(host, next)
+        }
+    }
+
+    private fun rememberRect(rect: OverlayRect) {
+        panelX = rect.x; panelY = rect.y; panelWidth = rect.width; panelHeight = rect.height
+        updatePanelGeometry()
+    }
 
     fun render(state: ManualControlState) {
         latestState = state
@@ -53,6 +85,13 @@ internal class TaskHudController(
             return
         }
 
+        if (state.approval != null || state.selection?.automatic == false) chatVisible = true
+        if (pet == null) pet = com.yukisoffd.lyracode.interaction.pet.DesktopPetWindow(context, {
+            chatVisible = !chatVisible
+            if (!chatVisible) chatPanel?.releaseInput()
+            panelHost?.visibility = if (chatVisible) View.VISIBLE else View.GONE
+        }, onSubmit)
+        pet?.render(state)
         // Create the non-touchable highlight layer first so the interactive panel always stays above it.
         ensureHighlightLayer()
         val selectedBounds = state.selection?.let { selection ->
@@ -70,172 +109,41 @@ internal class TaskHudController(
 
     fun destroy() = removeViews()
 
-    private fun buildPanel(state: ManualControlState): View {
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = roundedBackground(Color.argb(235, 34, 36, 40), dp(16).toFloat())
-        }
-        val title = DragHandleView(context).apply {
-            text = context.getString(R.string.manual_control_overlay_title)
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding(dp(6), dp(4), dp(6), dp(6))
-            setOnTouchListener(DragTouchListener())
-        }
-        container.addView(title, matchWrap())
-        if (!expanded) return container
-
-        val target = state.targetPackage ?: context.getString(R.string.manual_control_waiting_target)
-        container.addView(
-            textView(
-                context.getString(R.string.manual_control_overlay_status, statusLabel(state.status), target),
-                12f,
-                Color.LTGRAY,
-            ),
-            matchWrap(),
-        )
-
-        val selection = state.selection
-        if (selection != null) {
-            val node = state.latestSnapshot?.nodes?.firstOrNull { it.handle == selection.elementHandle }
-            container.addView(
-                textView(
-                    context.getString(
-                        R.string.manual_control_confirm_target,
-                        actionLabel(selection.action),
-                        node?.let(::nodeLabel) ?: selection.elementHandle,
-                    ),
-                    13f,
-                    Color.WHITE,
-                ),
-                matchWrap(),
-            )
-            container.addView(button(context.getString(R.string.manual_control_confirm)) { onConfirm() }, matchWrap())
-            container.addView(button(context.getString(R.string.manual_control_cancel_selection)) { onCancelSelection() }, matchWrap())
-        } else if (state.status !in setOf(ManualControlStatus.EXECUTING, ManualControlStatus.VERIFYING)) {
-            val candidates = actionCandidates(state).take(MAX_ACTIONS)
-            if (candidates.isEmpty()) {
-                container.addView(
-                    textView(context.getString(R.string.manual_control_no_safe_actions), 12f, Color.LTGRAY),
-                    matchWrap(),
-                )
-            } else {
-                candidates.forEach { candidate ->
-                    val label = "${actionLabel(candidate.action)} · ${nodeLabel(candidate.node)}"
-                    val key = candidateKey(candidate)
-                    container.addView(button(label) { selectLatestCandidate(key) }, matchWrap())
-                }
-            }
-        }
-        state.lastResult?.let { result ->
-            container.addView(
-                textView(context.getString(R.string.manual_control_last_result, result.status.name), 12f, Color.LTGRAY),
-                matchWrap(),
-            )
-        }
-        container.addView(button(context.getString(R.string.manual_control_stop)) { onStop() }, matchWrap())
-        return container
-    }
-
-    private fun actionCandidates(state: ManualControlState): List<ActionCandidate> {
-        val snapshot = state.latestSnapshot ?: return emptyList()
-        val packageName = state.targetPackage ?: return emptyList()
-        return buildList {
-            snapshot.nodes.asSequence()
-                .filter { it.packageName == packageName }
-                .forEach { node ->
-                    ManualDeviceAction.entries.forEach { action ->
-                        if (DeviceActionPolicy.evaluate(packageName, node, action) is DevicePolicyDecision.Allowed) {
-                            add(ActionCandidate(node, action))
-                        }
-                    }
-                }
-        }.distinctBy { it.node.handle to it.action }
-    }
-
-    private fun nodeLabel(node: SemanticNode): String =
-        listOf(node.text, node.contentDescription, node.resourceId?.substringAfterLast('/'), node.role)
-            .firstOrNull { !it.isNullOrBlank() }
-            ?.take(36)
-            ?: node.role
-
-    private fun actionLabel(action: ManualDeviceAction): String = when (action) {
-        ManualDeviceAction.ACTIVATE -> context.getString(R.string.manual_control_action_activate)
-        ManualDeviceAction.SCROLL_FORWARD -> context.getString(R.string.manual_control_action_scroll_forward)
-        ManualDeviceAction.SCROLL_BACKWARD -> context.getString(R.string.manual_control_action_scroll_backward)
-    }
-
-    private fun statusLabel(status: ManualControlStatus): String = when (status) {
-        ManualControlStatus.OBSERVING -> context.getString(R.string.manual_control_status_observing)
-        ManualControlStatus.READY -> context.getString(R.string.manual_control_status_ready)
-        ManualControlStatus.TARGET_SELECTED -> context.getString(R.string.manual_control_status_selected)
-        ManualControlStatus.EXECUTING -> context.getString(R.string.manual_control_status_executing)
-        ManualControlStatus.VERIFYING -> context.getString(R.string.manual_control_status_verifying)
-        ManualControlStatus.PAUSED_PACKAGE_CHANGED -> context.getString(R.string.manual_control_status_package_changed)
-        ManualControlStatus.FAILED -> context.getString(R.string.manual_control_status_failed)
-        ManualControlStatus.CANCELLED, ManualControlStatus.IDLE -> context.getString(R.string.manual_control_status_stopped)
-    }
-
     private fun updatePanel(state: ManualControlState) {
+        panelHost?.visibility = if (chatVisible) View.VISIBLE else View.GONE
+        updatePanelGeometry()
         val signature = panelSignature(state)
         if (signature == lastPanelSignature) return
-        val view = buildPanel(state)
         val host = panelHost ?: TouchAwareFrameLayout(context).also { newHost ->
             runCatching { windowManager.addView(newHost, panelLayoutParams()) }
                 .onSuccess { panelHost = newHost }
                 .onFailure { Log.w(LOG_TAG, "Unable to add control panel", it) }
         }
         if (host === panelHost) {
-            host.removeAllViews()
-            host.addView(view)
+            val panel = chatPanel ?: DeviceChatPanel(context, DragTouchListener(),
+                onInputFocus = { focused ->
+                    updateInputFocus(focused)
+                }, onSubmit = onSubmit, onPause = onPause, onStop = onStop,
+                onConfirm = onConfirm, onReject = onCancelSelection, onApproval = onApproval, onClearContext = onClearContext,
+            ).also { chatPanel = it; host.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)) }
+            panel.render(state, expanded)
             lastPanelSignature = signature
         }
     }
 
-    private fun panelSignature(state: ManualControlState): PanelSignature {
-        val selection = state.selection?.let { selected ->
-            val node = state.latestSnapshot?.nodes?.firstOrNull { it.handle == selected.elementHandle }
-            SelectionSignature(selected.action, node?.let { candidateKey(it, selected.action) })
-        }
-        val candidates = if (
-            expanded && selection == null &&
-            state.status !in setOf(ManualControlStatus.EXECUTING, ManualControlStatus.VERIFYING)
-        ) {
-            actionCandidates(state).take(MAX_ACTIONS).map(::candidateKey)
-        } else {
-            emptyList()
-        }
-        return PanelSignature(
-            expanded = expanded,
-            status = state.status,
-            targetPackage = state.targetPackage,
-            selection = selection,
-            candidates = candidates,
-            lastResultStatus = state.lastResult?.status?.name,
-        )
-    }
-
-    private fun selectLatestCandidate(key: CandidateKey) {
-        val candidates = latestState?.let(::actionCandidates).orEmpty()
-        val candidate = candidates.firstOrNull { candidateKey(it) == key }
-            ?: candidates.filter { candidateKey(it).hasSameSemanticTarget(key) }.singleOrNull()
-            ?: return
-        onSelect(candidate.node.handle, candidate.action)
-    }
-
-    private fun candidateKey(candidate: ActionCandidate): CandidateKey =
-        candidateKey(candidate.node, candidate.action)
-
-    private fun candidateKey(node: SemanticNode, action: ManualDeviceAction) = CandidateKey(
-        action = action,
-        packageName = node.packageName,
-        resourceId = node.resourceId,
-        text = node.text,
-        contentDescription = node.contentDescription,
-        role = node.role,
-        bounds = node.bounds,
+    private fun panelSignature(state: ManualControlState) = PanelSignature(
+        expanded, state.status, state.targetPackage, state.selection,
+        state.latestSnapshot?.snapshotId, state.chat, state.approval,
     )
+
+    private fun updateInputFocus(focused: Boolean) {
+        if (inputFocused == focused) return
+        inputFocused = focused
+        panelHost?.takeIf(View::isAttachedToWindow)?.let { host ->
+            runCatching { windowManager.updateViewLayout(host, panelLayoutParams()) }
+                .onFailure { Log.w(LOG_TAG, "Unable to update overlay input focus", it) }
+        }
+    }
 
     private fun updateHighlight(bounds: ScreenBounds) {
         if (bounds.width <= 0 || bounds.height <= 0) {
@@ -291,8 +199,12 @@ internal class TaskHudController(
     }
 
     private fun removeViews() {
+        pet?.destroy(); pet = null
         panelHost?.let { runCatching { windowManager.removeView(it) } }
         panelHost = null
+        chatPanel = null
+        inputFocused = false
+        keyboardTop = null
         latestState = null
         pendingPanelState = null
         lastPanelSignature = null
@@ -300,19 +212,20 @@ internal class TaskHudController(
         removeHighlight()
     }
 
-    private fun panelLayoutParams() = WindowManager.LayoutParams(
-        dp(300),
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-        PixelFormat.TRANSLUCENT,
-    ).apply {
-        gravity = Gravity.TOP or Gravity.START
-        x = panelX
-        y = panelY
+    private fun panelLayoutParams(): WindowManager.LayoutParams {
+        val rect = visibleRect()
+        return WindowManager.LayoutParams(
+            rect.width, rect.height, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            (if (inputFocused) 0 else WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.LEFT
+            x = rect.x; y = rect.y
+            // Fit explicitly: resizing the native message area preserves the editor and its IME session.
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            setFitInsetsTypes(0)
+        }
     }
 
     private fun highlightLayoutParams(bounds: ScreenBounds?) = WindowManager.LayoutParams(
@@ -331,32 +244,6 @@ internal class TaskHudController(
         alpha = HIGHLIGHT_WINDOW_ALPHA
     }
 
-    private fun textView(text: String, sizeSp: Float, color: Int) = TextView(context).apply {
-        this.text = text
-        textSize = sizeSp
-        setTextColor(color)
-    }
-
-    private fun button(text: String, action: () -> Unit) = Button(context).apply {
-        this.text = text
-        isAllCaps = false
-        minHeight = 0
-        setOnClickListener {
-            Log.i(LOG_TAG, "control_button_click")
-            action()
-        }
-    }
-
-    private fun matchWrap() = LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        LinearLayout.LayoutParams.WRAP_CONTENT,
-    )
-
-    private fun roundedBackground(color: Int, radius: Float) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius
-    }
-
     private fun dp(value: Int): Int = (value * context.resources.displayMetrics.density).roundToInt()
 
     private inner class DragTouchListener : View.OnTouchListener {
@@ -370,21 +257,19 @@ internal class TaskHudController(
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = event.rawX
                     downRawY = event.rawY
-                    startX = panelX
-                    startY = panelY
+                    startX = visibleRect().x
+                    startY = visibleRect().y
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    panelX = (startX + event.rawX - downRawX).roundToInt().coerceAtLeast(0)
-                    panelY = (startY + event.rawY - downRawY).roundToInt().coerceAtLeast(0)
-                    panelHost?.let { windowManager.updateViewLayout(it, panelLayoutParams()) }
+                    val current = visibleRect()
+                    val moved = OverlayGeometry.fit(current.copy(x = (startX + event.rawX - downRawX).roundToInt(),
+                        y = (startY + event.rawY - downRawY).roundToInt()), availableArea())
+                    panelX = moved.x; panelY = moved.y
+                    updatePanelGeometry()
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (abs(event.rawX - downRawX) < dp(8) && abs(event.rawY - downRawY) < dp(8)) {
-                        expanded = !expanded
-                        render(com.yukisoffd.lyracode.interaction.session.ManualControlController.state.value)
-                    }
                     view.performClick()
                     return true
                 }
@@ -394,15 +279,88 @@ internal class TaskHudController(
     }
 
     private inner class TouchAwareFrameLayout(context: Context) : FrameLayout(context) {
+        private var resizing = false
+        private var resizeLeft = false
+        private var resizeTop = false
+        private var downX = 0f
+        private var downY = 0f
+        private var start = OverlayRect(0, 0, 1, 1)
+        private var imeAnimating = false
+        private val gripPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = OverlayPalette(context).muted; alpha = 150; strokeWidth = dp(2).toFloat(); strokeCap = Paint.Cap.ROUND
+        }
+        private val applyGeometry = Runnable { updatePanelGeometry() }
+
+        init {
+            setOnApplyWindowInsetsListener { _, insets ->
+                updateInsets(insets)
+                insets
+            }
+            setWindowInsetsAnimationCallback(object : android.view.WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onPrepare(animation: android.view.WindowInsetsAnimation) {
+                    if (animation.typeMask and android.view.WindowInsets.Type.ime() != 0) imeAnimating = true
+                }
+                override fun onProgress(insets: android.view.WindowInsets, animations: MutableList<android.view.WindowInsetsAnimation>): android.view.WindowInsets {
+                    updateInsets(insets)
+                    return insets
+                }
+                override fun onEnd(animation: android.view.WindowInsetsAnimation) {
+                    if (animation.typeMask and android.view.WindowInsets.Type.ime() != 0) {
+                        imeAnimating = false
+                        rootWindowInsets?.let(::updateInsets)
+                    }
+                }
+            })
+        }
+
+        private fun updateInsets(insets: android.view.WindowInsets) {
+            bars = windowManager.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
+            val visible = insets.isVisible(android.view.WindowInsets.Type.ime())
+            val overlap = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
+            if (visible && overlap > 0 && height > 0) {
+                val location = IntArray(2); getLocationOnScreen(location)
+                val top = location[1] + height - overlap
+                keyboardTop = minOf(keyboardTop ?: Int.MAX_VALUE, top)
+            } else if (!visible && !imeAnimating) keyboardTop = null
+            removeCallbacks(applyGeometry)
+            post(applyGeometry)
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            post(applyGeometry)
+        }
+
+        override fun dispatchDraw(canvas: Canvas) {
+            super.dispatchDraw(canvas)
+            val inset = dp(9).toFloat(); val length = dp(10).toFloat()
+            for (left in listOf(true, false)) for (top in listOf(true, false)) {
+                val x = if (left) inset else width - inset
+                val y = if (top) inset else height - inset
+                canvas.drawLine(x, y, x + if (left) length else -length, y, gripPaint)
+                canvas.drawLine(x, y, x, y + if (top) length else -length, gripPaint)
+            }
+        }
+
         override fun dispatchTouchEvent(event: MotionEvent): Boolean {
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 panelTouchActive = true
                 requestUnbufferedDispatch(event)
-                Log.i(LOG_TAG, "panel_touch_down")
+                resizing = (event.x < dp(28) || event.x > width - dp(28)) &&
+                    (event.y < dp(28) || event.y > height - dp(28))
+                if (resizing) {
+                    resizeLeft = event.x < width / 2; resizeTop = event.y < height / 2
+                    downX = event.rawX; downY = event.rawY; start = visibleRect()
+                }
             }
-            val handled = super.dispatchTouchEvent(event)
+            val handled = if (resizing) {
+                if (event.actionMasked == MotionEvent.ACTION_MOVE) rememberRect(OverlayGeometry.resize(start, resizeLeft, resizeTop,
+                    (event.rawX - downX).roundToInt(), (event.rawY - downY).roundToInt(), availableArea(), dp(240), dp(240)))
+                true
+            } else super.dispatchTouchEvent(event)
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
-                Log.i(LOG_TAG, if (event.actionMasked == MotionEvent.ACTION_UP) "panel_touch_up" else "panel_touch_cancel")
+                resizing = false
                 panelTouchActive = false
                 val pending = pendingPanelState
                 pendingPanelState = null
@@ -410,48 +368,22 @@ internal class TaskHudController(
             }
             return handled
         }
+
+        override fun onDetachedFromWindow() {
+            removeCallbacks(applyGeometry)
+            super.onDetachedFromWindow()
+        }
     }
-
-    private data class ActionCandidate(val node: SemanticNode, val action: ManualDeviceAction)
-
-    private data class CandidateKey(
-        val action: ManualDeviceAction,
-        val packageName: String?,
-        val resourceId: String?,
-        val text: String?,
-        val contentDescription: String?,
-        val role: String,
-        val bounds: ScreenBounds,
-    ) {
-        fun hasSameSemanticTarget(other: CandidateKey): Boolean =
-            action == other.action &&
-                packageName == other.packageName &&
-                resourceId == other.resourceId &&
-                text == other.text &&
-                contentDescription == other.contentDescription &&
-                role == other.role
-    }
-
-    private data class SelectionSignature(
-        val action: ManualDeviceAction,
-        val candidate: CandidateKey?,
-    )
 
     private data class PanelSignature(
         val expanded: Boolean,
         val status: ManualControlStatus,
         val targetPackage: String?,
-        val selection: SelectionSignature?,
-        val candidates: List<CandidateKey>,
-        val lastResultStatus: String?,
+        val selection: com.yukisoffd.lyracode.interaction.model.ManualActionSelection?,
+        val snapshotId: String?,
+        val chat: com.yukisoffd.lyracode.interaction.session.DeviceChatState,
+        val approval: com.yukisoffd.lyracode.interaction.session.DeviceApproval?,
     )
-
-    private class DragHandleView(context: Context) : TextView(context) {
-        override fun performClick(): Boolean {
-            super.performClick()
-            return true
-        }
-    }
 
     private class HighlightView(context: Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -474,7 +406,6 @@ internal class TaskHudController(
 
     private companion object {
         const val LOG_TAG = "LyraManualControl"
-        const val MAX_ACTIONS = 8
         const val HIGHLIGHT_WINDOW_ALPHA = 0.79f
     }
 }

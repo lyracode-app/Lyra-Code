@@ -3,9 +3,9 @@ package com.yukisoffd.lyracode.interaction.service
 /** Process-local bridge; the foreground overlay never keeps an AccessibilityService reference. */
 internal object ManualControlCommandBridge {
     @Volatile
-    private var confirmAction: (() -> Unit)? = null
+    private var confirmAction: ((String, String, String) -> Unit)? = null
 
-    fun attach(confirmAction: () -> Unit) {
+    fun attach(confirmAction: (String, String, String) -> Unit) {
         this.confirmAction = confirmAction
     }
 
@@ -13,7 +13,8 @@ internal object ManualControlCommandBridge {
         confirmAction = null
     }
 
-    fun requestConfirm() {
-        confirmAction?.invoke()
+    fun requestConfirm(snapshotId: String?, handle: String?, requestId: String?) {
+        if (snapshotId == null || handle == null || requestId == null) return
+        confirmAction?.invoke(snapshotId, handle, requestId)
     }
 }

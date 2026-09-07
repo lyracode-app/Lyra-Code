@@ -548,24 +548,6 @@ internal class AgentToolSchemaFactory(
         }
     }
 
-    private fun toGeminiSchema(source: JSONObject): JSONObject {
-        val output = JSONObject()
-        val type = source.optString("type").ifBlank { "object" }
-        output.put("type", type.uppercase(Locale.US))
-        source.stringFieldOrNull("description")?.let { output.put("description", it) }
-        source.optJSONArray("required")?.let { output.put("required", it) }
-        source.optJSONArray("enum")?.let { output.put("enum", it) }
-        source.optJSONObject("properties")?.let { props ->
-            val outProps = JSONObject()
-            props.keys().forEach { name ->
-                (props.optJSONObject(name) ?: JSONObject().put("type", "string")).let { outProps.put(name, toGeminiSchema(it)) }
-            }
-            output.put("properties", outProps)
-        }
-        source.optJSONObject("items")?.let { output.put("items", toGeminiSchema(it)) }
-        return output
-    }
-
     private fun function(name: String, description: String, vararg properties: Pair<String, String>): JSONObject {
         return functionWithOptional(name, description, required = properties.toList(), optional = emptyList())
     }
@@ -862,13 +844,6 @@ internal class AgentToolSchemaFactory(
     }
 
 
-    private fun JSONObject.stringFieldOrNull(name: String): String? {
-        if (!has(name) || isNull(name)) return null
-        val value = opt(name) ?: return null
-        val text = value as? String ?: return null
-        return text.takeUnless { it.equals("null", ignoreCase = true) }
-    }
-
     private companion object {
         const val AGENT_TAG = "LyraAgent"
         val JSON_SCHEMA_TYPES = setOf("string", "number", "integer", "boolean", "object", "array")
@@ -907,3 +882,21 @@ internal class AgentToolSchemaFactory(
             ("path" to "Android shared-storage path, for example Download/file.txt or /storage/emulated/0/Download/file.txt.")
     }}
 
+internal fun toGeminiSchema(source: JSONObject): JSONObject {
+    val output = JSONObject()
+    val type = source.optString("type").ifBlank { "object" }
+    output.put("type", type.uppercase(Locale.US))
+    (source.opt("description") as? String)?.takeUnless { it.equals("null", ignoreCase = true) }
+        ?.let { output.put("description", it) }
+    source.optJSONArray("required")?.let { output.put("required", it) }
+    source.optJSONArray("enum")?.let { output.put("enum", it) }
+    source.optJSONObject("properties")?.let { props ->
+        val outProps = JSONObject()
+        props.keys().forEach { name ->
+            (props.optJSONObject(name) ?: JSONObject().put("type", "string")).let { outProps.put(name, toGeminiSchema(it)) }
+        }
+        output.put("properties", outProps)
+    }
+    source.optJSONObject("items")?.let { output.put("items", toGeminiSchema(it)) }
+    return output
+}

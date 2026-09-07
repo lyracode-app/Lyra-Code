@@ -50,9 +50,25 @@ class ManualControlCommandService : Service() {
                     ?: return true
                 ManualControlController.select(handle, action)
             }
-            CONFIRM -> ManualControlCommandBridge.requestConfirm()
-            CLEAR_SELECTION -> ManualControlController.clearSelection()
+            CONFIRM -> ManualControlCommandBridge.requestConfirm(
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_SNAPSHOT_ID),
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_HANDLE),
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_REQUEST_ID),
+            )
+            CLEAR_SELECTION -> ManualControlController.rejectSelection(
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_SNAPSHOT_ID),
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_HANDLE),
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_REQUEST_ID),
+            )
             STOP -> ManualControlController.stop()
+            SUBMIT -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.submit(
+                applicationContext, message.data.getString(ManualControlOverlayProtocol.EXTRA_INPUT).orEmpty(),
+            )
+            APPROVAL -> com.yukisoffd.lyracode.interaction.session.DeviceApprovalBroker.respond(
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_REQUEST_ID).orEmpty(),
+                message.data.getString(ManualControlOverlayProtocol.EXTRA_INPUT) == "approve")
+            CLEAR_CONTEXT -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.clearContext()
+            PAUSE -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.pause()
             else -> return false
         }
         return true
@@ -63,6 +79,10 @@ class ManualControlCommandService : Service() {
         const val CONFIRM = 2
         const val CLEAR_SELECTION = 3
         const val STOP = 4
+        const val SUBMIT = 5
+        const val PAUSE = 6
+        const val APPROVAL = 7
+        const val CLEAR_CONTEXT = 8
         private const val COMMAND_THREAD_NAME = "lyra-control-command"
         private const val LOG_TAG = "LyraManualControl"
     }

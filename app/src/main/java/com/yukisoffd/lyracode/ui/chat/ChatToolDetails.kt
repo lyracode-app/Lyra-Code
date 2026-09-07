@@ -61,6 +61,7 @@ internal fun ToolResultContent(
     expanded: Boolean,
     onToggle: () -> Unit,
     compact: Boolean = false,
+    inlineDetails: Boolean = false,
 ) {
     val summary = if (toolName.isNotBlank()) {
         uiText(R.string.ui_tool_call) + " $toolName · " + uiText(R.string.ui_view_details)
@@ -68,7 +69,16 @@ internal fun ToolResultContent(
         uiText(R.string.ui_tool_call_2) + " · " + uiText(R.string.ui_view_details)
     }
     ToolCallSummaryButton(text = summary, compact = compact, onClick = onToggle)
-    if (expanded) {
+    if (expanded && inlineDetails) {
+        // Application overlays have no Activity token for the full-screen detail Dialog.
+        androidx.compose.foundation.text.selection.SelectionContainer {
+            Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                Text(content.ifBlank { uiText(R.string.label_empty_result) },
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    } else if (expanded) {
         ToolCallDetailPage(
             toolName = toolName,
             toolInput = toolInput.ifBlank { "{}" },

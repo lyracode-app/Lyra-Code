@@ -55,8 +55,9 @@
             android:stopWithTask="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-started, time-bounded, visible floating control session for testing semantic device interaction" />
+                android:value="User-started visible floating assistant session; stopped explicitly by the user" />
         </service>
+        <activity android:name=".interaction.pet.DesktopPetSettingsActivity" android:exported="false" android:process=":manual_control_overlay" />
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"

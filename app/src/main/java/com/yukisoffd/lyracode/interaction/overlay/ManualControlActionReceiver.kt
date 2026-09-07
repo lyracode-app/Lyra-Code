@@ -24,9 +24,25 @@ class ManualControlActionReceiver : BroadcastReceiver() {
                     ?: return
                 ManualControlController.select(handle, action)
             }
-            ManualControlOverlayProtocol.COMMAND_CONFIRM -> ManualControlCommandBridge.requestConfirm()
-            ManualControlOverlayProtocol.COMMAND_CLEAR_SELECTION -> ManualControlController.clearSelection()
+            ManualControlOverlayProtocol.COMMAND_CONFIRM -> ManualControlCommandBridge.requestConfirm(
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_SNAPSHOT_ID),
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_HANDLE),
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_REQUEST_ID),
+            )
+            ManualControlOverlayProtocol.COMMAND_CLEAR_SELECTION -> ManualControlController.rejectSelection(
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_SNAPSHOT_ID),
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_HANDLE),
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_REQUEST_ID),
+            )
             ManualControlOverlayProtocol.COMMAND_STOP -> ManualControlController.stop()
+            ManualControlOverlayProtocol.COMMAND_SUBMIT -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.submit(
+                context, intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_INPUT).orEmpty(),
+            )
+            ManualControlOverlayProtocol.COMMAND_APPROVAL -> com.yukisoffd.lyracode.interaction.session.DeviceApprovalBroker.respond(
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_REQUEST_ID).orEmpty(),
+                intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_INPUT) == "approve")
+            ManualControlOverlayProtocol.COMMAND_CLEAR_CONTEXT -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.clearContext()
+            ManualControlOverlayProtocol.COMMAND_PAUSE -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.pause()
             ManualControlOverlayProtocol.SERVICE_STATE -> {
                 if (intent.getBooleanExtra(ManualControlOverlayProtocol.EXTRA_RUNNING, false)) {
                     ManualControlForegroundConnection.markRunning()

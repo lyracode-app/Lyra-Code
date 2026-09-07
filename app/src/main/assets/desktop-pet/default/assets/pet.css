@@ -1,0 +1,6 @@
+
+:root{--fur:#70A4FF;--speed:1.5s}body{display:grid;place-items:center}svg{width:96%;height:96%;overflow:visible;filter:drop-shadow(0 2px 3px #0004);animation:breathe var(--speed) ease-in-out infinite}.fur{fill:var(--fur)}#mouth{transition:d .2s}#badge{fill:#a6e5c0}body[data-state=thinking] svg{animation:think var(--speed) ease-in-out infinite}body[data-state=executing] svg{animation:hop .4s infinite alternate}body[data-state=approval] #badge{fill:#ffd580}body[data-state=error] #badge{fill:#ffb4ab}body[data-docked=true] #eyes{transform:scaleY(.35);transform-origin:50% 50%}.tap{animation:hop .2s 3!important}.eat{animation:eat .8s!important}@keyframes breathe{50%{transform:translateY(-3px)}}@keyframes think{50%{transform:rotate(8deg)}}@keyframes hop{to{transform:translateY(-6px) scale(1.06,.94)}}@keyframes eat{50%{transform:scale(1.3) rotate(-12deg)}}
+
+#pet-root{display:grid;place-items:center;position:relative}
+@keyframes sway{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+.bubble{position:absolute;bottom:0;left:3%;right:3%;border-radius:8px;background:#fff;color:#16253d;font:12px sans-serif;text-align:center;max-height:40%;overflow:hidden;overflow-wrap:anywhere;box-shadow:0 1px 3px #0004}

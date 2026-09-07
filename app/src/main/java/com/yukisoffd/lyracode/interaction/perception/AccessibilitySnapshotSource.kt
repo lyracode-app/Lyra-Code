@@ -202,7 +202,9 @@ internal class AccessibilitySnapshotSource(
             val handle = "$snapshotId:w$windowId:n${destination.size}"
             if (rootHandle == null) rootHandle = handle
             val password = safeBoolean { node.isPassword }
-            val dataSensitive = safeBoolean { node.isAccessibilityDataSensitive }
+            val dataSensitive = safeBoolean { node.isAccessibilityDataSensitive } ||
+                (node.isEditable && com.yukisoffd.lyracode.interaction.policy.TextInputPolicy.isSensitive(node.inputType,
+                    node.hintText?.toString(), node.contentDescription?.toString(), node.viewIdResourceName?.substringAfterLast('/')))
             val packageName = textBudget.take(safeString(node.packageName))
             val redacted = redactWindowText || password || dataSensitive || packageName in REDACTED_WINDOW_PACKAGES
             val text = if (redacted) textBudget.redacted() else textBudget.take(node.text)
@@ -235,6 +237,10 @@ internal class AccessibilitySnapshotSource(
                 password = password,
                 accessibilityDataSensitive = dataSensitive,
                 redacted = redacted,
+                hintText = if (redacted) null else textBudget.take(node.hintText),
+                inputType = node.inputType,
+                textFingerprint = if (!redacted && node.isEditable)
+                    com.yukisoffd.lyracode.interaction.policy.TextInputPolicy.fingerprint(node.text) else null,
             )
 
             if (frame.depth == MAX_TREE_DEPTH && node.childCount > 0) {

@@ -2096,14 +2096,14 @@ Revocation stops new access through that permission but does not automatically e
     <string name="accessibility_service_description">When explicitly enabled, this experimental service can inspect interface content and perform actions for user-started device tasks. It does not bypass protected or secure screens.</string>
     <string name="detail_manual_control">Floating control</string>
     <string name="device_interaction_open_manual_control">Open floating control test</string>
-    <string name="manual_control_title">Semantic floating control</string>
-    <string name="manual_control_instructions">Start a two-minute session, switch to another app, then select one safe action from Lyra’s floating panel. The selected node is highlighted and requires a second confirmation.</string>
+    <string name="manual_control_title">Device Agent chat</string>
+    <string name="manual_control_instructions">Start a session, open the target app, then describe your task in the floating chat. Redacted screen text is sent to your selected model. Each click, scroll, or text replacement requires confirmation.</string>
     <string name="manual_control_service_required">Connect the accessibility service before starting.</string>
     <string name="manual_control_idle">Control session is not running.</string>
-    <string name="manual_control_active">Control session active · %1$d s remaining · %2$s</string>
-    <string name="manual_control_start">Start 2 minutes</string>
+    <string name="manual_control_active">Control session active · %1$s</string>
+    <string name="manual_control_start">Start session</string>
     <string name="manual_control_stop">Stop</string>
-    <string name="manual_control_scope_notice">This round supports only click and forward/backward scroll actions advertised by the target node. It does not use arbitrary coordinates, enter text, or perform high-risk controls.</string>
+    <string name="manual_control_scope_notice">Supports multi-app tasks, UI trees, vision screenshots, workspace tools and guarded Shell/Root. Deletion and uninstall require two confirmations. Passwords, verification codes and financial actions remain blocked. Stop at any time.</string>
     <string name="manual_control_overlay_title">Lyra control · drag / tap to fold</string>
     <string name="manual_control_overlay_status">%1$s · %2$s</string>
     <string name="manual_control_waiting_target">waiting for an external app</string>
@@ -2131,7 +2131,7 @@ Revocation stops new access through that permission but does not automatically e
     <string name="manual_control_notification_required">Allow notifications so the foreground control service remains visible while Lyra is in the background.</string>
     <string name="manual_control_foreground_starting">Starting the foreground control service…</string>
     <string name="manual_control_notification_channel">Floating control session</string>
-    <string name="manual_control_notification_title">Lyra floating control is active</string>
+    <string name="manual_control_notification_title">Lyra device chat is active</string>
     <string name="manual_control_notification_text">Keeping the user-started control session responsive in the background.</string>
     <string name="manual_control_notification_stop">Stop</string>
 </resources>

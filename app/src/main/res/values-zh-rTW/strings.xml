@@ -2178,14 +2178,14 @@ Shizuku 與 Root：不屬於普通執行時許可權，由使用者在“系統�
     <string name="accessibility_service_description">明確啟用後，此實驗服務可為使用者主動發起的裝置任務讀取介面內容並執行操作；不會繞過受保護頁面或安全視窗。</string>
     <string name="detail_manual_control">懸浮控制</string>
     <string name="device_interaction_open_manual_control">開啟懸浮控制測試</string>
-    <string name="manual_control_title">語意懸浮控制</string>
-    <string name="manual_control_instructions">啟動兩分鐘工作階段後切換到其他應用程式，在 Lyra 懸浮面板中選擇一項安全操作。目標節點會先醒目顯示，並要求再次確認。</string>
+    <string name="manual_control_title">裝置 Agent 懸浮對話</string>
+    <string name="manual_control_instructions">啟動工作階段後手動開啟目標應用程式，在懸浮對話中描述任務。去識別化介面文字會傳送至目前所選模型；點擊、捲動和填寫文字均需逐次確認。可隨時暫停或停止。</string>
     <string name="manual_control_service_required">請先連接無障礙服務。</string>
     <string name="manual_control_idle">控制工作階段未執行。</string>
-    <string name="manual_control_active">控制工作階段執行中 · 剩餘 %1$d 秒 · %2$s</string>
-    <string name="manual_control_start">啟動 2 分鐘</string>
+    <string name="manual_control_active">控制工作階段執行中 · %1$s</string>
+    <string name="manual_control_start">啟動工作階段</string>
     <string name="manual_control_stop">停止</string>
-    <string name="manual_control_scope_notice">本輪僅支援目標節點宣告的點擊及前後捲動操作；不使用任意座標、不輸入文字，也不會執行高風險控制項。</string>
+    <string name="manual_control_scope_notice">支援跨應用任務、UI 樹、視覺模型截圖識別、工作區工具及受控 Shell/Root。刪除、解除安裝需二次確認。密碼、驗證碼與財產安全操作仍禁止；可隨時停止。</string>
     <string name="manual_control_overlay_title">Lyra 控制 · 拖曳 / 點擊摺疊</string>
     <string name="manual_control_overlay_status">%1$s · %2$s</string>
     <string name="manual_control_waiting_target">等待切換到外部應用程式</string>
@@ -2213,7 +2213,7 @@ Shizuku 與 Root：不屬於普通執行時許可權，由使用者在“系統�
     <string name="manual_control_notification_required">請允許通知，以便 Lyra 進入背景後前景控制服務仍保持可見。</string>
     <string name="manual_control_foreground_starting">正在啟動前景控制服務…</string>
     <string name="manual_control_notification_channel">懸浮控制工作階段</string>
-    <string name="manual_control_notification_title">Lyra 懸浮控制正在執行</string>
+    <string name="manual_control_notification_title">Lyra 裝置懸浮對話正在執行</string>
     <string name="manual_control_notification_text">正在維持使用者主動啟動的背景控制工作階段回應。</string>
     <string name="manual_control_notification_stop">停止</string>
 </resources>

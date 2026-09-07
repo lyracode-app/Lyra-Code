@@ -1,0 +1,17 @@
+# Lyra scalar TOML profile; structured data belongs in data/*.json.
+[pet]
+size = 72
+autoDock = true
+dockDelayMs = 3500
+dockFraction = 0.5
+dockOpacity = 0.42
+activeOpacity = 1.0
+soundEnabled = false
+volume = 0.5
+
+[controls]
+color = "#70A4FF"
+speed = 1.5
+roam = false
+greeting = "你好！"
+motion = "呼吸"

@@ -31,6 +31,7 @@ internal object ScreenSnapshotFingerprint {
                 append(node.bounds.asCanonicalString()).append('|')
                 append(node.actions.sortedBy { it.name }.joinToString(",") { it.name }).append('|')
                 append(node.enabled).append('|').append(node.visible).append('|').append(node.editable).append('|')
+                append(node.hintText).append('|').append(node.inputType).append('|').append(node.textFingerprint).append('|')
                 append(node.clickable).append('|').append(node.longClickable).append('|')
                 append(node.scrollable).append('|').append(node.focusable).append('|')
                 append(node.checkable).append('|').append(node.checked).append('|').append(node.selected).append('|')

@@ -39,7 +39,6 @@ import com.yukisoffd.lyracode.interaction.overlay.OverlayPermission
 import com.yukisoffd.lyracode.interaction.perception.ScreenProbeController
 import com.yukisoffd.lyracode.interaction.session.ManualControlController
 import kotlinx.coroutines.delay
-import kotlin.math.ceil
 
 @Composable
 internal fun ManualControlDebugScreen(settings: AppSettings) {
@@ -60,16 +59,13 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
     }
 
     LaunchedEffect(state.activeUntilEpochMillis) {
-        while (state.activeUntilEpochMillis > nowEpochMillis) {
+        while (state.activeUntilEpochMillis != Long.MAX_VALUE && state.activeUntilEpochMillis > nowEpochMillis) {
             delay(1_000L)
             nowEpochMillis = System.currentTimeMillis()
         }
     }
 
     val active = state.isActive(nowEpochMillis)
-    val remainingSeconds = ceil(
-        (state.activeUntilEpochMillis - nowEpochMillis).coerceAtLeast(0L) / 1_000.0,
-    ).toInt()
     val overlayGranted = remember(permissionRevision) { OverlayPermission.isGranted(context) }
     val notificationGranted = remember(permissionRevision) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -81,6 +77,10 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
         nowEpochMillis = System.currentTimeMillis()
         ScreenProbeController.stop()
         ManualControlController.start(nowEpochMillis)
+        val profile = settings.selectedProfile()
+        ManualControlController.updateChat(
+            com.yukisoffd.lyracode.interaction.session.DeviceChatState(providerLabel = "${profile.name} · ${profile.selectedModel}"),
+        )
         if (!ManualControlForegroundService.start(context.applicationContext)) {
             ManualControlController.stop()
         }
@@ -108,7 +108,6 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
                     context.getString(R.string.manual_control_foreground_starting)
                 active -> context.getString(
                     R.string.manual_control_active,
-                    remainingSeconds,
                     state.status.name,
                 )
                 else -> context.getString(R.string.manual_control_idle)
@@ -141,6 +140,8 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
                 Text(context.getString(R.string.manual_control_stop))
             }
         }
+        OutlinedButton(onClick = { context.startActivity(android.content.Intent(context,
+            com.yukisoffd.lyracode.interaction.pet.DesktopPetSettingsActivity::class.java)) }) { Text("桌宠与截图设置") }
         state.lastResult?.let { result ->
             Text(
                 context.getString(R.string.manual_control_last_result, result.status.name),
