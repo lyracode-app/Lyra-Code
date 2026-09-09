@@ -1538,7 +1538,7 @@
     <string name="compliance_documents">協議與清單</string>
     <string name="compliance_index_intro">以下文件結合當前版本的實際功能編寫，可離線檢視。外部模型、伺服器和網站由使用者自行選擇，其規則可能另行適用。</string>
     <string name="compliance_review_notice">說明：這些文件用於如實說明當前版本的資料處理和許可權用途，不代表已經自動滿足任何應用市場或地區的全部稽核要求。功能或資料處理方式變化時應同步更新。</string>
-    <string name="compliance_effective_date">生效及更新日期：2026 年 7 月 19 日</string>
+    <string name="compliance_effective_date">生效及更新日期：2026 年 9 月 9 日</string>
     <string name="compliance_user_agreement">使用者協議</string>
     <string name="compliance_user_agreement_desc">使用規則、風險與責任邊界</string>
     <string name="compliance_privacy_policy">隱私政策</string>
@@ -1649,7 +1649,7 @@ API Key、密碼、私鑰和遠端服務費用由使用者自行管理。請勿�
 方式與時機：使用相關功能時生成。
 儲存與去向：預設本地；使用者選擇 WebDAV 備份時傳送至指定伺服器，可在設定中清理或刪除。</string>
     <string name="compliance_personal_not_collected_title">當前版本不主動收集</string>
-    <string name="compliance_personal_not_collected_body">應用不要求手機號、真實姓名、身份證件、通訊錄、簡訊、通話記錄、支付銀行卡、人臉或指紋模板，也不讀取廣告識別符號用於畫像。使用者在對話、檔案或第三方服務中自行輸入上述資訊的，不屬於應用基本功能所必需，請謹慎提交。</string>
+    <string name="compliance_personal_not_collected_body">應用不要求手機號、真實姓名、身份證件、通訊錄、簡訊、通話記錄、支付銀行卡、人臉或指紋模板，也不讀取廣告識別符號用於畫像。使用者在對話、檔案或第三方服務中自行輸入上述資訊的，不屬於應用基本功能所必需，請謹慎提交。\n\n啟用裝置任務時，使用者主動顯示的其他應用程式頁面或確認上傳的截圖亦可能包含這些資訊，處理範圍另見螢幕互動條款；請避免顯示無關敏感內容。</string>
 
     <string name="compliance_third_party_summary">當前版本未內建廣告、行為分析或第三方崩潰統計 SDK。開源 UI、網路、播放器、編輯器和加密庫在應用程序內提供功能，不因被整合而獨立向其作者上傳個人資訊。以下外部接收方僅在對應功能觸發時出現。</string>
     <string name="compliance_third_sdk_title">本地開源元件</string>
@@ -2216,6 +2216,56 @@ Shizuku 與 Root：不屬於普通執行時許可權，由使用者在“系統�
     <string name="manual_control_notification_title">Lyra 裝置懸浮對話正在執行</string>
     <string name="manual_control_notification_text">正在維持使用者主動啟動的背景控制工作階段回應。</string>
     <string name="manual_control_notification_stop">停止</string>
+
+    <string name="pet_settings_entry">桌寵與截圖設定</string>
+    <string name="pet_settings_title">桌寵與懸浮對話</string>
+    <string name="pet_available_count">%1$d 個可用樣式</string>
+    <string name="pet_usage_hint">長按開啟設定，拖曳移動。吸邊後點一下喚醒，再次點擊開關對話。</string>
+    <string name="pet_switch">切換桌寵</string>
+    <string name="pet_import">匯入寵物包</string>
+    <string name="pet_export">匯出目前桌寵</string>
+    <string name="pet_appearance">外觀與位置</string>
+    <string name="pet_size">桌寵大小</string>
+    <string name="pet_auto_dock">自動吸附側邊</string>
+    <string name="pet_auto_dock_hint">閒置時移到螢幕邊緣，減少遮擋</string>
+    <string name="pet_dock_delay">吸邊等待</string>
+    <string name="pet_seconds">%1$s 秒</string>
+    <string name="pet_hide_fraction">側邊隱藏比例</string>
+    <string name="pet_dock_opacity">側邊不透明度</string>
+    <string name="pet_active_opacity">展開不透明度</string>
+    <string name="pet_customization">桌寵個人化</string>
+    <string name="pet_sound">聲音</string>
+    <string name="pet_sound_allow">允許桌寵播放聲音</string>
+    <string name="pet_sound_hint">切換聲音會重新載入目前桌寵</string>
+    <string name="pet_volume">音量</string>
+    <string name="pet_vision">截圖與模型</string>
+    <string name="pet_vision_supported">目前模型支援圖片</string>
+    <string name="pet_vision_hint">自訂模型可手動開啟；修改後對新任務生效</string>
+    <string name="pet_vision_detail">已設定視覺補充模型時優先使用該模型；截圖上傳前會確認。</string>
+    <string name="pet_library_hint">支援 ZIP 寵物包及舊 JSON。匯入後保留已有樣式，可隨時切換；每個樣式分別記住個人化設定。</string>
+    <string name="pet_choose">選擇桌寵</string>
+    <string name="pet_remove_named">移除 %1$s</string>
+    <string name="pet_remove_title">移除桌寵？</string>
+    <string name="pet_remove_body">將從本機桌寵庫移除「%1$s」。原始 ZIP 檔案不會被刪除。</string>
+    <string name="pet_remove">移除</string>
+    <string name="pet_switch_failed">切換失敗，請檢查寵物包是否仍可用。</string>
+    <string name="pet_remove_failed">移除失敗，請稍後重試。</string>
+    <string name="pet_imported">已加入桌寵庫並切換</string>
+    <string name="pet_exported">寵物包已匯出</string>
+    <string name="pet_operation_failed">操作失敗，請檢查寵物包格式、檔案存取權限及可用空間。</string>
+
+    <string name="compliance_user_device_title">裝置互動與桌寵功能</string>
+    <string name="compliance_user_device_body">使用者開啟裝置互動實驗、系統無障礙服務及懸浮視窗權限並主動開始任務後，可透過懸浮對話跨應用程式觀察、點擊、捲動及填寫一般文字。安全動作可自動執行，切換應用程式不會自動結束任務；使用者可暫停、清除上下文或透過通知停止工作階段。傳送、發布等對外操作需要確認，刪除和解除安裝等操作保留二次確認；密碼、驗證碼及財產交易等受保護操作仍禁止自動執行。辨識或攔截可能出錯，禁止原因會傳回對話。Shell/Root 等工具仍受自身授權及執行規則約束，授予無障礙或懸浮視窗權限不等於授予 Root。</string>
+    <string name="compliance_privacy_device_title">螢幕資訊與裝置任務</string>
+    <string name="compliance_privacy_device_body">無障礙服務僅在裝置互動實驗開啟且使用者啟動觀察或任務工作階段時，按需處理前景應用程式套件名稱、視窗、控制項文字、描述、位置及狀態，用於頁面辨識及動作驗證。已辨識的密碼、驗證碼及受保護節點會被遮蔽或拒絕操作；請勿在任務期間顯示無關敏感內容。文字 UI 樹及工具結果可能隨任務上下文傳送至使用者設定的模型服務。使用者呼叫截圖工具時會取得螢幕影像，上傳前確認後傳送至使用者設定的視覺補充模型或支援圖片的目前模型；截圖可能包含其他應用程式的個人資訊。系統保護頁面或安全視窗不支援讀取時會傳回失敗。螢幕對話採用臨時工作階段，寵物包及個人化設定儲存在本機；使用者匯出、工具產物及臨時快取依各自儲存規則管理。</string>
+    <string name="compliance_personal_screen_title">螢幕互動資訊與桌寵設定（選用）</string>
+    <string name="compliance_personal_screen_body">內容：前景應用程式套件名稱、控制項文字與描述、視窗及位置、動作參數與結果、經使用者確認上傳的截圖、寵物包及偏好。目的：裝置任務、驗證操作、視覺辨識及桌寵顯示。觸發：使用者啟用對應能力並發起觀察或任務。去向：頁面資訊及工具結果按需加入所選模型請求；截圖上傳前確認。桌寵僅取得執行狀態、目前套件名稱、互動事件及設定，不取得聊天正文、UI 樹、截圖、金鑰或審批權杖。使用者可停止任務、撤銷系統權限、移除桌寵或清除應用程式資料；已傳送至第三方的資訊依對方政策處理。</string>
+    <string name="compliance_third_pets_title">匯入的寵物包</string>
+    <string name="compliance_third_pets_body">寵物包由使用者選取匯入，其 JavaScript、圖片及音訊由本機 WebView 執行。宿主禁止寵物包直接存取網路、任意本機檔案、系統權限及工具執行介面；僅透過受限事件橋接請求移動、設定等互動。解除安裝請求仍交由 Agent 及兩次使用者確認執行。套件作者不會因使用者匯入或執行桌寵就自動收到資料；使用者下載或分享套件時，下載網站及分享平台依各自政策處理資訊。請遵守套件內授權條款，只匯入信任的資源，異常時切換或移除。</string>
+    <string name="compliance_permission_overlay_title">懸浮顯示與前景工作階段</string>
+    <string name="compliance_permission_overlay_body">SYSTEM_ALERT_WINDOW 用於在其他應用程式上方顯示桌寵、懸浮對話及操作提示，不會單獨授予讀取螢幕或執行操作的能力。使用者可在系統設定中授權或撤銷。執行中的可見裝置工作階段使用前景服務及通知（包括 FOREGROUND_SERVICE_SPECIAL_USE），以維持使用者發起的任務並提供停止入口；通知權限用於顯示提示。關閉工作階段或撤銷相關權限會影響懸浮功能，不影響無需這些權限的一般對話。</string>
+    <string name="compliance_permission_accessibility_title">無障礙服務與按需截圖</string>
+    <string name="compliance_permission_accessibility_body">BIND_ACCESSIBILITY_SERVICE 由 Android 系統繫結已獲使用者啟用的服務，不是一般執行階段授權彈窗。用途是在使用者啟動的觀察或裝置任務中讀取介面結構並執行受控點擊、捲動、文字填寫等動作；具備截圖能力的系統版本亦用於使用者呼叫的螢幕截圖。UI 樹及工具結果可能傳送至使用者設定的模型，截圖上傳另需確認。不會僅因開啟系統服務就在非活動工作階段持續擷取螢幕，也不會繞過系統保護視窗。入口：設定 → 應用程式權限或裝置互動 → 無障礙設定；可隨時在 Android 無障礙設定關閉服務。</string>
 </resources>
 
 

@@ -255,7 +255,7 @@ private fun ObserveAccessibilitySetting(context: Context, onChanged: () -> Unit)
     }
 }
 
-private fun openAccessibilitySettings(context: Context) {
+internal fun openAccessibilitySettings(context: Context) {
     runCatching {
         context.startActivity(
             Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)

@@ -1455,7 +1455,7 @@
     <string name="compliance_documents">Agreements and lists</string>
     <string name="compliance_index_intro">These documents describe the current version and are available offline. Services, servers, and websites selected by you may apply their own terms.</string>
     <string name="compliance_review_notice">These documents disclose current behavior but do not by themselves guarantee compliance with every store or jurisdiction. Update them whenever features or data practices change.</string>
-    <string name="compliance_effective_date">Effective and updated: July 19, 2026</string>
+    <string name="compliance_effective_date">Effective and updated: September 9, 2026</string>
     <string name="compliance_user_agreement">User Agreement</string>
     <string name="compliance_user_agreement_desc">Usage rules, risks, and responsibilities</string>
     <string name="compliance_privacy_policy">Privacy Policy</string>
@@ -1566,7 +1566,7 @@ Purpose: restore chats, audit operations, performance, and migration.
 Timing: while using those features.
 Storage/recipient: local by default; WebDAV backups go only to your selected server.</string>
     <string name="compliance_personal_not_collected_title">Not actively required by this version</string>
-    <string name="compliance_personal_not_collected_body">The app does not require a phone number, legal name, identity document, contacts, SMS, call logs, payment card, face/fingerprint template, or advertising identifier for profiling. Avoid entering such data into chats, files, or external services unless truly necessary.</string>
+    <string name="compliance_personal_not_collected_body">The app does not require a phone number, legal name, identity document, contacts, SMS, call logs, payment card, face/fingerprint template, or advertising identifier for profiling. Avoid entering such data into chats, files, or external services unless truly necessary.\n\nDuring device tasks, pages users open in other apps or screenshots they approve for upload may also contain such information. See the screen interaction section for handling details and avoid exposing unrelated sensitive content.</string>
 
     <string name="compliance_third_party_summary">The current version has no advertising, behavioral analytics, or third-party crash-reporting SDK. Open-source UI, networking, player, editor, and encryption libraries run in the app and do not independently upload personal data merely because they are included.</string>
     <string name="compliance_third_sdk_title">Local open-source components</string>
@@ -2134,4 +2134,54 @@ Revocation stops new access through that permission but does not automatically e
     <string name="manual_control_notification_title">Lyra device chat is active</string>
     <string name="manual_control_notification_text">Keeping the user-started control session responsive in the background.</string>
     <string name="manual_control_notification_stop">Stop</string>
+
+    <string name="pet_settings_entry">Pet and screenshot settings</string>
+    <string name="pet_settings_title">Pet and floating chat</string>
+    <string name="pet_available_count">Available styles: %1$d</string>
+    <string name="pet_usage_hint">Long-press for settings and drag to move. Tap a docked pet to reveal it; tap again to toggle chat.</string>
+    <string name="pet_switch">Switch pet</string>
+    <string name="pet_import">Import pet</string>
+    <string name="pet_export">Export pet</string>
+    <string name="pet_appearance">Appearance and position</string>
+    <string name="pet_size">Pet size</string>
+    <string name="pet_auto_dock">Dock automatically</string>
+    <string name="pet_auto_dock_hint">Move to the screen edge when idle to keep the screen clear.</string>
+    <string name="pet_dock_delay">Dock delay</string>
+    <string name="pet_seconds">%1$s s</string>
+    <string name="pet_hide_fraction">Hidden at the edge</string>
+    <string name="pet_dock_opacity">Docked opacity</string>
+    <string name="pet_active_opacity">Revealed opacity</string>
+    <string name="pet_customization">Pet customization</string>
+    <string name="pet_sound">Sound</string>
+    <string name="pet_sound_allow">Allow pet audio</string>
+    <string name="pet_sound_hint">Changing this reloads the current pet.</string>
+    <string name="pet_volume">Volume</string>
+    <string name="pet_vision">Screenshots and models</string>
+    <string name="pet_vision_supported">Current model supports images</string>
+    <string name="pet_vision_hint">Enable manually for custom models. Applies to new tasks.</string>
+    <string name="pet_vision_detail">A configured supplementary vision model takes priority. Screenshot uploads require confirmation.</string>
+    <string name="pet_library_hint">Supports ZIP packages and legacy JSON. Imported styles stay in your library, each with its own customization settings.</string>
+    <string name="pet_choose">Choose a pet</string>
+    <string name="pet_remove_named">Remove %1$s</string>
+    <string name="pet_remove_title">Remove pet?</string>
+    <string name="pet_remove_body">Remove %1$s from this device’s pet library? The original ZIP file will be kept.</string>
+    <string name="pet_remove">Remove</string>
+    <string name="pet_switch_failed">Unable to switch. Check that the pet package is still available.</string>
+    <string name="pet_remove_failed">Unable to remove the pet. Try again.</string>
+    <string name="pet_imported">Added to the library and selected</string>
+    <string name="pet_exported">Pet package exported</string>
+    <string name="pet_operation_failed">Operation failed. Check the package format, file access, and available storage.</string>
+
+    <string name="compliance_user_device_title">Device interaction and pets</string>
+    <string name="compliance_user_device_body">After enabling the device interaction experiment, the system accessibility service and overlay permission, users can start a floating-chat task to observe, click, scroll and enter ordinary text across apps. Safe actions may run automatically; switching apps does not end the task. Users can pause, clear context or stop the session from its notification. Sending or publishing requires confirmation; deletion and uninstallation retain two confirmations. Protected actions involving passwords, verification codes or financial transactions remain blocked from automatic execution. Detection can be mistaken; blocked actions return a reason to the conversation. Shell/Root tools retain their own authorization and execution rules. Accessibility or overlay permission does not grant Root.</string>
+    <string name="compliance_privacy_device_title">Screen information and device tasks</string>
+    <string name="compliance_privacy_device_body">Only while the device interaction experiment and a user-started observation or task session are active does the accessibility service process foreground package names, windows, control text, descriptions, bounds and states for page understanding and action verification. Recognized passwords, verification codes and protected nodes are masked or blocked; avoid exposing unrelated sensitive information during tasks. Text UI trees and tool results may be included in requests to user-configured model services. The screenshot tool captures the display; uploads require confirmation and go to the configured supplementary vision model or image-capable current model. Screenshots may contain personal information from other apps. Unreadable protected pages or secure windows return a failure. Screen conversations are temporary sessions. Pet packages and customization are stored locally; exports, tool outputs and temporary caches follow their respective storage rules.</string>
+    <string name="compliance_personal_screen_title">Screen interaction and pet settings (optional)</string>
+    <string name="compliance_personal_screen_body">Data: foreground package names, control text and descriptions, windows and bounds, action parameters and results, screenshots approved for upload, pet packages and preferences. Purposes: device tasks, action verification, vision and pet display. Trigger: users enable the relevant capabilities and start observation or a task. Destinations: page information and tool results may enter selected model requests; screenshot uploads require confirmation. Pets receive only runtime state, current package name, interaction events and configuration, not chat bodies, UI trees, screenshots, keys or approval tokens. Users can stop tasks, revoke system permissions, remove pets or clear app data. Information already sent to third parties is governed by their policies.</string>
+    <string name="compliance_third_pets_title">Imported pet packages</string>
+    <string name="compliance_third_pets_body">Users choose which pet packages to import. Their JavaScript, images and audio run in a local WebView. The host blocks direct network access, arbitrary local files, system permissions and tool execution; a limited event bridge permits requests such as movement and settings. Uninstallation requests still go through the Agent and two user confirmations. Importing or running a pet does not automatically send data to its author. Download and sharing platforms handle information under their own policies. Respect package licenses, import trusted resources, and switch or remove malfunctioning pets.</string>
+    <string name="compliance_permission_overlay_title">Overlay display and foreground sessions</string>
+    <string name="compliance_permission_overlay_body">SYSTEM_ALERT_WINDOW displays pets, floating chat and action hints above other apps. It does not itself grant screen reading or action execution. Users grant or revoke it in system settings. Visible device sessions use a foreground service and notification, including FOREGROUND_SERVICE_SPECIAL_USE, to maintain user-started tasks and provide a stop action. Notification permission enables notices. Stopping sessions or revoking related permissions affects floating features, not ordinary chat that does not need them.</string>
+    <string name="compliance_permission_accessibility_title">Accessibility service and on-demand screenshots</string>
+    <string name="compliance_permission_accessibility_body">Android uses BIND_ACCESSIBILITY_SERVICE to bind a service that the user has enabled; it is not a regular runtime permission dialog. It reads UI structure and performs controlled clicks, scrolling and text entry during user-started observation or device tasks. Supported system versions also provide on-demand screenshots. UI trees and tool results may go to configured models; screenshot uploads require separate confirmation. Merely enabling the service does not continuously collect screens outside an active session or bypass protected windows. Open accessibility settings from App permissions or Device interaction, and disable the service at any time in Android accessibility settings.</string>
 </resources>

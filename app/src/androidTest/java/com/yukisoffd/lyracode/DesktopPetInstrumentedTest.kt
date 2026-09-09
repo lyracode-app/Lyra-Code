@@ -19,6 +19,10 @@ class DesktopPetInstrumentedTest {
     @Test fun defaultScriptDocksHalfOffscreenThenRevealsBeforeOpeningChat() {
         val context = instrumentation.targetContext
         val originalOptions = DevicePetStore.options(context)
+        val originalKey = DevicePetStore.activeKey(context)
+        DevicePetStore.select(context, "builtin")
+        val originalBuiltinOptions = DevicePetStore.options(context)
+        DevicePetStore.saveOptions(context, org.json.JSONObject().put("size", 72))
         var toggles = 0
         lateinit var pet: DesktopPetWindow
         lateinit var web: WebView
@@ -38,7 +42,7 @@ class DesktopPetInstrumentedTest {
                 assertEquals(-params.width / 2, params.x)
             }
             val newSize = (originalOptions.optInt("size", 72) + 10).coerceIn(40, 180)
-            DevicePetStore.saveOptions(context, org.json.JSONObject(originalOptions.toString()).put("size", newSize))
+            DevicePetStore.saveOptions(context, org.json.JSONObject().put("size", newSize))
             SystemClock.sleep(1300)
             instrumentation.runOnMainSync {
                 val params = web.layoutParams as WindowManager.LayoutParams
@@ -57,7 +61,7 @@ class DesktopPetInstrumentedTest {
             instrumentation.runOnMainSync { assertEquals(1, toggles) }
             tap(web)
             instrumentation.runOnMainSync { assertEquals(2, toggles) }
-        } finally { instrumentation.runOnMainSync { pet.destroy() }; DevicePetStore.saveOptions(context, originalOptions) }
+        } finally { instrumentation.runOnMainSync { pet.destroy() }; DevicePetStore.saveOptions(context, originalBuiltinOptions); DevicePetStore.select(context, originalKey); DevicePetStore.saveOptions(context, originalOptions) }
     }
     @Test fun approvalStageSurvivesPrivateIpcAndDefaultPackageDeclaresControls() {
         val original = ManualControlState(activeUntilEpochMillis = Long.MAX_VALUE, sessionId = 123,

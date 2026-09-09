@@ -34,8 +34,8 @@ class PetPackageInstrumentedTest {
     @Test fun zipModulesDataAndAllThreeAnimationFormatsPlayInRealOverlay() {
         assertTrue("Real animation sampling requires an awake device", context.getSystemService(android.os.PowerManager::class.java).isInteractive)
         assertFalse("Unlock the device before sampling the overlay", context.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked)
-        val backup = ByteArrayOutputStream().also { DevicePetStore.exportZip(context, it) }.toByteArray()
-        val wasDefault = !java.io.File(context.filesDir, "desktop-pet-active.json").exists() && !DevicePetStore.packageFile(context).exists()
+        val originalKey = DevicePetStore.activeKey(context)
+        val originalKeys = DevicePetStore.catalog(context).map { it.key }.toSet()
         val options = DevicePetStore.options(context)
         var pet: DesktopPetWindow? = null
         try {
@@ -94,7 +94,8 @@ class PetPackageInstrumentedTest {
             assertEquals(before, DevicePetStore.load(context).toString())
         } finally {
             instrumentation.runOnMainSync { pet?.destroy() }
-            if (wasDefault) DevicePetStore.reset(context) else DevicePetStore.installZip(context, backup.inputStream())
+            DevicePetStore.select(context, originalKey)
+            DevicePetStore.catalog(context).filter { it.key !in originalKeys }.forEach { DevicePetStore.remove(context, it.key) }
             DevicePetStore.saveOptions(context, options)
         }
     }

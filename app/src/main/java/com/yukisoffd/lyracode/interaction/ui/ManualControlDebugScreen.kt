@@ -141,7 +141,7 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
             }
         }
         OutlinedButton(onClick = { context.startActivity(android.content.Intent(context,
-            com.yukisoffd.lyracode.interaction.pet.DesktopPetSettingsActivity::class.java)) }) { Text("桌宠与截图设置") }
+            com.yukisoffd.lyracode.interaction.pet.DesktopPetSettingsActivity::class.java)) }) { Text(context.getString(R.string.pet_settings_entry)) }
         state.lastResult?.let { result ->
             Text(
                 context.getString(R.string.manual_control_last_result, result.status.name),

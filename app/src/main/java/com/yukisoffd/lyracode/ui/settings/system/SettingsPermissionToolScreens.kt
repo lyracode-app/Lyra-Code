@@ -229,6 +229,14 @@ private const val SHIZUKU_PERMISSION_REQUEST_CODE = 2300
 internal fun PermissionSettings(termuxExecutor: TermuxExecutor) {
     val context = LocalContext.current
     var revision by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) revision++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val permissions = remember(context, termuxExecutor, revision) {
         appPermissionRows(context, termuxExecutor)
     }
@@ -242,7 +250,11 @@ internal fun PermissionSettings(termuxExecutor: TermuxExecutor) {
                 row.status
             }
             KimiMenuRow(row.icon, row.title, displayStatus) {
-                if (row.title == uiText(R.string.permission_termux)) {
+                if (row.target == "overlay") {
+                    com.yukisoffd.lyracode.interaction.overlay.OverlayPermission.openSettings(context)
+                } else if (row.target == "accessibility") {
+                    com.yukisoffd.lyracode.interaction.ui.openAccessibilitySettings(context)
+                } else if (row.title == uiText(R.string.permission_termux)) {
                     requestTermuxRunCommandPermission(context)
                     revision++
                 } else if (row.title == uiText(R.string.permission_local_network)) {
@@ -543,6 +555,7 @@ internal data class PermissionRow(
     val title: String,
     val granted: Boolean,
     val status: String,
+    val target: String? = null,
 )
 
 internal fun appPermissionRows(context: Context, termuxExecutor: TermuxExecutor): List<PermissionRow> {
@@ -559,6 +572,11 @@ internal fun appPermissionRows(context: Context, termuxExecutor: TermuxExecutor)
     }
     val locationGranted = granted(Manifest.permission.ACCESS_FINE_LOCATION) || granted(Manifest.permission.ACCESS_COARSE_LOCATION)
     return buildList {
+        add(PermissionRow(Icons.Default.Layers, context.getString(R.string.device_interaction_overlay_title),
+            com.yukisoffd.lyracode.interaction.overlay.OverlayPermission.isGranted(context), context.getString(R.string.permission_status_not_allowed), "overlay"))
+        add(PermissionRow(Icons.Default.AccessibilityNew, context.getString(R.string.device_interaction_accessibility_title),
+            com.yukisoffd.lyracode.interaction.service.AccessibilityConnection.isEnabledInSystem(context), context.getString(R.string.permission_status_not_allowed), "accessibility"))
+
         add(PermissionRow(Icons.Default.PhotoLibrary, uiText(R.string.permission_media), mediaGranted, uiText(R.string.permission_status_not_allowed)))
         add(PermissionRow(Icons.Default.LocationOn, uiText(R.string.permission_location), locationGranted, uiText(R.string.permission_status_not_allowed)))
         if (Android17Compatibility.requiresLocalNetworkPermission()) {

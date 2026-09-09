@@ -1538,7 +1538,7 @@
     <string name="compliance_documents">协议与清单</string>
     <string name="compliance_index_intro">以下文档结合当前版本的实际功能编写，可离线查看。外部模型、服务器和网站由用户自行选择，其规则可能另行适用。</string>
     <string name="compliance_review_notice">说明：这些文档用于如实说明当前版本的数据处理和权限用途，不代表已经自动满足任何应用市场或地区的全部审核要求。功能或数据处理方式变化时应同步更新。</string>
-    <string name="compliance_effective_date">生效及更新日期：2026 年 7 月 19 日</string>
+    <string name="compliance_effective_date">生效及更新日期：2026 年 9 月 9 日</string>
     <string name="compliance_user_agreement">用户协议</string>
     <string name="compliance_user_agreement_desc">使用规则、风险与责任边界</string>
     <string name="compliance_privacy_policy">隐私政策</string>
@@ -1649,7 +1649,7 @@ API Key、密码、私钥和远程服务费用由用户自行管理。请勿分�
 方式与时机：使用相关功能时生成。
 保存与去向：默认本地；用户选择 WebDAV 备份时发送至指定服务器，可在设置中清理或删除。</string>
     <string name="compliance_personal_not_collected_title">当前版本不主动收集</string>
-    <string name="compliance_personal_not_collected_body">应用不要求手机号、真实姓名、身份证件、通讯录、短信、通话记录、支付银行卡、人脸或指纹模板，也不读取广告标识符用于画像。用户在对话、文件或第三方服务中自行输入上述信息的，不属于应用基本功能所必需，请谨慎提交。</string>
+    <string name="compliance_personal_not_collected_body">应用不要求手机号、真实姓名、身份证件、通讯录、短信、通话记录、支付银行卡、人脸或指纹模板，也不读取广告标识符用于画像。用户在对话、文件或第三方服务中自行输入上述信息的，不属于应用基本功能所必需，请谨慎提交。\n\n启用设备任务时，用户主动展示的其他应用页面或确认上传的截图也可能包含这些信息，处理范围另见屏幕交互条款；请避免展示无关敏感内容。</string>
 
     <string name="compliance_third_party_summary">当前版本未内置广告、行为分析或第三方崩溃统计 SDK。开源 UI、网络、播放器、编辑器和加密库在应用进程内提供功能，不因被集成而独立向其作者上传个人信息。以下外部接收方仅在对应功能触发时出现。</string>
     <string name="compliance_third_sdk_title">本地开源组件</string>
@@ -2216,6 +2216,56 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="manual_control_notification_title">Lyra 设备悬浮对话正在运行</string>
     <string name="manual_control_notification_text">正在维持用户主动启动的后台控制会话响应。</string>
     <string name="manual_control_notification_stop">停止</string>
+
+    <string name="pet_settings_entry">桌宠与截图设置</string>
+    <string name="pet_settings_title">桌宠与悬浮对话</string>
+    <string name="pet_available_count">%1$d 个可用样式</string>
+    <string name="pet_usage_hint">长按打开设置，拖动移动。吸边后点一下唤醒，再次点击开关对话。</string>
+    <string name="pet_switch">切换桌宠</string>
+    <string name="pet_import">导入宠物包</string>
+    <string name="pet_export">导出当前</string>
+    <string name="pet_appearance">外观与位置</string>
+    <string name="pet_size">桌宠大小</string>
+    <string name="pet_auto_dock">自动吸附侧边</string>
+    <string name="pet_auto_dock_hint">空闲时移到屏幕边缘，减少遮挡</string>
+    <string name="pet_dock_delay">吸边等待</string>
+    <string name="pet_seconds">%1$s 秒</string>
+    <string name="pet_hide_fraction">侧边隐藏比例</string>
+    <string name="pet_dock_opacity">侧边不透明度</string>
+    <string name="pet_active_opacity">展开不透明度</string>
+    <string name="pet_customization">桌宠个性化</string>
+    <string name="pet_sound">声音</string>
+    <string name="pet_sound_allow">允许桌宠播放声音</string>
+    <string name="pet_sound_hint">开关声音会重新加载当前桌宠</string>
+    <string name="pet_volume">音量</string>
+    <string name="pet_vision">截图与模型</string>
+    <string name="pet_vision_supported">当前模型支持图片</string>
+    <string name="pet_vision_hint">自定义模型可手动开启；修改后对新任务生效</string>
+    <string name="pet_vision_detail">已配置视觉补充模型时优先使用该模型；截图上传前会确认。</string>
+    <string name="pet_library_hint">支持 ZIP 宠物包及旧 JSON。导入后保留已有样式，可随时切换；每个样式分别记住个性化设置。</string>
+    <string name="pet_choose">选择桌宠</string>
+    <string name="pet_remove_named">移除 %1$s</string>
+    <string name="pet_remove_title">移除桌宠？</string>
+    <string name="pet_remove_body">将从本机桌宠库移除「%1$s」。原始 ZIP 文件不会被删除。</string>
+    <string name="pet_remove">移除</string>
+    <string name="pet_switch_failed">切换失败，请检查宠物包是否仍可用。</string>
+    <string name="pet_remove_failed">移除失败，请稍后重试。</string>
+    <string name="pet_imported">已加入桌宠库并切换</string>
+    <string name="pet_exported">宠物包已导出</string>
+    <string name="pet_operation_failed">操作失败，请检查宠物包格式、文件访问权限和可用空间。</string>
+
+    <string name="compliance_user_device_title">设备交互与桌宠功能</string>
+    <string name="compliance_user_device_body">用户开启设备交互实验、系统无障碍服务和悬浮窗权限并主动开始任务后，可通过悬浮对话跨应用观察、点击、滚动和填写普通文本。安全动作可自动执行，切换应用不会自动结束任务；用户可暂停、清空上下文或通过通知停止会话。发送、发布等对外操作需要确认，删除和卸载等操作保留二次确认；密码、验证码和财产交易等受保护操作仍禁止自动执行。识别或拦截可能出错，禁止原因会返回对话。Shell/Root 等工具仍受自身授权及执行规则约束，授予无障碍或悬浮窗权限不等于授予 Root。</string>
+    <string name="compliance_privacy_device_title">屏幕信息与设备任务</string>
+    <string name="compliance_privacy_device_body">无障碍服务仅在设备交互实验开启且用户启动观察或任务会话时按需处理前台应用包名、窗口、控件文字、描述、位置及状态，用于页面识别和动作验证。已识别的密码、验证码及受保护节点会被屏蔽或拒绝操作；不要在任务期间展示无关敏感内容。文本 UI 树和工具结果可能随任务上下文发送至用户配置的模型服务。用户调用截图工具时会获取屏幕图像，上传前确认后发送至用户配置的视觉补充模型或支持图片的当前模型；截图可能含其他应用的个人信息。系统保护页面或安全窗口不支持读取时会返回失败。屏幕对话采用临时会话，宠物包及个性化配置保存在本机；用户导出、工具产物和临时缓存按各自存储规则管理。</string>
+    <string name="compliance_personal_screen_title">屏幕交互信息与桌宠配置（可选）</string>
+    <string name="compliance_personal_screen_body">内容：前台应用包名、控件文字与描述、窗口和位置、动作参数和结果、经用户确认上传的截图、桌宠包及偏好。目的：设备任务、验证操作、视觉识别和桌宠展示。触发：用户启用对应能力并发起观察或任务。去向：页面信息和工具结果按需进入所选模型请求；截图上传前确认。桌宠仅获得运行状态、当前包名、交互事件和配置，不获得聊天正文、UI 树、截图、密钥或审批令牌。用户可停止任务、撤销系统权限、移除桌宠或清除应用数据；已发送至第三方的信息按对方政策处理。</string>
+    <string name="compliance_third_pets_title">导入的桌宠包</string>
+    <string name="compliance_third_pets_body">桌宠包由用户选取导入，其 JavaScript、图片和音频由本地 WebView 运行。宿主禁止宠物包直接访问网络、任意本地文件、系统权限和工具执行接口；仅通过受限事件桥接请求移动、设置等交互。卸载请求仍交由 Agent 和两次用户确认执行。包作者不会因为用户导入或运行桌宠就自动收到数据；用户下载或分享包时，下载站点及分享平台按各自政策处理信息。请遵守包内许可证，只导入信任的资源，异常时切换或移除。</string>
+    <string name="compliance_permission_overlay_title">悬浮显示与前台会话</string>
+    <string name="compliance_permission_overlay_body">SYSTEM_ALERT_WINDOW 用于在其他应用上方显示桌宠、悬浮对话及操作提示，不单独授予读取屏幕或执行操作的能力。用户在系统设置中授权或撤销。运行中的可见设备会话使用前台服务及通知（包括 FOREGROUND_SERVICE_SPECIAL_USE），以维持用户发起的任务并提供停止入口；通知权限用于展示提示。关闭会话或撤销相关权限会影响悬浮功能，不影响无需这些权限的普通对话。</string>
+    <string name="compliance_permission_accessibility_title">无障碍服务与按需截图</string>
+    <string name="compliance_permission_accessibility_body">BIND_ACCESSIBILITY_SERVICE 由 Android 系统绑定已获用户启用的服务，不是普通运行时授权弹窗。用途是在用户启动的观察或设备任务中读取界面结构并执行受控点击、滚动、文字填写等动作；具备截图能力的系统版本还用于用户调用的屏幕截图。UI 树及工具结果可能发送至用户配置的模型，截图上传另需确认。不会仅因开启系统服务就在非活动会话中持续采集屏幕，也不会绕过系统保护窗口。入口：设置 → 应用权限或设备交互 → 无障碍设置；可随时在 Android 无障碍设置关闭服务。</string>
 </resources>
 
 

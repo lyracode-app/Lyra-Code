@@ -18,7 +18,76 @@ internal object DevicePetStore {
         val path = JSONObject(activeFile(context).readText()).getString("root")
         File(packages(context), PetArchive.path(path)).also { require(it.isDirectory) }
     }.getOrNull()
-    fun version(context: Context) = "${activeFile(context).lastModified()}:${packageFile(context).lastModified()}"
+    data class PetEntry(val key: String, val name: String, val author: String, val version: String)
+    private fun libraryFile(context: Context) = File(context.filesDir, "desktop-pet-library.json")
+    private fun profileFile(context: Context) = File(context.filesDir, "desktop-pet-profiles.json")
+    private fun atomic(file: File, value: JSONObject) {
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        temp.writeText(value.toString()); check(temp.renameTo(file))
+    }
+    fun activeKey(context: Context): String {
+        val pointer = runCatching { JSONObject(activeFile(context).readText()) }.getOrNull()
+        return pointer?.optString("root")?.takeIf { it.isNotEmpty() }
+            ?: if (pointer?.optBoolean("legacy") == true || (pointer == null && packageFile(context).exists())) "legacy" else "builtin"
+    }
+    private fun library(context: Context): JSONObject {
+        val file = libraryFile(context)
+        if (file.exists()) return JSONObject(file.readText())
+        // Recover the current and retained previous package when upgrading from the single-pet store.
+        val entries = JSONArray()
+        packages(context).listFiles()?.filter { it.isDirectory }?.forEach { directory ->
+            directory.walkTopDown().filter { it.isFile && it.name == "manifest.json" }.firstOrNull()?.let { manifest ->
+                if (runCatching { PetArchive.validateManifest(manifest.readText()) }.isSuccess)
+                    entries.put(manifest.parentFile!!.relativeTo(packages(context)).invariantSeparatorsPath)
+            }
+        }
+        return JSONObject().put("entries", entries).also { atomic(file, it) }
+    }
+    fun catalog(context: Context): List<PetEntry> = buildList {
+        val builtin = defaultManifest(context)
+        add(PetEntry("builtin", builtin.getString("name"), builtin.optString("author"), builtin.optString("version")))
+        if (packageFile(context).exists()) runCatching { validate(packageFile(context).readText()) }.getOrNull()?.let {
+            add(PetEntry("legacy", it.getString("name"), it.optString("author"), "API 1"))
+        }
+        val entries = library(context).getJSONArray("entries")
+        for (i in 0 until entries.length()) {
+            val key = entries.getString(i)
+            runCatching { PetArchive.validateManifest(File(packages(context), PetArchive.path(key) + "/manifest.json").readText()) }.getOrNull()?.let {
+                add(PetEntry(key, it.getString("name"), it.optString("author"), it.optString("version", "API 1")))
+            }
+        }
+    }
+    @Synchronized fun select(context: Context, key: String) {
+        require(catalog(context).any { it.key == key }) { "桌宠不存在，请重新导入" }
+        if (activeKey(context) == key) return
+        val options = options(context)
+        val profiles = runCatching { JSONObject(profileFile(context).readText()) }.getOrDefault(JSONObject())
+        profiles.put(activeKey(context), options.optJSONObject("controls") ?: JSONObject())
+        atomic(profileFile(context), profiles)
+        val pointer = when (key) {
+            "builtin" -> JSONObject().put("builtin", true)
+            "legacy" -> JSONObject().put("legacy", true)
+            else -> JSONObject().put("root", key)
+        }
+        atomic(activeFile(context), pointer.put("revision", java.util.UUID.randomUUID().toString()))
+        saveOptions(context, options.put("controls", profiles.optJSONObject(key) ?: JSONObject()))
+    }
+    @Synchronized fun remove(context: Context, key: String) {
+        require(key != "builtin" && catalog(context).any { it.key == key })
+        if (activeKey(context) == key) select(context, "builtin")
+        if (key == "legacy") packageFile(context).delete() else {
+            val data = library(context)
+            val entries = data.getJSONArray("entries")
+            data.put("entries", JSONArray((0 until entries.length()).map { entries.getString(it) }.filter { it != key }))
+            atomic(libraryFile(context), data)
+            val directory = File(packages(context), PetArchive.path(key))
+            require(directory.canonicalPath.startsWith(packages(context).canonicalPath + File.separator))
+            directory.deleteRecursively()
+        }
+        val profiles = runCatching { JSONObject(profileFile(context).readText()) }.getOrDefault(JSONObject())
+        profiles.remove(key); atomic(profileFile(context), profiles)
+    }
+    fun version(context: Context) = "${activeKey(context)}:${activeFile(context).lastModified()}:${packageFile(context).lastModified()}"
     fun defaultManifest(context: Context) = PetArchive.validateManifest(context.assets.open("desktop-pet/default/manifest.json").bufferedReader().use { it.readText() })
     fun resource(context: Context, path: String, builtin: Boolean = false): InputStream {
         PetArchive.path(path)
@@ -64,7 +133,7 @@ internal object DevicePetStore {
     }
     fun load(context: Context): JSONObject = runCatching {
         root(context)?.let { PetArchive.validateManifest(File(it, "manifest.json").readText()) }
-            ?: if (packageFile(context).exists()) validate(packageFile(context).readText()) else defaultManifest(context)
+            ?: if (activeKey(context) == "legacy") validate(packageFile(context).readText()) else defaultManifest(context)
     }.getOrElse { defaultManifest(context) }
     fun validate(text: String): JSONObject {
         require(text.toByteArray().size <= MAX_BYTES) { "桌宠脚本不能超过 2 MiB" }
@@ -98,15 +167,13 @@ internal object DevicePetStore {
     }
     fun install(context: Context, text: String) {
         validate(text)
-        val target = packageFile(context)
-        val temporary = File(target.parentFile, "${target.name}.tmp")
-        temporary.writeText(text); check(temporary.renameTo(target))
-        activeFile(context).delete()
-        val options = options(context).put("controls", JSONObject())
-        saveOptions(context, options)
+        val bytes = java.io.ByteArrayOutputStream()
+        ZipOutputStream(bytes).use { zip -> zip.putNextEntry(ZipEntry("manifest.json")); zip.write(text.toByteArray()); zip.closeEntry() }
+        installZip(context, bytes.toByteArray().inputStream())
     }
-    fun installZip(context: Context, input: InputStream) {
+    @Synchronized fun installZip(context: Context, input: InputStream) {
         val base = packages(context)
+        val catalog = library(context)
         val id = java.util.UUID.randomUUID().toString()
         val archive = File(base, "$id.zip")
         val stage = File(base, id)
@@ -117,15 +184,10 @@ internal object DevicePetStore {
                     require(total <= PetArchive.MAX_ARCHIVE_BYTES) { "ZIP 超过 64 MiB" }; output.write(buffer, 0, n) }
             } }
             val directory = archive.inputStream().use { PetArchive.extract(it, stage) }
-            val pointer = activeFile(context)
-            val temp = File(pointer.parentFile, "${pointer.name}.tmp")
-            temp.writeText(JSONObject().put("root", directory.relativeTo(base).invariantSeparatorsPath).toString())
-            check(temp.renameTo(pointer))
-            packageFile(context).delete()
-            saveOptions(context, options(context).put("controls", JSONObject()))
-            // Published directories remain immutable; keep only the active package and previous one
-            // until the next import so an existing WebView can finish in-flight resource reads.
-            base.listFiles()?.filter { it.isDirectory && it != stage }?.sortedByDescending { it.lastModified() }?.drop(1)?.forEach { it.deleteRecursively() }
+            val key = directory.relativeTo(base).invariantSeparatorsPath
+            catalog.getJSONArray("entries").put(key)
+            atomic(libraryFile(context), catalog)
+            select(context, key)
         } catch (e: Exception) {
             if (root(context)?.canonicalPath?.startsWith(stage.canonicalPath + File.separator) != true && root(context) != stage) stage.deleteRecursively()
             throw e
@@ -141,10 +203,7 @@ internal object DevicePetStore {
             }
         }
     }
-    fun reset(context: Context) {
-        activeFile(context).delete(); packageFile(context).delete()
-        saveOptions(context, options(context).put("controls", JSONObject()))
-    }
+    fun reset(context: Context) { select(context, "builtin") }
     fun controls(script: JSONObject, options: JSONObject): JSONObject = JSONObject().apply {
         val schema = script.optJSONArray("controls") ?: JSONArray()
         val saved = options.optJSONObject("controls") ?: JSONObject()

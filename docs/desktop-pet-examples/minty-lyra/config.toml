@@ -1,0 +1,9 @@
+[pet]
+size = 112
+autoDock = true
+dockDelayMs = 5000
+dockOpacity = 0.55
+[controls]
+speed = 1
+pose = "auto"
+roam = false

@@ -503,7 +503,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun Context.localizedContext(languageMode: String): Context {
+internal fun Context.localizedContext(languageMode: String): Context {
     val locale = when (AppSettings.normalizeLanguageMode(languageMode)) {
         AppSettings.LANGUAGE_ZH_CN -> Locale.SIMPLIFIED_CHINESE
         AppSettings.LANGUAGE_ZH_TW -> Locale.TRADITIONAL_CHINESE
