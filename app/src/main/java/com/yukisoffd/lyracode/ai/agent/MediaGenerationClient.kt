@@ -1,5 +1,6 @@
 package com.yukisoffd.lyracode.ai
 
+import com.yukisoffd.lyracode.ai.customizedFor
 import android.content.Context
 import android.net.Uri
 import com.yukisoffd.lyracode.data.ApiProfile
@@ -50,7 +51,7 @@ internal class MediaGenerationClient(
         model: String,
         request: MediaGenerationPrompt,
     ): MediaGenerationResult {
-        require(profile.apiKey.isNotBlank()) { "The configured media model profile has no API key." }
+
         require(model.isNotBlank()) { "The configured ${request.kind.value} model is empty." }
         val references = request.references.distinct().map(::normalizeReferenceSource)
         val prompt = mediaPromptText(request)
@@ -70,16 +71,16 @@ internal class MediaGenerationClient(
             .addHeader("Content-Type", "application/json")
         when (profile.apiFormat) {
             ApiProfile.API_FORMAT_ANTHROPIC -> requestBuilder
-                .addHeader("x-api-key", profile.apiKey)
+                .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                 .addHeader("anthropic-version", ANTHROPIC_VERSION)
-            ApiProfile.API_FORMAT_GEMINI -> requestBuilder.addHeader("x-goog-api-key", profile.apiKey)
-            else -> requestBuilder.addHeader("Authorization", "Bearer ${profile.apiKey}")
+            ApiProfile.API_FORMAT_GEMINI -> requestBuilder.apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
+            else -> requestBuilder.apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
         }
         val httpRequest = requestBuilder
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
         var directAsset: GeneratedMediaAsset? = null
-        val responseBody = client.newCall(httpRequest).execute().use { response ->
+        val responseBody = client.newCall(httpRequest.customizedFor(profile, model, com.yukisoffd.lyracode.data.AppSettings(appContext).purePromptMode)).execute().use { response ->
             val body = response.body ?: error("The media model returned an empty response.")
             val responseMime = body.contentType()?.toString()?.substringBefore(';').orEmpty()
             val directMediaResponse = request.kind.acceptsMimeType(responseMime)

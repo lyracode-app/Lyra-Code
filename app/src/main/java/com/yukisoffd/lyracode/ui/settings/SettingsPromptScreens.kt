@@ -54,6 +54,7 @@ import kotlin.math.max
 @Composable
 internal fun PromptSettingsScreen(settings: AppSettings) {
     fun visiblePresets() = settings.systemPromptPresets()
+    var pureMode by remember { mutableStateOf(settings.purePromptMode) }
     var presets by remember { mutableStateOf(visiblePresets()) }
     var selectedId by remember { mutableStateOf(settings.selectedSystemPromptId) }
     var editing by remember { mutableStateOf<SystemPromptPreset?>(null) }
@@ -69,6 +70,14 @@ internal fun PromptSettingsScreen(settings: AppSettings) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             KimiCardBox {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(uiText(R.string.prompt_pure_mode), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    androidx.compose.material3.Switch(checked = pureMode, onCheckedChange = {
+                        pureMode = it
+                        settings.purePromptMode = it
+                    })
+                }
+                Text(uiText(R.string.prompt_pure_mode_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
                 Text(uiText(R.string.title_system_prompt), style = MaterialTheme.typography.titleMedium)
                 Text(
                     uiText(R.string.ui_the_app_native_prompt_is_used_when_no_custom),

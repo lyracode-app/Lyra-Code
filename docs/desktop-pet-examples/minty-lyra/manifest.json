@@ -1,0 +1,44 @@
+{
+  "apiVersion": 2,
+  "id": "somnusochi.minty.lyra",
+  "name": "Minty · 薄荷",
+  "version": "1.0.0-lyra",
+  "author": "Somnusochi · Lyra 适配",
+  "entry": "scripts/main.js",
+  "config": "config.toml",
+  "controls": [
+    {
+      "key": "speed",
+      "label": "动画速度",
+      "type": "range",
+      "min": 0.5,
+      "max": 2,
+      "default": 1
+    },
+    {
+      "key": "pose",
+      "label": "动作预览",
+      "type": "select",
+      "options": [
+        "auto",
+        "idle",
+        "running-right",
+        "running-left",
+        "waving",
+        "jumping",
+        "failed",
+        "waiting",
+        "running",
+        "review",
+        "look"
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "roam",
+      "label": "空闲时随机移动",
+      "type": "boolean",
+      "default": false
+    }
+  ]
+}

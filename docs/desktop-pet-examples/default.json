@@ -1,0 +1,28 @@
+{
+  "apiVersion": 1,
+  "name": "Lyra 星猫",
+  "author": "Lyra Code",
+  "html": "<style>\n:root{--fur:#70A4FF;--speed:1.5s}body{display:grid;place-items:center}svg{width:96%;height:96%;overflow:visible;filter:drop-shadow(0 2px 3px #0004);animation:breathe var(--speed) ease-in-out infinite}.fur{fill:var(--fur)}#mouth{transition:d .2s}#badge{fill:#a6e5c0}body[data-state=thinking] svg{animation:think var(--speed) ease-in-out infinite}body[data-state=executing] svg{animation:hop .4s infinite alternate}body[data-state=approval] #badge{fill:#ffd580}body[data-state=error] #badge{fill:#ffb4ab}body[data-docked=true] #eyes{transform:scaleY(.35);transform-origin:50% 50%}.tap{animation:hop .2s 3!important}.eat{animation:eat .8s!important}@keyframes breathe{50%{transform:translateY(-3px)}}@keyframes think{50%{transform:rotate(8deg)}}@keyframes hop{to{transform:translateY(-6px) scale(1.06,.94)}}@keyframes eat{50%{transform:scale(1.3) rotate(-12deg)}}\n</style><svg viewBox=\"0 0 100 100\"><path class=\"fur\" d=\"M15 43 12 9 37 26Q50 20 64 26L88 9 85 44Q100 85 50 91 0 85 15 43\"/><path fill=\"#ffd1df\" d=\"m18 21 4 20 10-12zm64 0-14 8 10 12z\"/><g id=\"eyes\" fill=\"#16253d\"><ellipse cx=\"34\" cy=\"53\" rx=\"5\" ry=\"7\"/><ellipse cx=\"66\" cy=\"53\" rx=\"5\" ry=\"7\"/></g><path id=\"mouth\" d=\"m43 67 7 6 7-6\" stroke=\"#16253d\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\"/><circle id=\"badge\" cx=\"80\" cy=\"80\" r=\"10\" stroke=\"#fff\" stroke-width=\"3\"/></svg><script>\nlet config={roam:false,speed:1.5}, petState='idle';\naddEventListener('lyrapet',({detail:{type,data}})=>{\n if(type==='config'){config=data;document.documentElement.style.setProperty('--fur',data.color);document.documentElement.style.setProperty('--speed',data.speed+'s')}\n if(type==='state'){petState=data.state;document.body.dataset.state=data.state;document.body.dataset.docked=data.docked}\n if(type==='tap'||type==='drag'){document.querySelector('svg').classList.add('tap');setTimeout(()=>document.querySelector('svg').classList.remove('tap'),600)}\n if(type==='operationResult'&&data.operation==='uninstall'&&data.ok){document.querySelector('svg').classList.add('eat');setTimeout(()=>document.querySelector('svg').classList.remove('eat'),900)}\n});\nsetInterval(()=>{if(config.roam&&petState==='idle'){if(document.body.dataset.docked==='true')lyraPet.emit('reveal');else lyraPet.emit('move',{dx:Math.round(Math.random()*12-6),dy:Math.round(Math.random()*8-4)})}},1200);\n</script>",
+  "controls": [
+    {
+      "key": "color",
+      "label": "毛色",
+      "type": "color",
+      "default": "#70A4FF"
+    },
+    {
+      "key": "speed",
+      "label": "呼吸 / 思考动作周期（秒）",
+      "type": "range",
+      "min": 0.5,
+      "max": 4,
+      "default": 1.5
+    },
+    {
+      "key": "roam",
+      "label": "等待时随机爬动",
+      "type": "boolean",
+      "default": false
+    }
+  ]
+}

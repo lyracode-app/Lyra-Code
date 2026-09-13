@@ -15,6 +15,7 @@ data class ApiProfile(
     val useResponsesApi: Boolean = false,
     val presetId: String = "",
     val presetPlanId: String = "",
+    val modelRequestOverrides: Map<String, ModelRequestCustomization> = emptyMap(),
 ) {
     val chatEndpoint: String
         get() = "${baseUrl.trimEnd('/')}${normalizedChatPath(apiFormat, chatPath)}"

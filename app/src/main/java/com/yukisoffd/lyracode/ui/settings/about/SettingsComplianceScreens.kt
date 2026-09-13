@@ -149,6 +149,7 @@ private fun complianceDocument(pageId: String): ComplianceDocument = when (pageI
             ComplianceSection(R.string.compliance_user_ai_risk_title, R.string.compliance_user_ai_risk_body),
             ComplianceSection(R.string.compliance_user_third_party_title, R.string.compliance_user_third_party_body),
             ComplianceSection(R.string.compliance_user_disclaimer_title, R.string.compliance_user_disclaimer_body),
+            ComplianceSection(R.string.compliance_user_device_title, R.string.compliance_user_device_body),
             ComplianceSection(R.string.compliance_user_contact_title, R.string.compliance_user_contact_body),
         ),
     )
@@ -162,6 +163,7 @@ private fun complianceDocument(pageId: String): ComplianceDocument = when (pageI
             ComplianceSection(R.string.compliance_privacy_external_title, R.string.compliance_privacy_external_body),
             ComplianceSection(R.string.compliance_privacy_storage_title, R.string.compliance_privacy_storage_body),
             ComplianceSection(R.string.compliance_privacy_security_title, R.string.compliance_privacy_security_body),
+            ComplianceSection(R.string.compliance_privacy_device_title, R.string.compliance_privacy_device_body),
             ComplianceSection(R.string.compliance_privacy_rights_title, R.string.compliance_privacy_rights_body),
             ComplianceSection(R.string.compliance_privacy_children_title, R.string.compliance_privacy_children_body),
             ComplianceSection(R.string.compliance_privacy_changes_title, R.string.compliance_privacy_changes_body),
@@ -179,6 +181,7 @@ private fun complianceDocument(pageId: String): ComplianceDocument = when (pageI
             ComplianceSection(R.string.compliance_personal_device_title, R.string.compliance_personal_device_body),
             ComplianceSection(R.string.compliance_personal_location_apps_title, R.string.compliance_personal_location_apps_body),
             ComplianceSection(R.string.compliance_personal_logs_title, R.string.compliance_personal_logs_body),
+            ComplianceSection(R.string.compliance_personal_screen_title, R.string.compliance_personal_screen_body),
             ComplianceSection(R.string.compliance_personal_not_collected_title, R.string.compliance_personal_not_collected_body),
         ),
     )
@@ -193,6 +196,7 @@ private fun complianceDocument(pageId: String): ComplianceDocument = when (pageI
             ComplianceSection(R.string.compliance_third_mcp_title, R.string.compliance_third_mcp_body),
             ComplianceSection(R.string.compliance_third_remote_title, R.string.compliance_third_remote_body),
             ComplianceSection(R.string.compliance_third_update_title, R.string.compliance_third_update_body),
+            ComplianceSection(R.string.compliance_third_pets_title, R.string.compliance_third_pets_body),
             ComplianceSection(R.string.compliance_third_external_links_title, R.string.compliance_third_external_links_body),
         ),
     )
@@ -209,6 +213,8 @@ private fun complianceDocument(pageId: String): ComplianceDocument = when (pageI
             ComplianceSection(R.string.compliance_permission_notifications_title, R.string.compliance_permission_notifications_body),
             ComplianceSection(R.string.compliance_permission_install_title, R.string.compliance_permission_install_body),
             ComplianceSection(R.string.compliance_permission_termux_title, R.string.compliance_permission_termux_body),
+            ComplianceSection(R.string.compliance_permission_overlay_title, R.string.compliance_permission_overlay_body),
+            ComplianceSection(R.string.compliance_permission_accessibility_title, R.string.compliance_permission_accessibility_body),
             ComplianceSection(R.string.compliance_permission_control_title, R.string.compliance_permission_control_body),
         ),
     )

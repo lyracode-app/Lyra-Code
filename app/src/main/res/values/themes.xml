@@ -4,4 +4,19 @@
         <item name="android:statusBarColor">@android:color/white</item>
         <item name="android:navigationBarColor">@android:color/white</item>
     </style>
+    <style name="Theme.LyraCode.PetSettings" parent="Theme.LyraCode">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowAnimationStyle">@style/Animation.LyraCode.PetSettings</item>
+    </style>
+    <!-- Match SettingsScreens: 260 ms slide, with one-third parallax underneath. -->
+    <style name="Animation.LyraCode.PetSettings" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/pet_page_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/pet_page_under_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/pet_page_under_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/pet_page_exit</item>
+    </style>
 </resources>

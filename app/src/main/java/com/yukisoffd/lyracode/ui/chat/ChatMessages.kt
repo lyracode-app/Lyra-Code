@@ -105,6 +105,7 @@ private fun sourceMessageId(id: Long): Long = if (id < 0L) -id else id
 internal fun chatRenderItems(
     messages: List<ChatRecord>,
     isStreaming: Boolean = false,
+    collapseStreamingProse: Boolean = false,
 ): List<ChatRenderItem> {
     val result = mutableListOf<ChatRenderItem>()
     val assistantTurn = mutableListOf<ChatRecord>()
@@ -113,6 +114,11 @@ internal fun chatRenderItems(
         if (assistantTurn.isEmpty()) return
         val turn = assistantTurn.toList()
         assistantTurn.clear()
+        if (streamTurn && collapseStreamingProse) {
+            result += ChatRenderItem(key = "process-${turn.first().id}", process = turn,
+                processStartedAt = turn.minOfOrNull { it.createdAt }, processFinishedAt = turn.maxOfOrNull { it.createdAt })
+            return
+        }
         if (streamTurn) {
             val pendingProcess = mutableListOf<ChatRecord>()
 
@@ -206,6 +212,7 @@ internal fun AgentProcessSummary(
     streamingAnimationMode: String = AppSettings.STREAMING_ANIMATION_TYPEWRITER,
     startedAtOverride: Long? = null,
     finishedAtOverride: Long? = null,
+    inlineToolDetails: Boolean = false,
 ) {
     // Synthetic thinking-only records use a negative ID. Normalize it so the
     // expanded state survives both streaming splits and the final merge.
@@ -258,6 +265,7 @@ internal fun AgentProcessSummary(
                                 message = message,
                                 selectionResetKey = selectionResetKey,
                                 inProcessRecord = true,
+                                inlineToolDetails = inlineToolDetails,
                                 streamingAnimationMode = streamingAnimationMode,
                                 isStreaming = active &&
                                     index == messages.lastIndex &&
@@ -785,6 +793,7 @@ internal fun MessageCard(
     inProcessRecord: Boolean = false,
     streamingAnimationMode: String = AppSettings.STREAMING_ANIMATION_TYPEWRITER,
     isStreaming: Boolean = false,
+    inlineToolDetails: Boolean = false,
     onEditAndRegenerate: ((Long, String) -> Unit)? = null,
     onCreateBranch: ((Long) -> Unit)? = null,
 ) {
@@ -934,6 +943,7 @@ internal fun MessageCard(
                                     expanded = showToolResult,
                                     onToggle = { showToolResult = !showToolResult },
                                     compact = compactToolResult,
+                                    inlineDetails = inlineToolDetails,
                                 )
                             } else {
                                 if (visibleContent.isNotBlank()) {

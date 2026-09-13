@@ -16,7 +16,7 @@ class WebViewWebAgentInstrumentedTest {
     fun searchReturnsWithoutTimingOut() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val result = withTimeout(45_000L) {
-            WebViewWebAgent(context).search("OpenAI", limit = 2)
+            WebViewWebAgent(context, com.yukisoffd.lyracode.data.AppSettings(context)).search("OpenAI", limit = 2)
         }
         Log.d("LyraWebAgentTest", result.take(1_000))
         assertTrue(result.isNotBlank())

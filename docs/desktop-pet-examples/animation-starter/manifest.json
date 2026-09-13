@@ -1,0 +1,36 @@
+{
+  "apiVersion": 2,
+  "id": "lyra.animation.starter",
+  "name": "动画入门示例",
+  "version": "1.0.0",
+  "author": "Lyra Code",
+  "entry": "scripts/main.js",
+  "config": "config.toml",
+  "controls": [
+    {
+      "key": "animation",
+      "label": "动画来源",
+      "type": "select",
+      "options": [
+        "PNG",
+        "GIF",
+        "APNG"
+      ],
+      "default": "PNG"
+    },
+    {
+      "key": "fps",
+      "label": "PNG 帧率",
+      "type": "range",
+      "min": 1,
+      "max": 24,
+      "default": 4
+    },
+    {
+      "key": "greeting",
+      "label": "问候语",
+      "type": "text",
+      "default": "你好！"
+    }
+  ]
+}

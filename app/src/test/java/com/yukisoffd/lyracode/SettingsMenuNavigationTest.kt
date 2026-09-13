@@ -8,7 +8,9 @@ import org.junit.Test
 class SettingsMenuNavigationTest {
     @Test
     fun standardMenuRowKeepsTrailingLambdaBoundToOnClick() {
-        val source = File("src/main/java/com/yukisoffd/lyracode/UiCommon.kt").readText()
+        val source = File("src/main/java/com/yukisoffd/lyracode/UiCommon.kt")
+            .readText()
+            .replace("\r\n", "\n")
         val signatureStart = source.indexOf("internal fun KimiMenuRow(\n    icon: ImageVector")
         assertTrue("Vector KimiMenuRow signature is missing", signatureStart >= 0)
         val signatureEnd = source.indexOf("\n) {", signatureStart)

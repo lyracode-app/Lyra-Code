@@ -6,6 +6,8 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
 import com.yukisoffd.lyracode.data.AppSettings
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeout
@@ -94,7 +96,7 @@ class SystemCommandExecutor(
         runRootProcess("id -u", 12)
     }
 
-    suspend fun executeShell(command: String, timeoutSeconds: Int): SystemCommandResult = withContext(Dispatchers.IO) {
+    suspend fun executeShell(command: String, timeoutSeconds: Int, beforeDispatch: suspend () -> Unit = {}): SystemCommandResult = withContext(Dispatchers.IO) {
         if (!settings.requestShellAccess) {
             return@withContext unavailable("shell", "Shell 权限开关已关闭。")
         }
@@ -109,6 +111,8 @@ class SystemCommandExecutor(
         }
         runCatching {
             val service = requireShellService()
+            currentCoroutineContext().ensureActive()
+            beforeDispatch()
             SystemCommandResult.fromJson(service.execute(command, timeoutSeconds.coerceIn(3, 600)))
         }.getOrElse {
             shellService = null
@@ -120,16 +124,22 @@ class SystemCommandExecutor(
         command: String,
         timeoutSeconds: Int,
         allowShellFallback: Boolean = true,
+        beforeDispatch: suspend () -> Unit = {},
     ): SystemCommandResult = withContext(Dispatchers.IO) {
         if (!settings.requestRootAccess) {
             return@withContext unavailable("root", "Root 权限开关已关闭。")
         }
         val probe = runRootProcess("id -u", 12)
         if (probe.ok && probe.stdout.trim().lineSequence().lastOrNull() == "0") {
+            currentCoroutineContext().ensureActive()
+            try { beforeDispatch() }
+            catch (error: kotlinx.coroutines.CancellationException) { throw error }
+            catch (error: Exception) { return@withContext unavailable("root", "操作取消：${error.message.orEmpty()}") }
+            currentCoroutineContext().ensureActive()
             return@withContext runRootProcess(command, timeoutSeconds)
         }
         if (allowShellFallback && settings.requestShellAccess) {
-            val fallback = executeShell(command, timeoutSeconds)
+            val fallback = executeShell(command, timeoutSeconds, beforeDispatch)
             return@withContext fallback.copy(
                 message = "Root 不可用，已按设置回退到 Shizuku Shell。${fallback.message}",
             )

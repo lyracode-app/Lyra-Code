@@ -56,6 +56,8 @@ import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.MediaGenerationKind
 import com.yukisoffd.lyracode.data.SkillPack
 import com.yukisoffd.lyracode.filetransfer.FileTransferClient
+import com.yukisoffd.lyracode.interaction.ui.DeviceInteractionSettings
+import com.yukisoffd.lyracode.interaction.ui.ManualControlDebugScreen
 import com.yukisoffd.lyracode.mcp.LocalMcpServerManager
 import com.yukisoffd.lyracode.mcp.McpClientManager
 import com.yukisoffd.lyracode.server.MiniServerManager
@@ -118,6 +120,7 @@ internal fun SettingsScreen(
     onToggleSkill: (String, Boolean) -> Unit,
     onDeleteSkill: (String) -> Unit,
 ) {
+    var showUnsupportedDevice by rememberSaveable { mutableStateOf(false) }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     var modelNestedPageActive by rememberSaveable { mutableStateOf(false) }
     var modelNestedTitle by rememberSaveable { mutableStateOf("") }
@@ -126,6 +129,16 @@ internal fun SettingsScreen(
     var skipNextTransition by remember { mutableStateOf(false) }
     val settingsListScroll = rememberScrollState()
     val context = LocalContext.current
+    if (showUnsupportedDevice) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showUnsupportedDevice = false },
+            title = { Text(context.getString(R.string.detail_device_interaction)) },
+            text = { Text(context.getString(R.string.device_interaction_upgrade_hint)) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { showUnsupportedDevice = false }) {
+                Text(context.getString(android.R.string.ok))
+            } },
+        )
+    }
     fun previousDetail(current: String?): String? = when (current) {
         "device" -> "about"
         CompliancePageIds.INDEX -> "about"
@@ -135,6 +148,7 @@ internal fun SettingsScreen(
         CompliancePageIds.THIRD_PARTY,
         CompliancePageIds.APP_PERMISSIONS -> CompliancePageIds.INDEX
         "custom_theme_color" -> "theme_mode"
+        "device_interaction_control" -> "device_interaction"
         "font_library" -> "font"
         "topic_summary_model_topic",
         "topic_summary_model_compression",
@@ -187,7 +201,7 @@ internal fun SettingsScreen(
                 containerColor = MaterialTheme.colorScheme.background,
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
-                    TopAppBar(
+                    if (target != "model") TopAppBar(
                         expandedHeight = 56.dp,
                         windowInsets = WindowInsets(0, 0, 0, 0),
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -224,8 +238,13 @@ internal fun SettingsScreen(
                         .padding(pagePadding)
                         .fillMaxSize(),
                 ) pageContent@{
+            if (target in setOf("device_interaction", "device_interaction_control") && !com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported()) {
+                Text(context.getString(R.string.device_interaction_status_unsupported), Modifier.padding(18.dp))
+                return@pageContent
+            }
             if (target != null) {
                 SettingsDetailPage(
+                    inset = target != "model",
                     scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "device", "font", "font_library"),
                 ) {
                     when (target) {
@@ -235,6 +254,7 @@ internal fun SettingsScreen(
                         controller = controller,
                         predictiveBackEnabled = predictiveBackEnabled,
                         externalBackRequest = modelBackRequest,
+                        onBack = ::navigateBackFromDetail,
                         onNestedPageChanged = { active, title ->
                             modelNestedPageActive = active
                             modelNestedTitle = title
@@ -307,6 +327,11 @@ internal fun SettingsScreen(
                     "font_library" -> FontLibrarySettings(settings, controller)
                     "permissions" -> PermissionSettings(termuxExecutor)
                     "system_permissions" -> SystemPermissionSettings(settings, systemCommandExecutor)
+                    "device_interaction" -> DeviceInteractionSettings(
+                        settings = settings,
+                        onOpenManualControl = { detail = "device_interaction_control" },
+                    )
+                    "device_interaction_control" -> ManualControlDebugScreen(settings)
                     "tools" -> AgentToolSettings(settings, termuxExecutor, controller.settingsRevision.intValue)
                     "termux" -> TermuxSettings(settings, termuxExecutor, workspaceManager)
                     "debian" -> ProotLinuxSettings()
@@ -412,6 +437,7 @@ internal fun SettingsScreen(
             SettingsMenuEntry(Icons.Default.Storage, context.getString(R.string.menu_storage), context.getString(R.string.menu_storage_desc), "storage"),
             SettingsMenuEntry(Icons.Default.Backup, context.getString(R.string.menu_backup), context.getString(R.string.menu_backup_desc), "backup"),
             SettingsMenuEntry(Icons.Default.AdminPanelSettings, context.getString(R.string.menu_system_permissions), context.getString(R.string.menu_system_permissions_desc), "system_permissions"),
+            SettingsMenuEntry(Icons.Default.AccessibilityNew, context.getString(R.string.menu_device_interaction), context.getString(R.string.menu_device_interaction_desc), "device_interaction"),
             SettingsMenuEntry(Icons.Default.Security, context.getString(R.string.menu_app_permissions), context.getString(R.string.menu_app_permissions_desc), "permissions"),
             SettingsMenuEntry(Icons.Default.Description, context.getString(R.string.menu_licenses), context.getString(R.string.menu_licenses_desc), "licenses"),
             SettingsMenuEntry(Icons.Default.Info, context.getString(R.string.menu_about), context.getString(R.string.menu_about_desc), "about"),
@@ -435,7 +461,7 @@ internal fun SettingsScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(settingsListScroll)
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                    .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
             CapsuleTextField(
@@ -457,7 +483,9 @@ internal fun SettingsScreen(
                     KimiSectionLabel(label)
                     KimiCardBox {
                         entries.forEachIndexed { index, entry ->
-                            KimiMenuRow(entry.icon, entry.title, entry.description) {
+                            KimiMenuRow(entry.icon, entry.title, entry.description,
+                                enabled = entry.target != "device_interaction" || com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported(),
+                                onDisabledClick = { showUnsupportedDevice = true }) {
                                 detail = entry.target
                             }
                             if (index != entries.lastIndex) KimiDivider()
@@ -510,8 +538,10 @@ internal fun SettingsScreen(
                             initialState == CompliancePageIds.INDEX && isComplianceDocument(targetState) -> true
                             initialState == "custom_theme_color" && targetState == "theme_mode" -> false
                             initialState == "font_library" && targetState == "font" -> false
+                            initialState == "device_interaction_control" && targetState == "device_interaction" -> false
                             initialState == "theme_mode" && targetState == "custom_theme_color" -> true
                             initialState == "font" && targetState == "font_library" -> true
+                            initialState == "device_interaction" && targetState == "device_interaction_control" -> true
                             initialState in ADDITIONAL_MODEL_DETAIL_IDS && targetState == "topic_summary_model" -> false
                             initialState == "topic_summary_model" && targetState in ADDITIONAL_MODEL_DETAIL_IDS -> true
                             initialState in setOf("theme_mode", "font", "refresh_rate", "chat_background", "streaming_output") && targetState == "theme" -> false
@@ -535,6 +565,7 @@ internal fun SettingsScreen(
 
 @Composable
 internal fun SettingsDetailPage(
+    inset: Boolean = true,
     scroll: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -543,7 +574,7 @@ internal fun SettingsDetailPage(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .imePadding()
-            .padding(horizontal = 18.dp, vertical = 18.dp),
+            .padding(if (inset) 18.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         val bodyModifier = if (scroll) {
@@ -586,6 +617,8 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "streaming_output" -> context.getString(R.string.detail_streaming_output)
     "permissions" -> context.getString(R.string.detail_permissions)
     "system_permissions" -> context.getString(R.string.detail_system_permissions)
+    "device_interaction" -> context.getString(R.string.detail_device_interaction)
+    "device_interaction_control" -> context.getString(R.string.detail_manual_control)
     "tools" -> context.getString(R.string.detail_tools)
     "storage" -> context.getString(R.string.detail_storage)
     "termux" -> context.getString(R.string.detail_termux)
@@ -634,7 +667,7 @@ internal fun WorkspaceSettings(
     onPickWorkspace: () -> Unit,
 ) {
     KimiCardBox {
-        KimiMenuRow(Icons.Default.Folder, uiText(R.string.menu_current_directory), workspaceDisplayName, onPickWorkspace)
+        KimiMenuRow(Icons.Default.Folder, uiText(R.string.menu_current_directory), workspaceDisplayName, onClick = onPickWorkspace)
         KimiDivider()
         KimiMenuRow(Icons.Default.Terminal, uiText(R.string.menu_termux_path), workspaceManager.termuxRootPath() ?: uiText(R.string.termux_path_primary))
         Text(uiText(R.string.workspace_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)

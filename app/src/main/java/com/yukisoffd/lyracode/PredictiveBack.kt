@@ -66,6 +66,7 @@ internal class PredictiveBackGestureState {
 @Composable
 internal fun rememberPredictiveBackGestureState(
     enabled: Boolean,
+    retainCompletedState: Boolean = false,
     onBack: () -> Unit,
 ): PredictiveBackGestureState {
     val state = remember { PredictiveBackGestureState() }
@@ -82,7 +83,7 @@ internal fun rememberPredictiveBackGestureState(
         } catch (_: CancellationException) {
             withContext(NonCancellable) { state.cancel() }
         } finally {
-            if (committed) state.reset()
+            if (committed && !retainCompletedState) state.reset()
         }
     }
     return state

@@ -1,0 +1,40 @@
+{
+  "apiVersion": 2,
+  "id": "lyracode.deepseek-maid",
+  "name": "DeepSeek 娘 · 静谧蓝",
+  "version": "1.0.1",
+  "author": "Lyra Code · 参考用户提供的角色图",
+  "entry": "scripts/main.js",
+  "config": "config.toml",
+  "controls": [
+    {
+      "key": "transitionMs",
+      "label": "姿势过渡时长（毫秒）",
+      "type": "range",
+      "min": 120,
+      "max": 650,
+      "default": 320
+    },
+    {
+      "key": "feedback",
+      "label": "点击与拖动柔和反馈",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "pose",
+      "label": "姿势预览",
+      "type": "select",
+      "options": [
+        "auto",
+        "idle",
+        "thinking",
+        "executing",
+        "approval",
+        "completed",
+        "error"
+      ],
+      "default": "auto"
+    }
+  ]
+}

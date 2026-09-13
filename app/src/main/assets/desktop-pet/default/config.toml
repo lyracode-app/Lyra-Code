@@ -1,0 +1,9 @@
+[pet]
+size = 54
+autoDock = true
+dockDelayMs = 3500
+dockFraction = 0.5
+dockOpacity = 0.42
+activeOpacity = 1.0
+soundEnabled = false
+volume = 0.5

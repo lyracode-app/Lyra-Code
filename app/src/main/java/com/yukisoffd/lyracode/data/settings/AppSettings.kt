@@ -251,6 +251,12 @@ class AppSettings(context: Context) {
         get() = plainPrefs.getBoolean(KEY_PREDICTIVE_BACK_ENABLED, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_PREDICTIVE_BACK_ENABLED, value).apply()
 
+    var deviceInteractionExperimentalEnabled: Boolean
+        get() = plainPrefs.getBoolean(KEY_DEVICE_INTERACTION_EXPERIMENTAL_ENABLED, false)
+        set(value) = plainPrefs.edit()
+            .putBoolean(KEY_DEVICE_INTERACTION_EXPERIMENTAL_ENABLED, value)
+            .apply()
+
     var customThemeColorEnabled: Boolean
         get() = plainPrefs.getBoolean(KEY_CUSTOM_THEME_COLOR_ENABLED, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_CUSTOM_THEME_COLOR_ENABLED, value).apply()
@@ -656,6 +662,10 @@ class AppSettings(context: Context) {
         plainPrefs.edit().putString("$KEY_HIDDEN_FILE_CHANGES_SIGNATURE_PREFIX$conversationId", signature).apply()
     }
 
+    var purePromptMode: Boolean
+        get() = plainPrefs.getBoolean("pure_prompt_mode", false)
+        set(value) { plainPrefs.edit().putBoolean("pure_prompt_mode", value).apply() }
+
     var selectedSystemPromptId: String
         get() {
             val stored = plainPrefs.getString(KEY_SELECTED_SYSTEM_PROMPT_ID, NATIVE_SYSTEM_PROMPT_ID)
@@ -888,6 +898,7 @@ class AppSettings(context: Context) {
                             savedModels = savedModels,
                             enabledModels = enabledModels,
                             useResponsesApi = apiFormat == ApiProfile.API_FORMAT_OPENAI && item.optBoolean("useResponsesApi", false),
+                    modelRequestOverrides = ModelRequestCustomization.decodeMap(item.optJSONObject("modelRequestOverrides")),
                         ),
                     )
                 }
@@ -912,6 +923,7 @@ class AppSettings(context: Context) {
                     .put("savedModels", JSONArray(profile.savedModels.distinct()))
                     .put("enabledModels", JSONArray(profile.enabledModels.distinct()))
                     .put("useResponsesApi", profile.apiFormat == ApiProfile.API_FORMAT_OPENAI && profile.useResponsesApi)
+                    .put("modelRequestOverrides", ModelRequestCustomization.encodeMap(profile.modelRequestOverrides))
             )
         }
         securePrefs.edit().putString(KEY_API_PROFILES, array.toString()).apply()
@@ -1466,6 +1478,7 @@ class AppSettings(context: Context) {
             .put("chatBackgroundPath", chatBackgroundPath.orEmpty())
             .put("chatBackgroundMaskOpacity", chatBackgroundMaskOpacity.toDouble())
             .put("hideTermuxPermissionHint", hideTermuxPermissionHint)
+            .put("purePromptMode", purePromptMode)
             .put("selectedSystemPromptId", selectedSystemPromptId)
             .put("customSystemPrompts", JSONObject(plainPrefs.getString(KEY_CUSTOM_SYSTEM_PROMPTS, "{}").orEmpty().ifBlank { "{}" }))
             .put("systemPromptConfigs", JSONArray(plainPrefs.getString(KEY_SYSTEM_PROMPT_CONFIGS, "[]").orEmpty().ifBlank { "[]" }))
@@ -1536,6 +1549,7 @@ class AppSettings(context: Context) {
                             .put("savedModels", JSONArray(profile.savedModels))
                             .put("enabledModels", JSONArray(profile.enabledModels))
                             .put("useResponsesApi", profile.apiFormat == ApiProfile.API_FORMAT_OPENAI && profile.useResponsesApi)
+                    .put("modelRequestOverrides", ModelRequestCustomization.encodeMap(profile.modelRequestOverrides))
                     )
                 }
             })
@@ -1621,6 +1635,7 @@ class AppSettings(context: Context) {
             ).toFloat()
         }
         if (root.has("hideTermuxPermissionHint")) hideTermuxPermissionHint = root.optBoolean("hideTermuxPermissionHint")
+        if (root.has("purePromptMode")) purePromptMode = root.optBoolean("purePromptMode")
         root.optString("selectedSystemPromptId").takeIf { it.isNotBlank() }?.let { selectedSystemPromptId = it }
         root.optJSONObject("customSystemPrompts")?.let { imported ->
             val sanitizedImported = JSONObject().also { output ->
@@ -2006,6 +2021,7 @@ class AppSettings(context: Context) {
                     savedModels = savedModels,
                     enabledModels = enabledModels,
                     useResponsesApi = apiFormat == ApiProfile.API_FORMAT_OPENAI && item.optBoolean("useResponsesApi", false),
+                    modelRequestOverrides = ModelRequestCustomization.decodeMap(item.optJSONObject("modelRequestOverrides")),
                 ),
             )
         }
@@ -2359,6 +2375,7 @@ class AppSettings(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DYNAMIC_COLOR_ENABLED = "dynamic_color_enabled"
         private const val KEY_PREDICTIVE_BACK_ENABLED = "predictive_back_enabled"
+        private const val KEY_DEVICE_INTERACTION_EXPERIMENTAL_ENABLED = "device_interaction_experimental_enabled"
         private const val KEY_CUSTOM_THEME_COLOR_ENABLED = "custom_theme_color_enabled"
         private const val KEY_CUSTOM_THEME_COLOR = "custom_theme_color"
         private const val KEY_LANGUAGE_MODE = "language_mode"

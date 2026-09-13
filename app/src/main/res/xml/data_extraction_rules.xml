@@ -5,6 +5,7 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="first_use_consent.xml" />
         <exclude domain="file" path="debian-runtime/" />
         <exclude domain="file" path="proot-linux/" />
         <!-- TODO: Use <include> and <exclude> to control what is backed up.
@@ -13,6 +14,7 @@
         -->
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="first_use_consent.xml" />
         <exclude domain="file" path="debian-runtime/" />
         <exclude domain="file" path="proot-linux/" />
     </device-transfer>

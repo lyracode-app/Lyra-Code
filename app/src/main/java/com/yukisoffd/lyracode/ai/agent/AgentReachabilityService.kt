@@ -1,5 +1,6 @@
 package com.yukisoffd.lyracode.ai
 
+import com.yukisoffd.lyracode.ai.customizedFor
 import com.yukisoffd.lyracode.R
 import com.yukisoffd.lyracode.data.ApiProfile
 import com.yukisoffd.lyracode.uiText
@@ -18,7 +19,7 @@ internal class AgentReachabilityService(
     private val reachabilityClient: OkHttpClient,
 ) {
     fun fetchModels(profile: ApiProfile): Result<List<String>> = runCatching {
-        require(profile.apiKey.isNotBlank()) { "API Key 不能为空" }
+
         if (profile.apiFormat == ApiProfile.API_FORMAT_ANTHROPIC) {
             return@runCatching fetchAnthropicModels(profile)
         }
@@ -27,7 +28,7 @@ internal class AgentReachabilityService(
         }
         val request = Request.Builder()
             .url(profile.modelsEndpoint)
-            .addHeader("Authorization", "Bearer ${profile.apiKey}")
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
             .get()
             .build()
         client.newCall(request).execute().use { response ->
@@ -46,7 +47,7 @@ internal class AgentReachabilityService(
     }
 
     fun checkReachability(profile: ApiProfile, models: List<String>): ProviderReachabilityReport {
-        require(profile.apiKey.isNotBlank()) { "API Key 不能为空" }
+
         val targets = models
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -63,7 +64,7 @@ internal class AgentReachabilityService(
     }
 
     fun checkProviderReachability(profile: ApiProfile): ProviderReachabilityResult {
-        require(profile.apiKey.isNotBlank()) { "API Key 不能为空" }
+
         val probe = executeReachabilityProbe(providerReachabilityRequest(profile))
         return ProviderReachabilityResult(
             available = probe.available,
@@ -74,7 +75,7 @@ internal class AgentReachabilityService(
     }
 
     fun checkModelReachability(profile: ApiProfile, model: String): ModelReachabilityResult {
-        require(profile.apiKey.isNotBlank()) { "API Key 不能为空" }
+
         val target = model.trim().ifBlank { profile.selectedModel }
         val probe = executeReachabilityProbe(modelReachabilityRequest(profile, target))
         return ModelReachabilityResult(
@@ -90,10 +91,10 @@ internal class AgentReachabilityService(
         val builder = Request.Builder().url(profile.modelsEndpoint).get()
         when (profile.apiFormat) {
             ApiProfile.API_FORMAT_ANTHROPIC -> builder
-                .addHeader("x-api-key", profile.apiKey)
+                .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                 .addHeader("anthropic-version", ANTHROPIC_VERSION)
-            ApiProfile.API_FORMAT_GEMINI -> builder.addHeader("x-goog-api-key", profile.apiKey)
-            else -> builder.addHeader("Authorization", "Bearer ${profile.apiKey}")
+            ApiProfile.API_FORMAT_GEMINI -> builder.apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
+            else -> builder.apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
         }
         return builder.build()
     }
@@ -109,7 +110,7 @@ internal class AgentReachabilityService(
                     .toRequestBody("application/json".toMediaType())
                 Request.Builder()
                     .url(profile.chatEndpoint)
-                    .addHeader("x-api-key", profile.apiKey)
+                    .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                     .addHeader("anthropic-version", ANTHROPIC_VERSION)
                     .addHeader("Content-Type", "application/json")
                     .post(body)
@@ -123,7 +124,7 @@ internal class AgentReachabilityService(
                     .toRequestBody("application/json".toMediaType())
                 Request.Builder()
                     .url(profile.geminiGenerateContentEndpoint(model))
-                    .addHeader("x-goog-api-key", profile.apiKey)
+                    .apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
                     .addHeader("Content-Type", "application/json")
                     .post(body)
                     .build()
@@ -153,12 +154,12 @@ internal class AgentReachabilityService(
                     .toRequestBody("application/json".toMediaType())
                 Request.Builder()
                     .url(if (profile.useResponsesApi) profile.responsesEndpoint else profile.chatEndpoint)
-                    .addHeader("Authorization", "Bearer ${profile.apiKey}")
+                    .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
                     .addHeader("Content-Type", "application/json")
                     .post(body)
                     .build()
             }
-        }
+        }.customizedFor(profile, model)
     }
 
     private fun executeReachabilityProbe(request: Request): ReachabilityProbe {
@@ -191,13 +192,13 @@ internal class AgentReachabilityService(
         val requests = listOf(
             Request.Builder()
                 .url(profile.modelsEndpoint)
-                .addHeader("x-api-key", profile.apiKey)
+                .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                 .addHeader("anthropic-version", ANTHROPIC_VERSION)
                 .get()
                 .build(),
             Request.Builder()
                 .url(profile.modelsEndpoint)
-                .addHeader("Authorization", "Bearer ${profile.apiKey}")
+                .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
                 .addHeader("anthropic-version", ANTHROPIC_VERSION)
                 .get()
                 .build(),
@@ -218,7 +219,7 @@ internal class AgentReachabilityService(
     private fun fetchGeminiModels(profile: ApiProfile): List<String> {
         val request = Request.Builder()
             .url(profile.modelsEndpoint)
-            .addHeader("x-goog-api-key", profile.apiKey)
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
             .get()
             .build()
         client.newCall(request).execute().use { response ->

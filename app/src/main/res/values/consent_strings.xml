@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="consent_title">Before you begin</string>
+    <string name="consent_intro">Please open both documents below, read each for at least 10 seconds, and scroll to the bottom. You can continue only after checking your agreement.</string>
+    <string name="consent_checkbox">I have read and agree to the User Agreement and Privacy Policy</string>
+    <string name="consent_continue">Agree and continue</string>
+    <string name="consent_decline">Disagree and exit</string>
+    <string name="consent_back">Back</string>
+    <string name="consent_countdown">Please read for %1$d more seconds</string>
+    <string name="consent_scroll_hint">Scroll to the bottom to confirm that you have read this document</string>
+    <string name="consent_read_done">I have read this document</string>
+    <string name="consent_save_failed">Could not save your agreement. Please try again.</string>
+</resources>

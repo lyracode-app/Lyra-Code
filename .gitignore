@@ -4,6 +4,8 @@
 build/
 **/build/
 app/release/
+app/beta/
+app/debug/
 captures/
 .externalNativeBuild/
 .cxx/

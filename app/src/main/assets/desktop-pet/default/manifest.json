@@ -1,0 +1,10 @@
+{
+  "apiVersion": 2,
+  "id": "lyra.circle",
+  "name": "Lyra Circle",
+  "version": "1.0.0",
+  "author": "Lyra Code",
+  "entry": "scripts/main.js",
+  "config": "config.toml",
+  "controls": []
+}
