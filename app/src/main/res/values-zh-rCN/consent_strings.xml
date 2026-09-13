@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="consent_title">首次使用须知</string>
+    <string name="consent_intro">请打开下方两份文件，分别阅读至少 10 秒并滑到底部。阅读完成后，勾选同意方可继续使用。</string>
+    <string name="consent_checkbox">我已阅读并同意《用户协议》和《隐私政策》</string>
+    <string name="consent_continue">同意并继续</string>
+    <string name="consent_decline">不同意并退出</string>
+    <string name="consent_back">返回</string>
+    <string name="consent_countdown">请继续阅读 %1$d 秒</string>
+    <string name="consent_scroll_hint">请滑到文末，确认已阅读本文件</string>
+    <string name="consent_read_done">我已阅读本文件</string>
+    <string name="consent_save_failed">无法保存同意记录，请重试。</string>
+</resources>

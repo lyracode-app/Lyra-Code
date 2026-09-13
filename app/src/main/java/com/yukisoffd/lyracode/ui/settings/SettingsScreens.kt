@@ -461,7 +461,7 @@ internal fun SettingsScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(settingsListScroll)
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                    .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
             CapsuleTextField(

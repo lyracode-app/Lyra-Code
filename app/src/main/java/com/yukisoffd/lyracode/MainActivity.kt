@@ -31,6 +31,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -237,6 +238,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        if (!FirstUseConsentStore(this).isAccepted) {
+            AppStrings.initialize(this)
+            setContent {
+                LyraCodeTheme(
+                    darkMode = isSystemInDarkTheme(),
+                    dynamicColor = false,
+                    fontScale = LocalDensity.current.fontScale,
+                    settings = AppSettings(this),
+                    settingsRevision = 0,
+                    dynamicColorRevision = 0,
+                ) {
+                    MainActivityWindow(this@MainActivity) {
+                        FirstUseConsentScreen(
+                            onAccepted = { recreate() },
+                            onDeclined = { finishAndRemoveTask() },
+                        )
+                    }
+                }
+            }
+            return
+        }
         UpdateManifestEasterEggRuntime.initialize(this)
         if (savedInstanceState == null) UpdateManifestEasterEggRuntime.beginFreshAppTask()
         enableAndroid17CompatibilityDiagnostics()
@@ -351,97 +374,99 @@ class MainActivity : ComponentActivity() {
                     settingsRevision = settingsRevision,
                     dynamicColorRevision = wallpaperColorRevision,
                 ) {
-                    LyraCodeApp(
-                        settings = settings,
-                        auditLogStore = auditLogStore,
-                        workspaceManager = workspaceManager,
-                        termuxExecutor = termuxExecutor,
-                        mcpClientManager = mcpClientManager,
-                        sshExecutor = sshExecutor,
-                        sshTerminalSessionManager = sshTerminalSessionManager,
-                        localProotTerminalSessionManager = localProotTerminalSessionManager,
-                        systemCommandExecutor = systemCommandExecutor,
-                        webDavClient = webDavClient,
-                        fileTransferClient = fileTransferClient,
-                        backupManager = backupManager,
-                        miniServerManager = miniServerManager,
-                        localMcpServerManager = localMcpServerManager,
-                        downloadTaskManager = downloadTaskManager,
-                        scheduledTaskManager = scheduledTaskManager,
-                        controller = chatController,
-                        themeMode = themeMode,
-                        onThemeModeChange = {
-                            themeMode = it
-                            settings.themeMode = it
-                            settings.darkMode = it == AppSettings.THEME_DARK
-                        },
-                        dynamicColorEnabled = dynamicColorEnabled,
-                        onDynamicColorChange = {
-                            dynamicColorEnabled = it
-                            settings.dynamicColorEnabled = it
-                        },
-                        predictiveBackEnabled = predictiveBackEnabled,
-                        onPredictiveBackChange = {
-                            predictiveBackEnabled = it
-                            settings.predictiveBackEnabled = it
-                        },
-                        languageMode = languageMode,
-                        onLanguageModeChange = {
-                            val normalized = AppSettings.normalizeLanguageMode(it)
-                            if (normalized != languageMode) {
-                                languageMode = normalized
-                                settings.languageMode = normalized
-                                recreate()
-                            }
-                        },
-                        refreshRateMode = refreshRateMode,
-                        onRefreshRateModeChange = {
-                            refreshRateMode = it
-                            settings.refreshRateMode = it
-                        },
-                        fontScaleMode = fontScaleMode,
-                        customFontScale = customFontScale,
-                        onFontScaleModeChange = {
-                            fontScaleMode = it
-                            settings.fontScaleMode = it
-                        },
-                        onCustomFontScaleChange = {
-                            customFontScale = it
-                            settings.customFontScale = it
-                        },
-                    )
-                    if (showLocalNetworkPermissionRationale) {
-                        AlertDialog(
-                            onDismissRequest = {
-                                showLocalNetworkPermissionRationale = false
-                                compatibilityPreferences.edit {
-                                    putBoolean(LOCAL_NETWORK_RATIONALE_SEEN, true)
+                    MainActivityWindow(this@MainActivity) {
+                        LyraCodeApp(
+                            settings = settings,
+                            auditLogStore = auditLogStore,
+                            workspaceManager = workspaceManager,
+                            termuxExecutor = termuxExecutor,
+                            mcpClientManager = mcpClientManager,
+                            sshExecutor = sshExecutor,
+                            sshTerminalSessionManager = sshTerminalSessionManager,
+                            localProotTerminalSessionManager = localProotTerminalSessionManager,
+                            systemCommandExecutor = systemCommandExecutor,
+                            webDavClient = webDavClient,
+                            fileTransferClient = fileTransferClient,
+                            backupManager = backupManager,
+                            miniServerManager = miniServerManager,
+                            localMcpServerManager = localMcpServerManager,
+                            downloadTaskManager = downloadTaskManager,
+                            scheduledTaskManager = scheduledTaskManager,
+                            controller = chatController,
+                            themeMode = themeMode,
+                            onThemeModeChange = {
+                                themeMode = it
+                                settings.themeMode = it
+                                settings.darkMode = it == AppSettings.THEME_DARK
+                            },
+                            dynamicColorEnabled = dynamicColorEnabled,
+                            onDynamicColorChange = {
+                                dynamicColorEnabled = it
+                                settings.dynamicColorEnabled = it
+                            },
+                            predictiveBackEnabled = predictiveBackEnabled,
+                            onPredictiveBackChange = {
+                                predictiveBackEnabled = it
+                                settings.predictiveBackEnabled = it
+                            },
+                            languageMode = languageMode,
+                            onLanguageModeChange = {
+                                val normalized = AppSettings.normalizeLanguageMode(it)
+                                if (normalized != languageMode) {
+                                    languageMode = normalized
+                                    settings.languageMode = normalized
+                                    recreate()
                                 }
                             },
-                            title = { Text(uiText(R.string.local_network_permission_title)) },
-                            text = { Text(uiText(R.string.local_network_permission_rationale)) },
-                            confirmButton = {
-                                TextButton(
-                                    onClick = {
-                                        showLocalNetworkPermissionRationale = false
-                                        compatibilityPreferences.edit {
-                                            putBoolean(LOCAL_NETWORK_RATIONALE_SEEN, true)
-                                        }
-                                        requestLocalNetworkPermission()
-                                    },
-                                ) { Text(uiText(R.string.action_enable)) }
+                            refreshRateMode = refreshRateMode,
+                            onRefreshRateModeChange = {
+                                refreshRateMode = it
+                                settings.refreshRateMode = it
                             },
-                            dismissButton = {
-                                TextButton(
-                                    onClick = {
-                                        showLocalNetworkPermissionRationale = false
-                                        compatibilityPreferences.edit {
-                                            putBoolean(LOCAL_NETWORK_RATIONALE_SEEN, true)
-                                        }
-                                    },
-                                ) { Text(uiText(R.string.action_later)) }
+                            fontScaleMode = fontScaleMode,
+                            customFontScale = customFontScale,
+                            onFontScaleModeChange = {
+                                fontScaleMode = it
+                                settings.fontScaleMode = it
+                            },
+                            onCustomFontScaleChange = {
+                                customFontScale = it
+                                settings.customFontScale = it
                             },
                         )
+                        if (showLocalNetworkPermissionRationale) {
+                            AlertDialog(
+                                onDismissRequest = {
+                                    showLocalNetworkPermissionRationale = false
+                                    compatibilityPreferences.edit {
+                                        putBoolean(LOCAL_NETWORK_RATIONALE_SEEN, true)
+                                    }
+                                },
+                                title = { Text(uiText(R.string.local_network_permission_title)) },
+                                text = { Text(uiText(R.string.local_network_permission_rationale)) },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showLocalNetworkPermissionRationale = false
+                                            compatibilityPreferences.edit {
+                                                putBoolean(LOCAL_NETWORK_RATIONALE_SEEN, true)
+                                            }
+                                            requestLocalNetworkPermission()
+                                        },
+                                    ) { Text(uiText(R.string.action_enable)) }
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showLocalNetworkPermissionRationale = false
+                                            compatibilityPreferences.edit {
+                                                putBoolean(LOCAL_NETWORK_RATIONALE_SEEN, true)
+                                            }
+                                        },
+                                    ) { Text(uiText(R.string.action_later)) }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -475,7 +500,7 @@ class MainActivity : ComponentActivity() {
         localMcpServerManager?.close()
         sshTerminalSessionManager?.close()
         localProotTerminalSessionManager?.close()
-        if (isFinishing) {
+        if (isFinishing && controller != null) {
             AppSettings(this).clearChatInputDrafts()
         }
         super.onDestroy()
