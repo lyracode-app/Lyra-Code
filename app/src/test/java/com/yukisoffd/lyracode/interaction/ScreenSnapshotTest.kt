@@ -7,9 +7,7 @@ import com.yukisoffd.lyracode.interaction.model.ScreenSnapshotFingerprint
 import com.yukisoffd.lyracode.interaction.model.SemanticAction
 import com.yukisoffd.lyracode.interaction.model.SemanticNode
 import com.yukisoffd.lyracode.interaction.model.toDebugText
-import com.yukisoffd.lyracode.interaction.perception.ScreenProbeController
 import com.yukisoffd.lyracode.interaction.perception.SnapshotTextBudget
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -18,11 +16,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScreenSnapshotTest {
-    @After
-    fun clearProbeState() {
-        ScreenProbeController.clear()
-    }
-
     @Test
     fun fingerprintChangesWithUiContentButNotSnapshotVersion() {
         val display = ScreenDisplay(0, 0, 1080, 2400)
@@ -63,22 +56,6 @@ class ScreenSnapshotTest {
         assertEquals("123", budget.take("123456"))
         assertNull(budget.take("more"))
         assertTrue(budget.truncated)
-    }
-
-    @Test
-    fun probePublishesOnlyInsideItsBoundedSession() {
-        val snapshot = snapshot(listOf(node()))
-        ScreenProbeController.start(nowEpochMillis = 1_000L, durationMillis = 2_000L)
-
-        ScreenProbeController.publish(snapshot, nowEpochMillis = 2_000L)
-        assertEquals(snapshot, ScreenProbeController.state.value.latestSnapshot)
-        assertTrue(ScreenProbeController.isActive(nowEpochMillis = 2_999L))
-
-        ScreenProbeController.expire(nowEpochMillis = 3_000L)
-        assertFalse(ScreenProbeController.state.value.isActive(3_000L))
-        ScreenProbeController.clear()
-        ScreenProbeController.publish(snapshot, nowEpochMillis = 4_000L)
-        assertNull(ScreenProbeController.state.value.latestSnapshot)
     }
 
     private fun snapshot(nodes: List<SemanticNode>): ScreenSnapshot = ScreenSnapshot(

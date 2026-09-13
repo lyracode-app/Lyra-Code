@@ -75,7 +75,7 @@ class DesktopPetSettingsActivity : ComponentActivity() {
         val active = remember(revision) { DevicePetStore.activeKey(this) }
         var picker by remember { mutableStateOf(false) }
         var removing by remember { mutableStateOf<DevicePetStore.PetEntry?>(null) }
-        val backState = rememberPredictiveBackGestureState(enabled = predictiveEnabled && !picker && removing == null && !editing) {
+        val backState = rememberPredictiveBackGestureState(enabled = predictiveEnabled && !picker && removing == null && !editing, retainCompletedState = true) {
             finish()
             @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
@@ -96,7 +96,7 @@ class DesktopPetSettingsActivity : ComponentActivity() {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Icon(Icons.Default.Pets, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                             Column(Modifier.weight(1f)) {
-                                Text(manifest.getString("name"), style = MaterialTheme.typography.titleLarge)
+                                Text(if (DevicePetStore.activeKey(this@DesktopPetSettingsActivity) == "builtin") getString(R.string.pet_builtin_name) else manifest.getString("name"), style = MaterialTheme.typography.titleLarge)
                                 Text(getString(R.string.pet_available_count, catalog.size), style = MaterialTheme.typography.bodyMedium)
                             }
                         }

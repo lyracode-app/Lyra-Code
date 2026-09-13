@@ -129,6 +129,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -455,14 +456,18 @@ internal fun KimiMenuRow(
     icon: ImageVector,
     title: String,
     value: String = "",
+    enabled: Boolean = true,
+    onDisabledClick: (() -> Unit)? = null,
     onClick: () -> Unit = {},
 ) {
-    val (iconContainer, iconContent) = kimiMenuAccent(title)
+    val (iconContainer, iconContent) = if (enabled) kimiMenuAccent(title) else
+        MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled || onDisabledClick != null) { if (enabled) onClick() else onDisabledClick?.invoke() }
+            .then(if (enabled) Modifier else Modifier.graphicsLayer { alpha = 0.38f })
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

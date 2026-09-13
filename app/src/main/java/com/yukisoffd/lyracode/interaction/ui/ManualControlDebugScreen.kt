@@ -29,6 +29,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.yukisoffd.lyracode.KimiCardBox
 import com.yukisoffd.lyracode.KimiMuted
+import com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability
 import com.yukisoffd.lyracode.R
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.interaction.overlay.ManualControlForegroundConnection
@@ -36,7 +37,6 @@ import com.yukisoffd.lyracode.interaction.service.AccessibilityConnection
 import com.yukisoffd.lyracode.interaction.overlay.ManualControlForegroundService
 import com.yukisoffd.lyracode.interaction.overlay.ManualControlForegroundState
 import com.yukisoffd.lyracode.interaction.overlay.OverlayPermission
-import com.yukisoffd.lyracode.interaction.perception.ScreenProbeController
 import com.yukisoffd.lyracode.interaction.session.ManualControlController
 import kotlinx.coroutines.delay
 
@@ -72,10 +72,9 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
     }
-    val canRequestStart = connected && overlayGranted && settings.deviceInteractionExperimentalEnabled
+    val canRequestStart = overlayGranted && DeviceInteractionAvailability.isSupported()
     val startSession = {
         nowEpochMillis = System.currentTimeMillis()
-        ScreenProbeController.stop()
         ManualControlController.start(nowEpochMillis)
         val profile = settings.selectedProfile()
         ManualControlController.updateChat(
@@ -89,7 +88,7 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         permissionRevision++
-        if (granted) startSession()
+        startSession()
     }
 
     KimiCardBox {
@@ -101,7 +100,7 @@ internal fun ManualControlDebugScreen(settings: AppSettings) {
         )
         Text(
             when {
-                !connected -> context.getString(R.string.manual_control_service_required)
+                !connected -> context.getString(R.string.floating_chat_without_accessibility)
                 !overlayGranted -> context.getString(R.string.manual_control_overlay_required)
                 !notificationGranted -> context.getString(R.string.manual_control_notification_required)
                 active && foregroundState != ManualControlForegroundState.RUNNING ->

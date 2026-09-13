@@ -29,7 +29,7 @@ class PetLibraryInstrumentedTest {
                 java.io.File(it, "manifest.json").writeText(DevicePetStore.defaultManifest(context).toString())
             }
             java.io.File(directory, "desktop-pet-active.json").writeText(JSONObject().put("root", key).toString())
-            DevicePetStore.packageFile(isolated).writeText(context.assets.open("desktop-pet/default.json").bufferedReader().use { it.readText() })
+            DevicePetStore.packageFile(isolated).writeText(InstrumentationRegistry.getInstrumentation().context.assets.open("desktop-pet/default.json").bufferedReader().use { it.readText() })
             DevicePetStore.saveOptions(isolated, JSONObject().put("size", 81).put("controls", JSONObject().put("color", "#123456")))
             assertEquals(setOf("builtin", "legacy", key), DevicePetStore.catalog(isolated).map { it.key }.toSet())
             DevicePetStore.select(isolated, "builtin")
@@ -130,7 +130,7 @@ class PetLibraryInstrumentedTest {
                 java.io.File(context.externalCacheDir, "pet-settings-md3.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
             }
             clickText(switchLabel())
-            clickText("Lyra 星猫")
+            clickText(context.localizedContext(com.yukisoffd.lyracode.data.AppSettings(context).languageMode).getString(R.string.pet_builtin_name))
             awaitCondition("Picker did not select default pet") { DevicePetStore.activeKey(context) == "builtin" }
             clickText(switchLabel())
             clickText("Minty · 薄荷")

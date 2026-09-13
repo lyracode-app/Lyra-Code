@@ -74,6 +74,7 @@ class ManualControlForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        if (!com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported()) { stopSelf(); return }
         createNotificationChannel()
         try {
             startAsForeground()
@@ -97,7 +98,7 @@ class ManualControlForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!OverlayPermission.isGranted(this)) {
+        if (!com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported() || !OverlayPermission.isGranted(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -194,6 +195,9 @@ class ManualControlForegroundService : Service() {
             },
             onApproval = { id, approved ->
                 sendControlCommand(ManualControlCommandService.APPROVAL, ManualControlOverlayProtocol.COMMAND_APPROVAL, requestId = id, input = if (approved) "approve" else "reject")
+            },
+            onConfigure = { payload ->
+                sendControlCommand(ManualControlCommandService.CONFIGURE, ManualControlOverlayProtocol.COMMAND_CONFIGURE, input = payload)
             },
             onClearContext = {
                 sendControlCommand(ManualControlCommandService.CLEAR_CONTEXT, ManualControlOverlayProtocol.COMMAND_CLEAR_CONTEXT)
@@ -328,6 +332,7 @@ class ManualControlForegroundService : Service() {
         private const val LOG_TAG = "LyraManualControl"
 
         fun start(context: Context): Boolean {
+            if (!com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported()) return false
             val appContext = context.applicationContext
             ManualControlForegroundConnection.markStarting()
             return runCatching {

@@ -1,5 +1,6 @@
 package com.yukisoffd.lyracode.ai
 
+import com.yukisoffd.lyracode.ai.customizedFor
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -202,7 +203,7 @@ class OpenAiAgent(
         model: String,
         firstUserMessage: String,
     ): String = withContext(Dispatchers.IO) {
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         require(!isMediaGenerationModel(model)) { "媒体生成模型不能用于会话标题总结" }
         val input = firstUserMessage.trim().take(4000)
         require(input.isNotBlank()) { "首条消息不能为空" }
@@ -211,10 +212,10 @@ class OpenAiAgent(
             ApiProfile.API_FORMAT_ANTHROPIC -> {
                 val payload = JSONObject().put("model", model).put("max_tokens", 48).put("temperature", 0.2)
                     .put("system", instruction).put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", input)))
-                val request = Request.Builder().url(profile.chatEndpoint).addHeader("x-api-key", profile.apiKey)
+                val request = Request.Builder().url(profile.chatEndpoint).apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                     .addHeader("anthropic-version", ANTHROPIC_VERSION).addHeader("Content-Type", "application/json")
                     .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
                     val blocks = JSONObject(body).optJSONArray("content") ?: JSONArray()
@@ -226,9 +227,9 @@ class OpenAiAgent(
                     .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", input)))))
                     .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction))))
                     .put("generationConfig", JSONObject().put("temperature", 0.2).put("maxOutputTokens", 48))
-                val request = Request.Builder().url(profile.geminiGenerateContentEndpoint(model)).addHeader("x-goog-api-key", profile.apiKey)
+                val request = Request.Builder().url(profile.geminiGenerateContentEndpoint(model)).apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
                     .addHeader("Content-Type", "application/json").post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
                     val parts = JSONObject(body).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
@@ -259,7 +260,7 @@ class OpenAiAgent(
         customInstruction: String,
         requestedChunkCount: Int,
     ): String = withContext(Dispatchers.IO) {
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         require(model.isNotBlank()) { "未配置会话历史压缩模型" }
         require(!isMediaGenerationModel(model)) { "媒体生成模型不能用于会话历史压缩" }
         val history = contextHistory(conversationId, -1L)
@@ -403,10 +404,10 @@ class OpenAiAgent(
                 val payload = JSONObject().put("model", model).put("max_tokens", maxOutputTokens)
                     .put("temperature", 0.1).put("system", instruction)
                     .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", input)))
-                val request = Request.Builder().url(profile.chatEndpoint).addHeader("x-api-key", profile.apiKey)
+                val request = Request.Builder().url(profile.chatEndpoint).apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                     .addHeader("anthropic-version", ANTHROPIC_VERSION).addHeader("Content-Type", "application/json")
                     .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error(historyCompressionHttpError(response.code, body))
                     extractModelResponseText(JSONObject(body), ApiProfile.API_FORMAT_ANTHROPIC)
@@ -417,9 +418,9 @@ class OpenAiAgent(
                     .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", input)))))
                     .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction))))
                     .put("generationConfig", JSONObject().put("temperature", 0.1).put("maxOutputTokens", maxOutputTokens))
-                val request = Request.Builder().url(profile.geminiGenerateContentEndpoint(model)).addHeader("x-goog-api-key", profile.apiKey)
+                val request = Request.Builder().url(profile.geminiGenerateContentEndpoint(model)).apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
                     .addHeader("Content-Type", "application/json").post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error(historyCompressionHttpError(response.code, body))
                     extractModelResponseText(JSONObject(body), ApiProfile.API_FORMAT_GEMINI)
@@ -482,11 +483,11 @@ class OpenAiAgent(
         }
         val request = Request.Builder()
             .url(if (profile.useResponsesApi) profile.responsesEndpoint else profile.chatEndpoint)
-            .addHeader("Authorization", "Bearer ${profile.apiKey}")
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
             .addHeader("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        return client.newCall(request).execute().use { response ->
+        return client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) error(errorMessage(response.code, body))
             extractModelResponseText(JSONObject(body), profile.apiFormat, profile.useResponsesApi)
@@ -768,7 +769,7 @@ class OpenAiAgent(
         onStatus: suspend (String) -> Unit,
     ): StreamingResult {
         require(profile.apiFormat == ApiProfile.API_FORMAT_OPENAI) { "Responses API 仅支持 OpenAI 接口格式" }
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         val mediaGeneration = isMediaGenerationModel(model)
         val requestJson = JSONObject()
             .put("model", model)
@@ -777,9 +778,8 @@ class OpenAiAgent(
             .put("store", false)
         if (!mediaGeneration) {
             requestJson
-                .put("instructions", responsesInstructions(conversationId, profile))
-                .put("tools", responsesToolDefinitions(conversationId, profile))
-                .put("tool_choice", "auto")
+                .apply { responsesInstructions(conversationId, profile).takeIf { it.isNotBlank() }?.let { put("instructions", it) } }
+                .apply { addModelTools(settings.purePromptMode, automaticChoice = true) { responsesToolDefinitions(conversationId, profile) } }
             if (!modelLooksReasoningCapable(model)) requestJson.put("temperature", 0.2)
             applyProviderCacheHints(requestJson, profile, model, conversationId)
             applyReasoningDepthHint(requestJson, profile, model)
@@ -788,7 +788,7 @@ class OpenAiAgent(
         val body = stableJson(requestJson).toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(profile.responsesEndpoint)
-            .addHeader("Authorization", "Bearer ${profile.apiKey}")
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
             .addHeader("Content-Type", "application/json")
             .post(body)
             .build()
@@ -801,9 +801,20 @@ class OpenAiAgent(
         var streamCompleted = false
         val toolBuilders = linkedMapOf<Int, ToolCallBuilder>()
         val replayableItems = JSONArray()
-        client.newCall(request).execute().use { response ->
+        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) throwModelRequestHttpError(response.code, source.string())
+            if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
+                val completed = JSONObject(source.string())
+                completed.optJSONObject("error")?.let { throw IOException(it.optString("message")) }
+                require(completed.optJSONArray("output") != null) { "Responses API response has no output" }
+                outputTokens = completed.optJSONObject("usage")?.optLong("output_tokens", 0L) ?: 0L
+                collectCompletedResponseItems(completed, content, thinking, toolBuilders)
+                collectReplayableResponseItems(completed, replayableItems)
+                streamCompleted = true
+                onDelta(content.toString(), thinking.toString())
+                return@use
+            }
             source.byteStream().bufferedReader().useLines { lines ->
                 var sseEventType = ""
                 lines.forEach { line ->
@@ -913,7 +924,7 @@ class OpenAiAgent(
         model: String,
         onDelta: suspend (String, String) -> Unit,
     ): StreamingResult {
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         val mediaGeneration = isMediaGenerationModel(model)
         val messages = promptMessages(conversationId, excludeMessageId, mediaGeneration).also {
             if (supportsDeepSeekFilesApi(profile, model)) deepSeekFilesApi.replaceOpenAiInlineImages(it, profile)
@@ -924,14 +935,13 @@ class OpenAiAgent(
             .put("stream", true)
         if (!mediaGeneration) {
             requestJson
-                .put("tools", toolDefinitionsFor(conversationId))
-                .put("tool_choice", "auto")
+                .apply { addModelTools(settings.purePromptMode, automaticChoice = true) { toolDefinitionsFor(conversationId) } }
                 .put("temperature", 0.2)
             applyProviderCacheHints(requestJson, profile, model, conversationId)
             applyReasoningDepthHint(requestJson, profile, model)
         }
 
-        val allowLocalResponseCache = !mediaGeneration && !isFreshSingleUserTurn(conversationId, excludeMessageId)
+        val allowLocalResponseCache = profile.modelRequestOverrides[model] == null && !mediaGeneration && !isFreshSingleUserTurn(conversationId, excludeMessageId)
         if (allowLocalResponseCache) responseCache?.get(profile, requestJson, responseCacheScope(conversationId))?.let { cached ->
             val result = cached.toStreamingResult()
             Log.d(
@@ -948,7 +958,7 @@ class OpenAiAgent(
             .toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(profile.chatEndpoint)
-            .addHeader("Authorization", "Bearer ${profile.apiKey}")
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
             .addHeader("Content-Type", "application/json")
             .post(body)
             .build()
@@ -962,11 +972,30 @@ class OpenAiAgent(
         var cacheHitRate: Double? = null
         var streamCompleted = false
         val toolBuilders = linkedMapOf<Int, ToolCallBuilder>()
-        client.newCall(request).execute().use { response ->
+        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val text = source.string()
                 throwModelRequestHttpError(response.code, text)
+            }
+            if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
+                val root = JSONObject(source.string())
+                root.optJSONObject("error")?.let { throw IOException(it.optString("message")) }
+                val message = root.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+                    ?: throw IOException("Model response has no assistant message")
+                content.append(extractModelResponseText(root, profile.apiFormat, false))
+                thinking.append(message.stringFieldOrNull("reasoning_content") ?: message.stringFieldOrNull("thinking_content") ?: message.stringFieldOrNull("reasoning").orEmpty())
+                message.optJSONArray("tool_calls")?.let { calls ->
+                    for (index in 0 until calls.length()) calls.optJSONObject(index)?.put("index", index)
+                }
+                parseToolDelta(message, toolBuilders)
+                root.optJSONObject("usage")?.let { usage ->
+                    promptTokens = usage.optLong("prompt_tokens", 0L)
+                    completionTokens = usage.optLong("completion_tokens", 0L)
+                }
+                streamCompleted = true
+                onDelta(content.toString(), thinking.toString())
+                return@use
             }
             source.byteStream().bufferedReader().useLines { lines ->
                 lines.forEach { line ->
@@ -1106,7 +1135,7 @@ class OpenAiAgent(
         model: String,
         onDelta: suspend (String, String) -> Unit,
     ): StreamingResult {
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         val mediaGeneration = isMediaGenerationModel(model)
         val requestJson = JSONObject()
             .put("model", model)
@@ -1116,13 +1145,13 @@ class OpenAiAgent(
         if (!mediaGeneration) {
             requestJson
                 .put("temperature", 0.2)
-                .put("system", providerSystemText(conversationId))
-                .put("tools", anthropicToolsFor(conversationId))
+                .apply { providerSystemText(conversationId).takeIf { it.isNotBlank() }?.let { put("system", it) } }
+                .apply { addModelTools(settings.purePromptMode) { anthropicToolsFor(conversationId) } }
             applyReasoningDepthHint(requestJson, profile, model)
         }
         val requestBuilder = Request.Builder()
             .url(profile.chatEndpoint)
-            .addHeader("x-api-key", profile.apiKey)
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
             .addHeader("anthropic-version", ANTHROPIC_VERSION)
             .addHeader("Content-Type", "application/json")
             .post(stableJson(requestJson).toRequestBody("application/json".toMediaType()))
@@ -1138,7 +1167,7 @@ class OpenAiAgent(
         val nonStreamingBody = StringBuilder()
         var sawStreamingData = false
         var streamCompleted = false
-        client.newCall(request).execute().use { response ->
+        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val body = source.string()
@@ -1254,24 +1283,24 @@ class OpenAiAgent(
         model: String,
         onDelta: suspend (String, String) -> Unit,
     ): StreamingResult {
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         val mediaGeneration = isMediaGenerationModel(model)
         val requestJson = JSONObject()
             .put("contents", geminiContents(conversationId, excludeMessageId, mediaGeneration))
         if (!mediaGeneration) {
             requestJson
-                .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", providerSystemText(conversationId)))))
+                .apply { providerSystemText(conversationId).takeIf { it.isNotBlank() }?.let { put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", it)))) } }
                 .put("generationConfig", JSONObject().put("temperature", 0.2))
-                .put("tools", JSONArray().put(JSONObject().put("functionDeclarations", geminiFunctionDeclarationsFor(conversationId))))
+                .apply { addModelTools(settings.purePromptMode) { JSONArray().put(JSONObject().put("functionDeclarations", geminiFunctionDeclarationsFor(conversationId))) } }
         }
         val request = Request.Builder()
             .url(profile.geminiGenerateContentEndpoint(model))
-            .addHeader("x-goog-api-key", profile.apiKey)
+            .apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
             .addHeader("Content-Type", "application/json")
             .post(stableJson(requestJson).toRequestBody("application/json".toMediaType()))
             .build()
         val startedAtNanos = System.nanoTime()
-        client.newCall(request).execute().use { response ->
+        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val source = response.body ?: throw IOException("响应为空")
             val body = source.string()
             if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
@@ -1324,6 +1353,7 @@ class OpenAiAgent(
     }
 
     private fun ensureRuntimeContextSnapshot(conversationId: Long, profile: ApiProfile, model: String) {
+        if (settings.purePromptMode) return
         val conversation = conversationStore.conversation(conversationId)
         val messages = conversationStore.messages(conversationId)
         val snapshot = runtimeContextSnapshot(conversationId)
@@ -1338,7 +1368,7 @@ class OpenAiAgent(
     }
 
     private fun runtimeContextSnapshot(conversationId: Long): String {
-        if (scopedToolsFor(conversationId) != null) return "Foreground device task: use only the explicitly scoped device tools."
+        if (scopedToolsFor(conversationId)?.includesNativeTools == false) return "Foreground device task: use only the explicitly scoped device tools."
         return buildRuntimeContextSnapshot(
             memoryPrompt = settings.memoryPrompt(),
             activeSkillsPrompt = settings.activeSkillsPrompt(forcedSkillIdsFor(conversationId)),
@@ -1368,7 +1398,7 @@ class OpenAiAgent(
     }
 
     private fun responsesToolDefinitions(conversationId: Long, profile: ApiProfile): JSONArray =
-        buildResponsesToolDefinitions(
+        if (settings.purePromptMode) JSONArray() else buildResponsesToolDefinitions(
             chatTools = toolDefinitionsFor(conversationId),
             includeDeepSeekWebSearch = scopedToolsFor(conversationId) == null && supportsDeepSeekNativeWebSearch(profile),
         )
@@ -1383,7 +1413,7 @@ class OpenAiAgent(
         val messages = promptMessages(conversationId, excludeMessageId, mediaGeneration).also {
             if (supportsDeepSeekFilesApi(profile, model)) deepSeekFilesApi.replaceOpenAiInlineImages(it, profile)
         }
-        val includeReasoningTextFallback = supportsDeepSeekNativeWebSearch(profile)
+        val includeReasoningTextFallback = supportsDeepSeekNativeWebSearch(profile) && profile.modelRequestOverrides[model]?.replayThinking != false
         return JSONArray().also { output ->
             for (index in 0 until messages.length()) {
                 val message = messages.optJSONObject(index) ?: continue
@@ -1506,7 +1536,7 @@ class OpenAiAgent(
 
     private fun responsesInstructions(conversationId: Long, profile: ApiProfile): String {
         val base = providerSystemText(conversationId)
-        if (!supportsDeepSeekNativeWebSearch(profile)) return base
+        if (settings.purePromptMode || !supportsDeepSeekNativeWebSearch(profile)) return base
         return "$base\n\n" +
             "DEEPSEEK_NATIVE_WEB_SEARCH_V1\n" +
             "A server-side built-in web_search tool is available in this Responses API request. " +
@@ -1517,9 +1547,15 @@ class OpenAiAgent(
     }
 
     private fun systemMessagesFor(conversationId: Long): List<JSONObject> = buildList {
+        if (settings.purePromptMode) {
+            settings.activeSystemPromptText().takeIf { it.isNotBlank() }?.let {
+                add(JSONObject().put("role", "system").put("content", it))
+            }
+            return@buildList
+        }
         scopedToolsFor(conversationId)?.let {
             add(JSONObject().put("role", "system").put("content", it.systemPrompt))
-            return@buildList
+            if (!it.includesNativeTools) return@buildList
         }
         add(staticSystemMessage())
         if (isSubAgentConversation(conversationId)) add(subAgentStaticSystemMessage())
@@ -1547,6 +1583,7 @@ class OpenAiAgent(
         val source = conversationStore.messages(conversationId)
             .filter {
                     it.id != excludeMessageId &&
+                    (!settings.purePromptMode || it.role != RUNTIME_CONTEXT_ROLE) &&
                     it.id > (conversation?.compressedThroughMessageId ?: 0L) &&
                     it.role != MEDIA_MESSAGE_ROLE &&
                     !it.isLocalRequestErrorMessage() &&
@@ -1990,6 +2027,11 @@ class OpenAiAgent(
         }
     }
 
+    internal fun floatingToolDefinitions(): JSONArray = toolSchemaFactory.toolDefinitions(allowSubAgents = settings.subAgentOrchestrationEnabled)
+
+    internal suspend fun executeFloatingTool(conversationId: Long, name: String, args: JSONObject): String =
+        executeTool(conversationId, ToolCall(java.util.UUID.randomUUID().toString(), name, args, args.toString()), floatingBridge = true)
+
     internal fun deviceWorkspaceDefinitions(): JSONArray = toolSchemaFactory.toolDefinitions(
         allowSubAgents = false, allowedToolNames = DEVICE_WORKSPACE_TOOLS)
 
@@ -2010,12 +2052,13 @@ class OpenAiAgent(
         call: ToolCall,
         skipApproval: Boolean = false,
         deviceBridge: Boolean = false,
+        floatingBridge: Boolean = false,
         onStatus: suspend (String) -> Unit = {},
     ): String {
         val args = call.arguments
         // Route before generic logging/approval: device arguments may contain screen content.
         // A scoped session cannot use shell, MCP, configuration or sub-agent escape hatches.
-        scopedToolsFor(conversationId)?.takeUnless { deviceBridge }?.let {
+        scopedToolsFor(conversationId)?.takeUnless { deviceBridge || floatingBridge }?.let {
             if (skipApproval) return "ERROR: DEVICE_FOREGROUND_SESSION_REQUIRED"
             if (call.name in settings.disabledTools()) return "ERROR: TOOL_DISABLED"
             return it.execute(call.name, args)
@@ -2404,7 +2447,7 @@ class OpenAiAgent(
         userInstruction: String,
         attachments: List<UploadedAttachmentPrompt>,
     ): String {
-        require(profile.apiKey.isNotBlank()) { "请先配置 ${profile.name} 的 API Key" }
+
         require(model.isNotBlank()) { "视觉补充模型不能为空" }
         val openAiParts = JSONArray().put(JSONObject().put("type", "text").put("text", userInstruction))
         attachments.forEach { attachment ->
@@ -2507,12 +2550,12 @@ class OpenAiAgent(
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
         when (profile.apiFormat) {
             ApiProfile.API_FORMAT_ANTHROPIC -> requestBuilder
-                .addHeader("x-api-key", profile.apiKey)
+                .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                 .addHeader("anthropic-version", ANTHROPIC_VERSION)
-            ApiProfile.API_FORMAT_GEMINI -> requestBuilder.addHeader("x-goog-api-key", profile.apiKey)
-            else -> requestBuilder.addHeader("Authorization", "Bearer ${profile.apiKey}")
+            ApiProfile.API_FORMAT_GEMINI -> requestBuilder.apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
+            else -> requestBuilder.apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
         }
-        return client.newCall(requestBuilder.build()).execute().use { response ->
+        return client.newCall(requestBuilder.build().customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
             extractModelResponseText(JSONObject(body), profile.apiFormat, profile.useResponsesApi)
@@ -3553,11 +3596,12 @@ class OpenAiAgent(
 
     private fun estimatedStaticInputTokens(conversationId: Long): Long {
         val systemTokens = tokenizer.count(providerSystemText(conversationId))
-        val toolTokens = tokenizer.count(stableJson(toolDefinitionsFor(conversationId)))
+        val toolTokens = if (settings.purePromptMode) 0L else tokenizer.count(stableJson(toolDefinitionsFor(conversationId)))
         return MESSAGE_WRAPPER_TOKENS + systemTokens + toolTokens
     }
 
     private fun pendingRuntimeContextTokens(conversationId: Long): Long {
+        if (settings.purePromptMode) return 0L
         val conversation = conversationStore.conversation(conversationId)
         val messages = conversationStore.messages(conversationId)
         val snapshot = runtimeContextSnapshot(conversationId)
@@ -3755,7 +3799,7 @@ class OpenAiAgent(
         toolSchemaFactory.toolDefinitions(allowSubAgents)
 
     private fun toolDefinitionsFor(conversationId: Long): JSONArray =
-        scopedToolsFor(conversationId)?.definitions() ?: toolSchemaFactory.toolDefinitions(
+        if (settings.purePromptMode) JSONArray() else scopedToolsFor(conversationId)?.definitions() ?: toolSchemaFactory.toolDefinitions(
             allowSubAgents = allowSubAgentsFor(conversationId),
             allowedToolNames = allowedToolNamesFor(conversationId),
         )
@@ -3764,7 +3808,7 @@ class OpenAiAgent(
         toolSchemaFactory.anthropicTools(allowSubAgents)
 
     private fun anthropicToolsFor(conversationId: Long): JSONArray =
-        scopedToolsFor(conversationId)?.let { session ->
+        if (settings.purePromptMode) JSONArray() else scopedToolsFor(conversationId)?.let { session ->
             val definitions = session.definitions()
             JSONArray().apply {
                 for (index in 0 until definitions.length()) {
@@ -3783,7 +3827,7 @@ class OpenAiAgent(
         toolSchemaFactory.geminiFunctionDeclarations(allowSubAgents)
 
     private fun geminiFunctionDeclarationsFor(conversationId: Long): JSONArray =
-        scopedToolsFor(conversationId)?.let { session ->
+        if (settings.purePromptMode) JSONArray() else scopedToolsFor(conversationId)?.let { session ->
             val definitions = session.definitions()
             JSONArray().apply {
                 for (index in 0 until definitions.length()) {

@@ -156,7 +156,7 @@ sfx.play().catch(console.error);
 | 事件 | 数据与用途 |
 | --- | --- |
 | config | 宿主和脚本参数，首次加载及参数改变 |
-| state | state、docked、packageName；状态包括 idle/thinking/executing/approval/completed/error |
+| state | state、docked、packageName；状态包括 idle/thinking/executing/approval/completed/error/paused |
 | pointerdown | 桌宠内部触点 x/y |
 | tap | 点击反馈，同时由宿主开关对话 |
 | drag / dragend | 拖动位置 x/y / 拖动结束 |
@@ -210,3 +210,8 @@ api.emit('requestUninstall', {packageName: 'example.app'});
 | 9 / 10 | look | 共 16 | 吸边视线与预览 |
 
 Minty 图集为 8 列 × 11 行，空白图格不参与播放。个性化设置中的 `auto` 跟随事件；其他值可预览对应动画，`look` 循环展示十六方向。动画速度及随机移动也由 controls 声明。适配源码见 [Minty 入口](desktop-pet-examples/minty-lyra/scripts/main.js)。
+
+
+### 2026-09-10 状态与静止待机
+
+收起悬浮对话后仍持续发送状态。建议默认使用静止待机图，状态改变时才更新，避免永久低帧率循环抖动。无配套行走动画时不启用随机移动。参考 `desktop-pet-examples/deepseek-maid-lyra/` 的事件驱动单图过渡（避免不同姿勢叠放产生多余肢体）。`paused` 表示任务暂停或中断，旧包可回退 idle。

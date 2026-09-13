@@ -42,6 +42,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -596,12 +600,14 @@ internal fun mediaGenerationDescriptionRes(kind: MediaGenerationKind): Int = whe
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ModelServiceSettings(
     settings: AppSettings,
     controller: ChatController,
     predictiveBackEnabled: Boolean = false,
     externalBackRequest: Int = 0,
+    onBack: () -> Unit = {},
     onNestedPageChanged: (Boolean, String) -> Unit = { _, _ -> },
 ) {
     var profiles by remember { mutableStateOf(controller.profiles.toList()) }
@@ -611,6 +617,7 @@ internal fun ModelServiceSettings(
     var showProviderPicker by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var showReachabilityPage by rememberSaveable { mutableStateOf(false) }
+    var showRequestCustomization by rememberSaveable { mutableStateOf(false) }
     var skipNextModelTransition by remember { mutableStateOf(false) }
     val serviceListScrollState = rememberScrollState()
     val providerPickerScrollState = rememberScrollState()
@@ -625,7 +632,9 @@ internal fun ModelServiceSettings(
         }
     }
     fun navigateBackWithinModel() {
-        if (showReachabilityPage) {
+        if (showRequestCustomization) {
+            showRequestCustomization = false
+        } else if (showReachabilityPage) {
             showReachabilityPage = false
         } else if (editingProfileId != null) {
             val isUnsavedNewProfile = draftNewProfile?.id == editingProfileId
@@ -642,6 +651,7 @@ internal fun ModelServiceSettings(
     }
     val modelNestedPageActive = editingProfileId != null || showProviderPicker
     val modelPage = when {
+        showRequestCustomization -> 4
         showReachabilityPage -> 3
         editingProfileId != null -> 2
         showProviderPicker -> 1
@@ -665,6 +675,7 @@ internal fun ModelServiceSettings(
     val editingIndex = profiles.indexOfFirst { it.id == editingProfileId }
     val current = if (draftNewProfile?.id == editingProfileId) draftNewProfile else profiles.getOrNull(editingIndex)
     val predictiveTargetPage = when (modelPage) {
+        4 -> 2
         3 -> 2
         2 -> if (draftNewProfile?.id == editingProfileId) 1 else 0
         else -> 0
@@ -680,6 +691,7 @@ internal fun ModelServiceSettings(
             reachabilityScrollState.scrollTo(0)
         }
     }
+    var requestOverrides by remember(editKey) { mutableStateOf(current?.modelRequestOverrides.orEmpty()) }
     var name by remember(editKey) { mutableStateOf(current?.name.orEmpty()) }
     var key by remember(editKey) { mutableStateOf(current?.apiKey.orEmpty()) }
     var baseUrl by remember(editKey) { mutableStateOf(current?.baseUrl.orEmpty()) }
@@ -703,6 +715,7 @@ internal fun ModelServiceSettings(
     val matchedPreset = ProviderCatalog.byId(current?.presetId ?: draftPresetId)
     val matchedPlan = matchedPreset?.resolvePlan(current?.presetPlanId, current?.baseUrl.orEmpty())
     val nestedTitle = when {
+        showRequestCustomization -> uiText(R.string.request_custom_title)
         showProviderPicker -> uiText(R.string.label_choose_provider)
         showReachabilityPage -> uiText(R.string.ui_reachability_check)
         editingProfileId != null -> current?.name?.ifBlank { uiText(R.string.title_new_model_service) } ?: uiText(R.string.title_new_model_service)
@@ -746,6 +759,7 @@ internal fun ModelServiceSettings(
             savedModels = models.filter { it.isNotBlank() }.distinct(),
             enabledModels = enabled,
             useResponsesApi = apiFormat == ApiProfile.API_FORMAT_OPENAI && useResponsesApi,
+            modelRequestOverrides = requestOverrides,
         )
     }
     fun saveCurrentProfile() {
@@ -840,11 +854,38 @@ internal fun ModelServiceSettings(
         )
     }
 
+    val pageTitles = remember { mutableMapOf<Int, String>() }
+    if (current != null) pageTitles[2] = current.name.ifBlank { uiText(R.string.title_new_model_service) }
+    val editorTitle = pageTitles[2] ?: uiText(R.string.title_new_model_service)
     val renderModelPage: @Composable (Int) -> Unit = { page ->
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            TopAppBar(
+                expandedHeight = 56.dp,
+                windowInsets = WindowInsets(0, 0, 0, 0),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.primary),
+                navigationIcon = {
+                    IconButton(onClick = { if (page == 0) onBack() else navigateBackWithinModel() }, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = uiText(R.string.cd_back))
+                    }
+                },
+                title = { Text(when (page) {
+                    1 -> uiText(R.string.label_choose_provider)
+                    2 -> editorTitle
+                    3 -> uiText(R.string.ui_reachability_check)
+                    4 -> uiText(R.string.request_custom_title)
+                    else -> uiText(R.string.detail_model)
+                }, style = MaterialTheme.typography.titleLarge) },
+                actions = {
+                    if (page == 2) TextButton(onClick = { showRequestCustomization = true }) { Text(uiText(R.string.request_custom)) }
+                },
+            )
         Box(
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(MaterialTheme.colorScheme.background)
+                .padding(18.dp),
         ) {
         if (page == 0) {
             val filtered = remember(profiles, query) {
@@ -930,6 +971,15 @@ internal fun ModelServiceSettings(
                     },
                 )
             }
+        } else if (page == 4) {
+            ModelRequestSettings(draftProfile()) { selectedModel, customization ->
+                requestOverrides = if (customization == null) requestOverrides - selectedModel else requestOverrides + (selectedModel to customization)
+                if (editingIndex >= 0) {
+                    val updated = profiles[editingIndex].copy(modelRequestOverrides = requestOverrides)
+                    profiles = profiles.mapIndexed { index, item -> if (index == editingIndex) updated else item }
+                    controller.saveProfiles(profiles, controller.activeProfileId.value)
+                }
+            }
         } else if (page == 3) {
             Column(
                 modifier = Modifier
@@ -946,7 +996,6 @@ internal fun ModelServiceSettings(
                     activeModel = activeReachabilityModel,
                     status = status,
                     onSelectedModelsChange = { selectedReachabilityModels = it },
-                    onBack = { showReachabilityPage = false },
                     onStartCheck = { startReachabilityCheck(reachabilityModels.filter { it in selectedReachabilityModels }) },
                 )
             }
@@ -996,7 +1045,7 @@ internal fun ModelServiceSettings(
                         }
                     }
                     OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_service_name)) }, singleLine = true)
-                    OutlinedTextField(value = key, onValueChange = { key = it }, modifier = Modifier.fillMaxWidth(), label = { Text(apiKeyLabel(apiFormat)) }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    OutlinedTextField(value = key, onValueChange = { key = it }, modifier = Modifier.fillMaxWidth(), label = { Text(apiKeyLabel(apiFormat)) }, supportingText = { Text(uiText(R.string.api_key_optional_hint)) }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1184,6 +1233,8 @@ internal fun ModelServiceSettings(
         }
     }
 
+    }
+
     Box(Modifier.fillMaxSize()) {
         if (predictiveBackState.isInProgress) {
             Box(Modifier.fillMaxSize()) {
@@ -1209,8 +1260,8 @@ internal fun ModelServiceSettings(
                     EnterTransition.None togetherWith ExitTransition.None
                 } else {
                     val forward = targetState > initialState
-                    (fadeIn(animationSpec = tween(180)) + slideInHorizontally { if (forward) it / 6 else -it / 6 })
-                        .togetherWith(fadeOut(animationSpec = tween(140)) + slideOutHorizontally { if (forward) -it / 8 else it / 8 })
+                    slideInHorizontally(animationSpec = tween(260)) { if (forward) it else -it / 3 }
+                        .togetherWith(slideOutHorizontally(animationSpec = tween(260)) { if (forward) -it / 3 else it })
                 }
             },
             label = "model-service-page",
@@ -1318,20 +1369,11 @@ internal fun ReachabilitySelectionPage(
     activeModel: String,
     status: String,
     onSelectedModelsChange: (Set<String>) -> Unit,
-    onBack: () -> Unit,
     onStartCheck: () -> Unit,
 ) {
     val resultByModel = remember(modelResults) { modelResults.associateBy { it.model } }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = uiText(R.string.ui_back_to_model_service))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(uiText(R.string.ui_reachability_check), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(providerName, color = KimiMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+        Text(providerName, color = KimiMuted, style = MaterialTheme.typography.bodySmall)
         KimiCardBox {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(

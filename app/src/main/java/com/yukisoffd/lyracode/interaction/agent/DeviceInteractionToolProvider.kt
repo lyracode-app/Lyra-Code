@@ -25,12 +25,19 @@ internal class DeviceInteractionToolProvider(
     private val onTool: (Long, String, String) -> Unit = { _, _, _ -> },
 ) : ScopedAgentTools {
     var extended: DeviceExtendedTools? = null
+    var nativeDefinitions: (() -> JSONArray)? = null
+    var nativeExecute: (suspend (String, JSONObject) -> String)? = null
+    var deviceAvailable: () -> Boolean = { true }
+    override val includesNativeTools: Boolean get() = nativeDefinitions != null
     override var finished = false
         private set
     private var observed: ScreenSnapshot? = null
     private val sessionId = ManualControlController.state.value.sessionId
     override val systemPrompt = """
-        You are Lyra's foreground Android device assistant. Respond in the user's language.
+        You are Lyra's floating chat assistant with the same native application Agent tools as the main chat. Respond in the user's language.
+        Use native workspace, files, search, network, shell/root and other enabled tools directly for their tasks; these do not require a foreground target app or accessibility observation.
+        Use device_* tools only for Android screen interaction. Missing accessibility does not disable native tools or conversation.
+        A workspace must be selected for workspace file tools. Use the provided native tool schemas; do not claim tools are unavailable without checking their returned results.
         The user authorized a foreground multi-app task, starting in $targetPackage.
         App switches are allowed. Always observe the current app again after a switch; old handles and approvals are invalid.
         Use device_observe before each semantic action. Safe clicks, scrolling, searching and ordinary text input execute automatically.
@@ -55,13 +62,20 @@ internal class DeviceInteractionToolProvider(
         .put(tool("device_set_text", "Replace an ordinary text field with the exact user-supplied draft (1-500 characters); execute automatically after policy checks. Never submits or presses Enter.", "snapshot_id", "element_handle", "text"))
         .put(tool("device_wait_for_change", "Wait up to 3 seconds for a page change.", "snapshot_id"))
         .put(tool("device_finish", "Finish this task and show the outcome to the user.", "summary"))
-        .apply { extended?.definitions()?.let { extra -> for (i in 0 until extra.length()) put(extra.getJSONObject(i)) } }
+        .apply {
+            val extra = nativeDefinitions?.invoke() ?: extended?.definitions()
+            if (extra != null) for (i in 0 until extra.length()) put(extra.getJSONObject(i))
+            if (nativeDefinitions != null) extended?.definitions()?.let { extras ->
+                for (i in 0 until extras.length()) if (extras.getJSONObject(i).getJSONObject("function").getString("name") == "device_screenshot") put(extras.getJSONObject(i))
+            }
+        }
 
     fun ensureSession() = checkSession()
     override fun checkRound() { checkSession(); budget.round() }
 
     override suspend fun execute(name: String, arguments: JSONObject): String {
         val eventId = -System.nanoTime()
+        onStatus("执行中 · $name")
         onTool(eventId, name, "执行中")
         val result = executeAction(name, arguments)
         // Raw screen trees and images never enter the overlay transcript.
@@ -74,6 +88,9 @@ internal class DeviceInteractionToolProvider(
     private suspend fun executeAction(name: String, arguments: JSONObject): String {
         checkSession()
         check(!finished) { "任务已经结束。" }
+        if (name.startsWith("device_") && name != "device_finish" && !deviceAvailable())
+            return "BLOCKED: ACCESSIBILITY_UNAVAILABLE；未启用无障碍服务，不能读取屏幕、截图或执行无障碍操作。普通对话和其他已授权工具仍可使用，请向用户说明原因。"
+        if (!name.startsWith("device_") && nativeExecute != null) return nativeExecute!!.invoke(name, arguments)
         return try {
             when (name) {
                 "device_observe" -> observe()

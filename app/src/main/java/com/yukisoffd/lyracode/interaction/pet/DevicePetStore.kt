@@ -45,7 +45,7 @@ internal object DevicePetStore {
     }
     fun catalog(context: Context): List<PetEntry> = buildList {
         val builtin = defaultManifest(context)
-        add(PetEntry("builtin", builtin.getString("name"), builtin.optString("author"), builtin.optString("version")))
+        add(PetEntry("builtin", context.getString(com.yukisoffd.lyracode.R.string.pet_builtin_name), builtin.optString("author"), builtin.optString("version")))
         if (packageFile(context).exists()) runCatching { validate(packageFile(context).readText()) }.getOrNull()?.let {
             add(PetEntry("legacy", it.getString("name"), it.optString("author"), "API 1"))
         }

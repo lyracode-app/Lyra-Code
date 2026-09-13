@@ -12,8 +12,9 @@ function files(directory = '') {
 }
 function report(error) {
   console.error('Lyra pet:', error);
-  document.getElementById('pet-root').textContent = '🐱';
-  document.getElementById('pet-root').style.fontSize = '60px';
+  const root = document.getElementById('pet-root');
+  root.textContent = '!';
+  root.style.cssText = 'width:92%;height:92%;margin:4%;border-radius:50%;background:#5376B9;color:white;display:grid;place-items:center;font:32px sans-serif';
 }
 function createSprite(parent = document.getElementById('pet-root')) {
   const element = document.createElement('img'); element.draggable = false; parent.append(element);

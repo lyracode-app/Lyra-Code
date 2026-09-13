@@ -135,7 +135,9 @@ internal class DesktopPetWindow(private val context: Context, private val toggle
         web?.let { runCatching { manager.removeViewImmediate(it) }; runCatching { it.destroy() } }; web = null
         if (fallbackView != null) return
         val view = android.widget.TextView(context).apply {
-            text = "🐱"; textSize = 36f; gravity = Gravity.CENTER
+            text = "···"; textSize = 28f; gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Color.rgb(83, 118, 185)) }
             contentDescription = "Lyra 桌宠：点击打开对话，长按设置"
             setOnClickListener { if (docked) { docked = false; constrain(); position() } else toggleChat() }
             setOnLongClickListener { openSettings(); true }
@@ -198,6 +200,7 @@ internal class DesktopPetWindow(private val context: Context, private val toggle
             current.chat.running -> "thinking"
             current.chat.status == "已完成" -> "completed"
             current.chat.status.startsWith("任务停止") -> "error"
+            current.chat.status.startsWith("已暂停") || current.chat.status.startsWith("已中断") -> "paused"
             else -> "idle"
         }
         val data = JSONObject().put("state", name).put("docked", docked)

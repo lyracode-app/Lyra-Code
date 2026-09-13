@@ -1,38 +1,25 @@
-let timer, bubbleTimer, bubble, root, config = {}, state = 'idle';
+let root;
+const icons = {
+  idle: '<path d="M5 5h14v11H9l-4 3V5Z"/><path d="M8 9h8M8 12h5"/>',
+  thinking: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
+  executing: '<path d="m14 3-8 10h6l-2 8 8-11h-6l2-7Z"/>',
+  approval: '<path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5M12 17v.1"/>',
+  completed: '<path d="m5 12 4 4L19 6"/>',
+  paused: '<path d="M8 5v14M16 5v14"/>',
+  error: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17v.1"/>'
+};
+function render(state) {
+  root.dataset.state = icons[state] ? state : 'idle';
+  root.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[root.dataset.state]}</svg>`;
+}
 export default {
-  async mount(api) {
+  mount(api) {
     root = api.root;
-    const style = document.createElement('link'); style.rel = 'stylesheet'; style.href = api.asset('assets/pet.css'); document.head.append(style);
-    root.innerHTML = await (await fetch(api.asset('assets/cat.svg'))).text();
-    bubble = document.createElement('div'); bubble.className = 'bubble'; root.append(bubble);
-    timer = setInterval(() => {
-      if (config.roam && state === 'idle') {
-        if (api.state.docked) api.emit('reveal');
-        else api.emit('move', {dx: Math.round(Math.random()*12-6), dy: Math.round(Math.random()*8-4)});
-      }
-    }, 1200);
+    const style = document.createElement('style');
+    style.textContent = '#pet-root{width:92%;height:92%;margin:4%;border-radius:50%;background:#5376B9;display:grid;place-items:center}#pet-root svg{width:52%;height:52%}';
+    root.append(style); document.head.append(style);
+    render('idle');
   },
-  onEvent(type, data) {
-    if (type === 'config') {
-      config = data;
-      document.documentElement.style.setProperty('--fur', data.color);
-      document.documentElement.style.setProperty('--speed', data.speed + 's');
-      root.querySelector('svg').style.animationName = data.motion === '摇摆' ? 'sway' : '';
-      root.querySelector('svg').style.animationPlayState = data.motion === '静止' ? 'paused' : 'running';
-    }
-    if (type === 'state') { state = data.state; document.body.dataset.state = data.state; document.body.dataset.docked = data.docked; }
-    if (type === 'reveal') document.body.dataset.docked = 'false';
-    if (type === 'dock') document.body.dataset.docked = 'true';
-    if (type === 'tap' || type === 'drag') {
-      const svg = root.querySelector('svg'); svg.classList.add('tap'); setTimeout(() => svg.classList.remove('tap'), 600);
-      if (type === 'tap' && config.greeting) {
-        clearTimeout(bubbleTimer); bubble.textContent = config.greeting; bubble.hidden = false;
-        bubbleTimer = setTimeout(() => { bubble.hidden = true; }, 1600);
-      }
-    }
-    if (type === 'operationResult' && data.operation === 'uninstall' && data.ok) {
-      const svg = root.querySelector('svg'); svg.classList.add('eat'); setTimeout(() => svg.classList.remove('eat'), 900);
-    }
-  },
-  unmount() { clearInterval(timer); clearTimeout(bubbleTimer); root?.replaceChildren(); }
+  onEvent(type, data) { if (type === 'state') render(data.state); },
+  unmount() { root?.replaceChildren(); }
 };

@@ -93,6 +93,95 @@ class DeviceChatInstrumentedTest {
         } finally { instrumentation.runOnMainSync { hud.destroy() } }
     }
 
+    @Test fun plusMenuSelectsConfiguredModelWithoutRecreatingComposer() {
+        lateinit var hud: com.yukisoffd.lyracode.interaction.overlay.TaskHudController
+        lateinit var panel: DeviceChatPanel
+        var selection = ""
+        instrumentation.runOnMainSync {
+            hud = com.yukisoffd.lyracode.interaction.overlay.TaskHudController(instrumentation.targetContext, {}, {}, {}, {}, {}, onConfigure = { selection = it })
+            hud.render(ManualControlState(activeUntilEpochMillis = Long.MAX_VALUE, chat = DeviceChatState(
+                configurationOptions = """{"models":[{"profile":"fixture","model":"menu-fixture","label":"Menu test model"}]}""")))
+            panel = android.view.inspector.WindowInspector.getGlobalWindowViews().flatMap(::descendants).filterIsInstance<DeviceChatPanel>().single()
+        }
+        try {
+            instrumentation.waitForIdleSync()
+            instrumentation.runOnMainSync {
+                descendants(panel).filterIsInstance<EditText>().single().setText("Keep draft")
+                descendants(panel).filterIsInstance<android.widget.Button>().single { it.text == "+" }.performClick()
+            }
+            instrumentation.waitForIdleSync(); SystemClock.sleep(150)
+            instrumentation.runOnMainSync {
+                val label = android.view.inspector.WindowInspector.getGlobalWindowViews().flatMap(::descendants)
+                    .filterIsInstance<android.widget.TextView>().single { it.text == "Menu test model" }
+                var row: View = label
+                while (row.parent !is android.widget.ListView) row = row.parent as View
+                val list = row.parent as android.widget.ListView
+                val position = list.getPositionForView(row)
+                list.performItemClick(row, position, list.adapter.getItemId(position))
+                assertEquals("menu-fixture", org.json.JSONObject(selection).getString("model"))
+                assertEquals("Keep draft", descendants(panel).filterIsInstance<EditText>().single().text.toString())
+            }
+        } finally { instrumentation.runOnMainSync { hud.destroy() } }
+    }
+
+    @Test fun floatingComposerHasWorkspaceModelAndNewChatWithConditionalSend() {
+        instrumentation.runOnMainSync {
+            val panel = DeviceChatPanel(instrumentation.targetContext, View.OnTouchListener { _, _ -> false }, {}, {}, {}, {}, {}, {})
+            val state = ManualControlState(chat = DeviceChatState(modelLabel = "local-model", workspaceLabel = "Test workspace"))
+            panel.render(state, true)
+            val views = descendants(panel)
+            assertTrue(views.filterIsInstance<android.widget.TextView>().any { it.text == "local-model" })
+            assertFalse(views.filterIsInstance<android.widget.TextView>().any { it.text == "Lyra" || it.text.contains("等待目标") })
+            assertTrue(views.any { it.contentDescription == "Test workspace" })
+            val editor = views.filterIsInstance<EditText>().single()
+            val send = views.filterIsInstance<android.widget.Button>().single { it.text == "↑" }
+            assertEquals(View.GONE, send.visibility)
+            editor.setText(" ")
+            assertEquals(View.GONE, send.visibility)
+            editor.setText("Hello")
+            assertEquals(View.VISIBLE, send.visibility)
+            panel.render(state.copy(chat = state.chat.copy(running = true)), true)
+            assertEquals(View.GONE, send.visibility)
+            assertEquals(View.VISIBLE, views.filterIsInstance<android.widget.Button>().single { it.text == "Ⅱ" }.visibility)
+        }
+    }
+
+    @OptIn(androidx.compose.ui.InternalComposeUiApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
+    @Test fun growingSingleReplyAndReopenedWindowFollowBottom() {
+        lateinit var hud: com.yukisoffd.lyracode.interaction.overlay.TaskHudController
+        lateinit var panel: DeviceChatPanel
+        fun render(lines: Int) {
+            hud.render(ManualControlState(activeUntilEpochMillis = Long.MAX_VALUE,
+                chat = DeviceChatState(messages = listOf(DeviceChatMessage(900, "assistant", (1..lines).joinToString("\n\n") { "Reply paragraph $it" })))))
+        }
+        instrumentation.runOnMainSync {
+            hud = com.yukisoffd.lyracode.interaction.overlay.TaskHudController(instrumentation.targetContext, {}, {}, {}, {}, {})
+            render(3)
+            panel = android.view.inspector.WindowInspector.getGlobalWindowViews().flatMap(::descendants).filterIsInstance<DeviceChatPanel>().single()
+        }
+        try {
+            instrumentation.waitForIdleSync()
+            for (lines in listOf(25, 50, 80)) {
+                instrumentation.runOnMainSync { render(lines) }
+                SystemClock.sleep(500)
+                instrumentation.waitForIdleSync()
+                instrumentation.runOnMainSync {
+                    fun all(node: androidx.compose.ui.semantics.SemanticsNode): List<androidx.compose.ui.semantics.SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+                    val compose = descendants(panel).filterIsInstance<androidx.compose.ui.platform.ViewRootForTest>().single()
+                    val range = all(compose.semanticsOwner.rootSemanticsNode).mapNotNull {
+                        it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)
+                    }.first()
+                    assertEquals("Reply must follow its growing last item", range.maxValue(), range.value(), 1f)
+                }
+            }
+            instrumentation.runOnMainSync { hud.setChatVisible(false); render(100) }
+            SystemClock.sleep(250)
+            instrumentation.runOnMainSync { hud.setChatVisible(true) }
+            SystemClock.sleep(500)
+            instrumentation.runOnMainSync { assertTrue(panel.isShown) }
+        } finally { instrumentation.runOnMainSync { hud.destroy() } }
+    }
+
     @Test fun allFourCornersResizeWindowAndPreserveDraft() {
         lateinit var hud: com.yukisoffd.lyracode.interaction.overlay.TaskHudController
         lateinit var panel: DeviceChatPanel
@@ -144,7 +233,7 @@ class DeviceChatInstrumentedTest {
                 {}, {}, {}, { stops++ }, {}, {}, onClearContext = { clears++ })
             val editor = descendants(panel).filterIsInstance<EditText>().single()
             editor.setText("旧草稿")
-            descendants(panel).filterIsInstance<android.widget.Button>().single { it.text == "清空上下文" }.performClick()
+            descendants(panel).filterIsInstance<android.widget.Button>().single { it.contentDescription == instrumentation.targetContext.getString(R.string.label_new_conversation) }.performClick()
             assertEquals(1, clears)
             assertEquals(0, stops)
             assertEquals("", editor.text.toString())

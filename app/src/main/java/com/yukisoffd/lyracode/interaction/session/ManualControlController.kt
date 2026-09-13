@@ -80,6 +80,13 @@ internal object ManualControlController {
         _state.value = ManualControlState(status = ManualControlStatus.CANCELLED)
     }
 
+    /** Losing device access clears handles, but the independently authorized overlay stays alive. */
+    @Synchronized
+    fun clearDeviceState() {
+        _state.value = _state.value.copy(latestSnapshot = null, targetPackage = null, selection = null,
+            lastResult = null, status = ManualControlStatus.OBSERVING)
+    }
+
     @Synchronized
     fun publish(snapshot: ScreenSnapshot) {
         val current = _state.value

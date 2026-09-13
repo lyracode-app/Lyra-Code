@@ -20,6 +20,7 @@ import com.yukisoffd.lyracode.interaction.session.ManualControlStatus
 
 /** Compact Bundle protocol between the accessibility process and the overlay process. */
 internal object ManualControlOverlayProtocol {
+    const val COMMAND_CONFIGURE = "com.yukisoffd.lyracode.command.CONFIGURE_FLOATING_CHAT"
     const val ACTION_START = "com.yukisoffd.lyracode.action.START_MANUAL_CONTROL"
     const val ACTION_RENDER = "com.yukisoffd.lyracode.action.RENDER_MANUAL_CONTROL"
     const val ACTION_STOP_SERVICE = "com.yukisoffd.lyracode.action.STOP_MANUAL_CONTROL_SERVICE"
@@ -99,11 +100,15 @@ internal object ManualControlOverlayProtocol {
         putLong("session_id", state.sessionId)
         state.approval?.let { a -> putBundle("approval", Bundle().apply {
             putString("id", a.id); putString("title", a.title); putString("detail", a.detail)
-            putString("package", a.packageName); putBoolean("twice", a.secondConfirmation); putInt("stage", a.stage)
+            putString("package", a.packageName); putBoolean("twice", a.secondConfirmation); putInt("stage", a.stage); putBoolean("text_input", a.textInput)
         }) }
         putBoolean("chat_running", state.chat.running)
         putString("chat_status", state.chat.status.take(240))
         putString("chat_provider", state.chat.providerLabel.take(240))
+        putString("chat_options", state.chat.configurationOptions)
+        putString("chat_model", state.chat.modelLabel)
+        putString("chat_workspace", state.chat.workspaceLabel)
+        putBoolean("chat_pure", state.chat.pureMode)
         putString("agent_target", state.agentTargetPackage)
         putParcelableArrayList("chat_messages", ArrayList(state.chat.messages.takeLast(16).map { message ->
             Bundle().apply { putLong("id", message.id); putString("role", message.role); putString("text", message.text.takeLast(4000)); putString("thinking", message.thinking.takeLast(4000)); putString("tool_name", message.toolName.take(100)); putLong("created_at", message.createdAt) }
@@ -123,10 +128,14 @@ internal object ManualControlOverlayProtocol {
             sessionId = bundle.getLong("session_id"),
             approval = bundle.getBundle("approval")?.let { a -> com.yukisoffd.lyracode.interaction.session.DeviceApproval(
                 a.getString("id").orEmpty(), a.getString("title").orEmpty(), a.getString("detail").orEmpty().take(16000),
-                a.getString("package"), a.getBoolean("twice"), a.getInt("stage", 1)) },
+                a.getString("package"), a.getBoolean("twice"), a.getInt("stage", 1), a.getBoolean("text_input")) },
             agentTargetPackage = bundle.getString("agent_target"),
             chat = com.yukisoffd.lyracode.interaction.session.DeviceChatState(
                 running = bundle.getBoolean("chat_running"),
+                configurationOptions = bundle.getString("chat_options") ?: "{}",
+                modelLabel = bundle.getString("chat_model").orEmpty(),
+                workspaceLabel = bundle.getString("chat_workspace").orEmpty(),
+                pureMode = bundle.getBoolean("chat_pure"),
                 status = bundle.getString("chat_status").orEmpty(),
                 providerLabel = bundle.getString("chat_provider").orEmpty(),
                 messages = decodeMessages(bundle),

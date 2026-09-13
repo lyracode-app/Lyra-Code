@@ -29,35 +29,70 @@ internal object DeviceTaskCoordinator {
     private var taskExpiry = 0L
     private var taskSession = 0L
     private var contextSession = 0L
-    private var contextHistory: List<DeviceChatMessage> = emptyList()
+    private var conversationId: Long? = null
+    private var floatingProfileId: String? = null
+    private var floatingModel: String? = null
+    private var floatingWorkspace: String? = null
+
+    @Synchronized fun configure(context: Context, payload: String) {
+        val state = ManualControlController.state.value
+        if (!DeviceInteractionAvailability.isSupported() || !state.isActive() || state.chat.running) return
+        if (contextSession != state.sessionId) {
+            contextSession = state.sessionId
+            conversationId = null
+            floatingProfileId = null; floatingModel = null; floatingWorkspace = null
+        }
+        val settings = AppSettings(context)
+        val value = runCatching { org.json.JSONObject(payload) }.getOrNull() ?: return
+        if (value.has("profile")) {
+            val profile = settings.profiles().firstOrNull { it.id == value.optString("profile") } ?: return
+            val model = value.optString("model")
+            if (model !in (profile.enabledModels + profile.selectedModel)) return
+            floatingProfileId = profile.id; floatingModel = model
+            conversationId?.let { id -> ConversationStore(context).use { it.setConversationMeta(id, profileId = profile.id, model = model) } }
+        }
+        if (value.has("workspace")) {
+            val uri = value.optString("workspace")
+            if (uri.isNotBlank() && context.contentResolver.persistedUriPermissions.none { it.uri.toString() == uri && it.isReadPermission }) return
+            floatingWorkspace = uri
+            conversationId?.let { id -> ConversationStore(context).use { it.setConversationMeta(id, workspaceUri = uri) } }
+        }
+        if (value.has("pure")) settings.purePromptMode = value.optBoolean("pure")
+        val profile = settings.profiles().firstOrNull { it.id == floatingProfileId } ?: settings.selectedProfile()
+        val options = org.json.JSONObject().apply {
+            put("models", org.json.JSONArray().apply {
+                settings.profiles().forEach { p ->
+                    (p.enabledModels + p.selectedModel).filter(String::isNotBlank).distinct().forEach { m ->
+                        put(org.json.JSONObject().put("profile", p.id).put("model", m).put("label", "${p.name} · $m"))
+                    }
+                }
+            })
+        }
+        val uri = floatingWorkspace ?: settings.workspaceUri
+        val workspaceName = uri?.takeIf { it.isNotBlank() }?.let { androidx.documentfile.provider.DocumentFile.fromTreeUri(context, android.net.Uri.parse(it))?.name }
+        ManualControlController.updateChat(state.chat.copy(modelLabel = floatingModel ?: profile.selectedModel,
+            providerLabel = "${profile.name} · ${floatingModel ?: profile.selectedModel}",
+            workspaceLabel = workspaceName.orEmpty(), configurationOptions = options.toString(), pureMode = settings.purePromptMode))
+    }
     @Volatile private var activeAgent: com.yukisoffd.lyracode.ai.OpenAiAgent? = null
 
     @Synchronized
     fun submit(context: Context, rawInput: String) {
+        if (DeviceQuestionBroker.answer(rawInput.trim())) return
         val current = ManualControlController.state.value
         if (!current.isActive() || job?.isCompleted == false || current.chat.running) return
         if (contextSession != current.sessionId) {
             contextSession = current.sessionId
-            contextHistory = emptyList()
+            conversationId = null
+            floatingProfileId = null; floatingModel = null; floatingWorkspace = null
         }
         val input = rawInput.trim().take(2000)
         if (input.isBlank()) return
         val app = context.applicationContext
         val settings = AppSettings(app)
         val target = current.targetPackage
-        val profile = settings.selectedProfile()
-        val failure = when {
-            target.isNullOrBlank() || target.startsWith(app.packageName) -> "请先手动打开目标 App，等待页面识别后再发送。"
-            !isAgentPackageAllowed(target) -> "此 App 不在设备 Agent 的支持范围内。"
-            profile.apiKey.isBlank() -> "请先在 Lyra 设置中配置模型 API Key。"
-            com.yukisoffd.lyracode.ai.isMediaGenerationModel(profile.selectedModel) -> "请选择支持工具调用的对话模型。"
-            else -> null
-        }
-        if (failure != null) {
-            ManualControlController.updateChat(current.chat.copy(status = failure))
-            return
-        }
-        target ?: return
+        val selected = settings.profiles().firstOrNull { it.id == floatingProfileId } ?: settings.selectedProfile()
+        val profile = selected.copy(selectedModel = floatingModel?.takeIf { selected.id == floatingProfileId && it in (selected.enabledModels + selected.selectedModel) } ?: selected.selectedModel)
         val token = ++generation
         val expiry = current.activeUntilEpochMillis
         val sessionId = current.sessionId
@@ -68,6 +103,7 @@ internal object DeviceTaskCoordinator {
         ManualControlController.updateChat(current.chat.copy(
             messages = (current.chat.messages + userMessage).takeLast(16), running = true,
             status = "思考中", providerLabel = "${profile.name} · ${profile.selectedModel}",
+            modelLabel = profile.selectedModel, pureMode = settings.purePromptMode,
         ), target)
         val next = scope.launch(start = CoroutineStart.LAZY) {
             var store: ConversationStore? = null
@@ -88,13 +124,13 @@ internal object DeviceTaskCoordinator {
                         }
                     }
                 }
-                // Reuse the existing schema in SQLite memory. Screen tool results never reach backups/history.
-                store = ConversationStore(app, inMemory = true)
-                val id = store.createConversation(profile.id, profile.selectedModel, title = "设备任务 · ${input.take(24)}")
-                contextHistory.takeLast(24).forEach { previous ->
-                    store.addMessage(id, previous.role, previous.text, profileId = profile.id, model = profile.selectedModel)
+                // The same persisted conversation is reused until the user clears context.
+                store = ConversationStore(app)
+                val id = synchronized(this@DeviceTaskCoordinator) {
+                    conversationId?.takeIf { store.conversation(it) != null }
+                        ?: store.createConversation(profile.id, profile.selectedModel, title = "悬浮对话 · ${input.take(24)}", workspaceUri = floatingWorkspace ?: settings.workspaceUri.orEmpty()).also { conversationId = it }
                 }
-                val provider = DeviceInteractionToolProvider(id, target, expiry,
+                val provider = DeviceInteractionToolProvider(id, target.orEmpty(), expiry,
                     ExecutionBudget(SystemClock::elapsedRealtime),
                     checkAvailability = { checkAvailability(app) },
                     onStatus = { status -> update(token) { it.copy(status = status.take(240)) } },
@@ -108,8 +144,19 @@ internal object DeviceTaskCoordinator {
                         it.copy(messages = (it.messages + DeviceChatMessage(-System.nanoTime(), "assistant", summary)).takeLast(16))
                     } },
                 )
-                val agent = DeviceAgentFactory.create(app, settings, store)
+                val agent = DeviceAgentFactory.create(app, settings, store, floatingWorkspace ?: settings.workspaceUri)
                 agent.scopedTools = provider
+                agent.userQuestionHandler = DeviceQuestionBroker::ask
+                agent.approvalHandler = { request ->
+                    val approved = DeviceApprovalBroker.request(request.summary,
+                        "${request.risk}\n${request.arguments}".take(16000),
+                        twice = request.toolName.contains("delete") || request.toolName.contains("uninstall") ||
+                            Regex("""(?i)\b(rm|rmdir|uninstall|delete)\b""").containsMatchIn(request.arguments))
+                    com.yukisoffd.lyracode.ai.ToolApprovalDecision(approved)
+                }
+                provider.nativeDefinitions = { agent.floatingToolDefinitions() }
+                provider.nativeExecute = { name, args -> agent.executeFloatingTool(id, name, args) }
+                provider.deviceAvailable = { DeviceInteractionAvailability.isSupported() && settings.deviceInteractionExperimentalEnabled && AccessibilityConnection.connected.value }
                 provider.extended = com.yukisoffd.lyracode.interaction.agent.DeviceExtendedTools(app, settings, agent, id) { provider.ensureSession() }
                 activeAgent = agent
                 run {
@@ -125,11 +172,6 @@ internal object DeviceTaskCoordinator {
                                 chat.status else delta.status.take(240))
                         }
                     }
-                }
-                synchronized(this@DeviceTaskCoordinator) {
-                    if (token == generation) contextHistory = store.messages(id)
-                        .filter { it.role in setOf("user", "assistant") && it.content.isNotBlank() }
-                        .takeLast(24).map { DeviceChatMessage(it.id, it.role, it.content.take(8000)) }
                 }
                 update(token) { it.copy(running = false, status = "已完成") }
             } catch (error: CancellationException) {
@@ -159,8 +201,7 @@ internal object DeviceTaskCoordinator {
         job?.cancel()
         activeAgent?.cancelScopedRequests()
         DeviceApprovalBroker.cancel()
-        contextHistory = ManualControlController.state.value.chat.messages
-            .filter { it.role in setOf("user", "assistant") }
+        DeviceQuestionBroker.cancel()
         val chat = ManualControlController.state.value.chat
         ManualControlController.clearSelection()
         ManualControlController.updateChat(chat.copy(running = false, status = "已暂停；发送新任务后继续"), null)
@@ -169,9 +210,9 @@ internal object DeviceTaskCoordinator {
     @Synchronized
     fun clearContext() {
         pause()
-        contextHistory = emptyList()
+        conversationId = null
         ManualControlController.setApproval(null)
-        ManualControlController.updateChat(DeviceChatState(status = "上下文已清空，可开始新任务"), null)
+        ManualControlController.updateChat(ManualControlController.state.value.chat.copy(messages = emptyList(), running = false, status = ""), null)
     }
 
     @Synchronized
@@ -183,8 +224,8 @@ internal object DeviceTaskCoordinator {
     }
 
     private fun checkAvailability(context: Context) {
-        check(DeviceInteractionAvailability.isSupported() && AppSettings(context).deviceInteractionExperimentalEnabled &&
-            AccessibilityConnection.connected.value && OverlayPermission.isGranted(context)) { "设备交互权限不可用。" }
+        check(DeviceInteractionAvailability.isSupported()) { context.getString(com.yukisoffd.lyracode.R.string.device_interaction_status_unsupported) }
+        check(OverlayPermission.isGranted(context)) { "悬浮窗权限不可用。" }
         check(context.getSystemService(PowerManager::class.java).isInteractive &&
             !context.getSystemService(KeyguardManager::class.java).isKeyguardLocked) { "锁屏时不能执行设备任务。" }
     }

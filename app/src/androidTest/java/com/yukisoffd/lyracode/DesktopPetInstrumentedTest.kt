@@ -61,6 +61,21 @@ class DesktopPetInstrumentedTest {
             instrumentation.runOnMainSync { assertEquals(1, toggles) }
             tap(web)
             instrumentation.runOnMainSync { assertEquals(2, toggles) }
+            fun evaluate(script: String): String {
+                val latch = java.util.concurrent.CountDownLatch(1); var result = ""
+                instrumentation.runOnMainSync { web.evaluateJavascript(script) { result = it; latch.countDown() } }
+                assertTrue(latch.await(5, java.util.concurrent.TimeUnit.SECONDS)); return result
+            }
+            instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
+                java.io.File(context.externalCacheDir, "circle-pet.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
+            }
+            assertEquals("lyra.circle", DevicePetStore.defaultManifest(context).getString("id"))
+            assertEquals("\"50%\"", evaluate("getComputedStyle(document.getElementById('pet-root')).borderRadius"))
+            for (state in listOf("idle", "thinking", "executing", "approval", "completed", "paused", "error")) {
+                evaluate("window.dispatchEvent(new CustomEvent('lyrapet',{detail:{type:'state',data:{state:'$state'}}}))")
+                assertEquals("\"$state\"", evaluate("document.getElementById('pet-root').dataset.state"))
+                assertEquals("1", evaluate("document.querySelectorAll('#pet-root svg').length"))
+            }
         } finally { instrumentation.runOnMainSync { pet.destroy() }; DevicePetStore.saveOptions(context, originalBuiltinOptions); DevicePetStore.select(context, originalKey); DevicePetStore.saveOptions(context, originalOptions) }
     }
     @Test fun approvalStageSurvivesPrivateIpcAndDefaultPackageDeclaresControls() {
@@ -70,7 +85,7 @@ class DesktopPetInstrumentedTest {
             com.yukisoffd.lyracode.interaction.overlay.ManualControlOverlayProtocol.encode(original))!!
         assertEquals(123L, decoded.sessionId)
         assertEquals(original.approval, decoded.approval)
-        val script = DevicePetStore.validate(instrumentation.targetContext.assets.open("desktop-pet/default.json")
+        val script = DevicePetStore.validate(instrumentation.context.assets.open("desktop-pet/default.json")
             .bufferedReader().use { it.readText() })
         assertEquals(1, script.getInt("apiVersion"))
         assertTrue(script.getJSONArray("controls").length() >= 3)

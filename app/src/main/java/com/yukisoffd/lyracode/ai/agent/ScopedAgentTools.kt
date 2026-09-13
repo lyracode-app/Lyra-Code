@@ -7,6 +7,7 @@ import org.json.JSONObject
 internal interface ScopedAgentTools {
     val conversationId: Long
     val systemPrompt: String
+    val includesNativeTools: Boolean get() = false
     val finished: Boolean
     fun definitions(): JSONArray
     fun checkRound()

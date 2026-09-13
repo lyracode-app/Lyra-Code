@@ -1,6 +1,7 @@
 package com.yukisoffd.lyracode.interaction.agent
 
 import android.content.Context
+import com.yukisoffd.lyracode.localizedContext
 import com.yukisoffd.lyracode.ai.OpenAiAgent
 import com.yukisoffd.lyracode.ai.WebViewWebAgent
 import com.yukisoffd.lyracode.data.AppSettings
@@ -22,9 +23,10 @@ import com.yukisoffd.lyracode.workspace.WorkspaceManager
 
 /** Owns application-context dependencies; no reference to MainActivity or ChatController. */
 internal object DeviceAgentFactory {
-    fun create(context: Context, settings: AppSettings, store: ConversationStore): OpenAiAgent {
+    fun create(context: Context, settings: AppSettings, store: ConversationStore, workspaceUri: String? = settings.workspaceUri): OpenAiAgent {
         val app = context.applicationContext
-        val workspace = WorkspaceManager(app, settings)
+        com.yukisoffd.lyracode.AppStrings.initialize(app.localizedContext(settings.languageMode))
+        val workspace = WorkspaceManager(app, settings).apply { setActiveWorkspaceUri(workspaceUri) }
         val nativeFiles = NativeFileManager(app, workspace)
         val globalFiles = GlobalFileManager()
         return OpenAiAgent(

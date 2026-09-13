@@ -27,6 +27,7 @@ internal class TaskHudController(
     private val onPause: () -> Unit,
     private val onApproval: (String, Boolean) -> Unit = { _, _ -> },
     private val onClearContext: () -> Unit = {},
+    private val onConfigure: (String) -> Unit = {},
 ) {
     init {
         check(android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
@@ -37,6 +38,7 @@ internal class TaskHudController(
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var pet: com.yukisoffd.lyracode.interaction.pet.DesktopPetWindow? = null
     private var chatVisible = true
+    private var shownApproval: String? = null
     private var panelHost: FrameLayout? = null
     private var chatPanel: DeviceChatPanel? = null
     private var inputFocused = false
@@ -85,11 +87,11 @@ internal class TaskHudController(
             return
         }
 
-        if (state.approval != null || state.selection?.automatic == false) chatVisible = true
+        val approvalId = state.approval?.id ?: state.selection?.takeIf { !it.automatic }?.confirmationToken
+        if (approvalId != null && approvalId != shownApproval) chatVisible = true
+        shownApproval = approvalId
         if (pet == null) pet = com.yukisoffd.lyracode.interaction.pet.DesktopPetWindow(context, {
-            chatVisible = !chatVisible
-            if (!chatVisible) chatPanel?.releaseInput()
-            panelHost?.visibility = if (chatVisible) View.VISIBLE else View.GONE
+            setChatVisible(!chatVisible)
         }, onSubmit)
         pet?.render(state)
         // Create the non-touchable highlight layer first so the interactive panel always stays above it.
@@ -105,6 +107,13 @@ internal class TaskHudController(
         } else {
             updatePanel(state)
         }
+    }
+
+    /** Presentation-only: execution and pet state continue in the foreground service. */
+    internal fun setChatVisible(visible: Boolean) {
+        chatVisible = visible
+        if (!visible) chatPanel?.releaseInput()
+        panelHost?.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
     fun destroy() = removeViews()
@@ -124,7 +133,7 @@ internal class TaskHudController(
                 onInputFocus = { focused ->
                     updateInputFocus(focused)
                 }, onSubmit = onSubmit, onPause = onPause, onStop = onStop,
-                onConfirm = onConfirm, onReject = onCancelSelection, onApproval = onApproval, onClearContext = onClearContext,
+                onConfirm = onConfirm, onReject = onCancelSelection, onApproval = onApproval, onClearContext = onClearContext, onConfigure = onConfigure,
             ).also { chatPanel = it; host.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)) }
             panel.render(state, expanded)
             lastPanelSignature = signature

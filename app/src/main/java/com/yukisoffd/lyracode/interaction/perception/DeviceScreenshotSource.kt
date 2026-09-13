@@ -22,7 +22,7 @@ internal object DeviceScreenshotSource {
     }
     suspend fun capture(windowId: Int): Frame = suspendCancellableCoroutine { continuation ->
         val active = service
-        if (active == null || Build.VERSION.SDK_INT < 34) {
+        if (active == null || !com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported()) {
             continuation.resumeWithException(IllegalStateException("窗口截图不可用")); return@suspendCancellableCoroutine
         }
         val bounds = android.graphics.Rect()

@@ -4,12 +4,17 @@ import android.content.Context
 import android.content.res.Configuration
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -70,14 +75,32 @@ internal class DeviceChatTranscript(context: Context) : FrameLayout(context), Li
                             toolName = message.toolName, createdAt = message.createdAt)
                     }, isStreaming = chat.running, collapseStreamingProse = true)
                     val list = rememberLazyListState()
-                    LaunchedEffect(rows.size) {
-                        if (rows.isNotEmpty() && !list.canScrollForward && !list.isScrollInProgress)
-                            list.scrollToItem(rows.lastIndex)
+                    var follow by remember { mutableStateOf(true) }
+                    LaunchedEffect(list) {
+                        list.interactionSource.interactions.collect { event ->
+                            if (event is DragInteraction.Start) follow = false
+                            if (event is DragInteraction.Stop || event is DragInteraction.Cancel) follow = !list.canScrollForward
+                        }
+                    }
+                    LaunchedEffect(chat.messages.lastOrNull { it.role == "user" }?.id) { follow = true }
+                    // A real tail item works for a single message taller than the viewport too.
+                    // Re-evaluate after composition/layout on each streamed chunk, including hidden-window updates.
+                    LaunchedEffect(chat.messages, chat.running, follow) {
+                        if (follow) {
+                            androidx.compose.runtime.withFrameNanos { }
+                            list.scrollToItem(rows.size)
+                        }
+                    }
+                    LaunchedEffect(list) {
+                        snapshotFlow { list.isScrollInProgress to list.canScrollForward }.collect { (scrolling, more) ->
+                            if (!scrolling && !more) follow = true
+                        }
+                    }
+                    LaunchedEffect(list) {
+                        snapshotFlow { list.layoutInfo.let { Triple(it.viewportEndOffset, it.totalItemsCount, it.visibleItemsInfo.lastOrNull()?.size) } }
+                            .collect { (_, count, _) -> if (follow && count > 0) list.scrollToItem(count - 1) }
                     }
                     LazyColumn(Modifier.fillMaxSize(), state = list, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (rows.isEmpty()) item {
-                            Text("输入任务即可开始。安全操作自动执行，敏感操作会说明拦截原因。")
-                        }
                         items(rows, key = { it.key }) { row ->
                             if (row.process.isNotEmpty()) {
                                 com.yukisoffd.lyracode.AgentProcessSummary(row.process, selectionResetKey = 0,
@@ -87,6 +110,7 @@ internal class DeviceChatTranscript(context: Context) : FrameLayout(context), Li
                             }
                             row.message?.let { MessageCard(it, inlineToolDetails = true) }
                         }
+                        item(key = "floating-chat-tail") { androidx.compose.foundation.layout.Spacer(Modifier.fillParentMaxWidth().height(1.dp)) }
                     }
                 }
             }

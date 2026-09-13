@@ -19,7 +19,6 @@ import com.yukisoffd.lyracode.interaction.model.ManualActionSelection
 import com.yukisoffd.lyracode.interaction.model.ScreenSnapshot
 import com.yukisoffd.lyracode.interaction.perception.AccessibilitySnapshotSource
 import com.yukisoffd.lyracode.interaction.perception.ActionSnapshotSource
-import com.yukisoffd.lyracode.interaction.perception.ScreenProbeController
 import com.yukisoffd.lyracode.interaction.perception.ScreenProbeFailureCode
 import com.yukisoffd.lyracode.interaction.perception.SnapshotCaptureResult
 import com.yukisoffd.lyracode.interaction.policy.DeviceActionPolicy
@@ -77,6 +76,7 @@ class LyraAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        if (!DeviceInteractionAvailability.isSupported()) { disableSelf(); return }
         AccessibilityConnection.markConnected()
         com.yukisoffd.lyracode.interaction.perception.DeviceScreenshotSource.service = this
         ManualControlCommandBridge.attach(::executeSelectedAction)
@@ -97,11 +97,10 @@ class LyraAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!probeIsAllowed()) {
-            ScreenProbeController.clear()
-            ManualControlController.stop()
+            ManualControlController.clearDeviceState()
             return
         }
-        if (!ScreenProbeController.isActive() && !ManualControlController.state.value.isActive()) return
+        if (!ManualControlController.state.value.isActive()) return
         val eventPackage = event?.packageName?.toString() ?: return
         if (eventPackage == packageName) return
         if (ManualControlController.state.value.status in EXECUTION_STATUSES) return
@@ -113,20 +112,14 @@ class LyraAccessibilityService : AccessibilityService() {
         mainHandler.removeCallbacks(captureRunnable)
         captureScheduled.set(false)
         capturePending.set(false)
-        if (ScreenProbeController.isActive()) {
-            ScreenProbeController.fail(ScreenProbeFailureCode.SERVICE_INTERRUPTED, stop = true)
-        }
-        ManualControlController.stop()
+        ManualControlController.clearDeviceState()
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         mainHandler.removeCallbacks(captureRunnable)
         captureScheduled.set(false)
         capturePending.set(false)
-        if (ScreenProbeController.isActive()) {
-            ScreenProbeController.fail(ScreenProbeFailureCode.SERVICE_DISCONNECTED, stop = true)
-        }
-        ManualControlController.stop()
+        ManualControlController.clearDeviceState()
         ManualControlCommandBridge.detach()
         com.yukisoffd.lyracode.interaction.perception.DeviceScreenshotSource.service = null
         AccessibilityConnection.markDisconnected()
@@ -136,7 +129,7 @@ class LyraAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         mainHandler.removeCallbacks(captureRunnable)
         captureScheduled.set(false)
-        ManualControlController.stop()
+        ManualControlController.clearDeviceState()
         ManualControlCommandBridge.detach()
         com.yukisoffd.lyracode.interaction.perception.DeviceScreenshotSource.service = null
         serviceScope.cancel()
@@ -149,18 +142,14 @@ class LyraAccessibilityService : AccessibilityService() {
     private fun requestCapture() {
         if (Build.VERSION.SDK_INT < DeviceInteractionAvailability.MIN_SUPPORTED_SDK) return
         val manualActive = ManualControlController.state.value.isActive()
-        if (!probeIsAllowed() || (!ScreenProbeController.isActive() && !manualActive)) return
+        if (!probeIsAllowed() || !manualActive) return
         if (!captureInFlight.compareAndSet(false, true)) {
             capturePending.set(true)
             return
         }
         val captureStartedAt = SystemClock.elapsedRealtime()
         serviceScope.launch(captureDispatcher) {
-            val result = if (ScreenProbeController.isActive()) {
-                AccessibilitySnapshotSource(this@LyraAccessibilityService).capture()
-            } else {
-                ActionSnapshotSource(this@LyraAccessibilityService).capture()
-            }
+            val result = ActionSnapshotSource(this@LyraAccessibilityService).capture()
             val captureDuration = SystemClock.elapsedRealtime() - captureStartedAt
             if (captureDuration >= SLOW_OPERATION_LOG_MILLIS) {
                 val nodeCount = (result as? SnapshotCaptureResult.Success)?.snapshot?.nodes?.size ?: 0
@@ -178,7 +167,6 @@ class LyraAccessibilityService : AccessibilityService() {
         when (result) {
             is SnapshotCaptureResult.Success -> {
                 if (result.snapshot.activePackage != packageName) {
-                    if (ScreenProbeController.isActive()) ScreenProbeController.publish(result.snapshot)
                     val manualState = ManualControlController.state.value
                     if (manualState.isActive() && manualState.status !in EXECUTION_STATUSES) {
                         ManualControlController.publish(result.snapshot)
@@ -186,7 +174,6 @@ class LyraAccessibilityService : AccessibilityService() {
                 }
             }
             is SnapshotCaptureResult.Failure -> {
-                if (ScreenProbeController.isActive()) ScreenProbeController.fail(result.code)
                 ManualControlController.invalidateObservation()
             }
         }
@@ -314,7 +301,6 @@ class LyraAccessibilityService : AccessibilityService() {
                         ),
                         snapshot = after,
                     )
-                    if (ScreenProbeController.isActive()) ScreenProbeController.publish(after)
                 }
             }
         }

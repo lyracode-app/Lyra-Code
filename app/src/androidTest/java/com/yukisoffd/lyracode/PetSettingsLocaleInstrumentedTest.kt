@@ -60,7 +60,7 @@ class PetSettingsLocaleInstrumentedTest {
                     assertEquals(title, activity.getString(R.string.pet_settings_title))
                     assertEquals(entry, activity.getString(R.string.pet_settings_entry))
                     assertTrue(texts(activity).contains(title))
-                    assertTrue(texts(activity).contains(DevicePetStore.load(context).getString("name")))
+                    assertTrue(texts(activity).contains(if (DevicePetStore.activeKey(context) == "builtin") activity.getString(R.string.pet_builtin_name) else DevicePetStore.load(context).getString("name")))
                     val controls = DevicePetStore.load(context).optJSONArray("controls")
                     if (controls != null) for (i in 0 until controls.length()) {
                         assertTrue("Package label must remain unchanged", texts(activity).contains(controls.getJSONObject(i).getString("label")))
@@ -95,6 +95,39 @@ class PetSettingsLocaleInstrumentedTest {
                 }
             }
         } finally { audit.close() }
+    }
+    @Test fun predictiveBackRevealsTheActualPreviousActivity() {
+        val old = settings.predictiveBackEnabled
+        settings.predictiveBackEnabled = true
+        val main = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        SystemClock.sleep(1000)
+        val before = instrumentation.uiAutomation.takeScreenshot()!!
+        val activity = open()
+        try {
+            instrumentation.runOnMainSync {
+                activity.onBackPressedDispatcher.dispatchOnBackStarted(BackEventCompat(0f, 300f, 0f, BackEventCompat.EDGE_LEFT))
+                repeat(5) { activity.onBackPressedDispatcher.dispatchOnBackProgressed(BackEventCompat(600f, 300f, .8f, BackEventCompat.EDGE_LEFT)) }
+            }
+            SystemClock.sleep(300)
+            val preview = instrumentation.uiAutomation.takeScreenshot()!!
+            try {
+                var equal = 0
+                var samples = 0
+                for (x in 30 until before.width / 3 step 20) for (y in before.height / 4 until before.height * 3 / 4 step 20) {
+                    samples++
+                    if (before.getPixel(x, y) == preview.getPixel(x, y)) equal++
+                }
+                assertTrue("Previous activity must remain visible: $equal / $samples", equal > samples * .9)
+                java.io.File(context.externalCacheDir, "pet-back-preview.png").outputStream().use { preview.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            } finally { preview.recycle() }
+            instrumentation.runOnMainSync { activity.onBackPressedDispatcher.onBackPressed() }
+            SystemClock.sleep(450)
+            assertTrue(activity.isFinishing)
+        } finally {
+            before.recycle()
+            instrumentation.runOnMainSync { activity.finish(); main.finish() }
+            settings.predictiveBackEnabled = old
+        }
     }
     @Test fun predictiveBackHonorsSwitchAndBothEdgesThenCancelsOrCommits() {
         val old = settings.predictiveBackEnabled

@@ -46,14 +46,12 @@ import com.yukisoffd.lyracode.R
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability
 import com.yukisoffd.lyracode.interaction.overlay.OverlayPermission
-import com.yukisoffd.lyracode.interaction.perception.ScreenProbeController
 import com.yukisoffd.lyracode.interaction.service.AccessibilityConnection
 import com.yukisoffd.lyracode.interaction.session.ManualControlController
 
 @Composable
 internal fun DeviceInteractionSettings(
     settings: AppSettings,
-    onOpenScreenProbe: () -> Unit,
     onOpenManualControl: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -115,8 +113,7 @@ internal fun DeviceInteractionSettings(
                     experimentEnabled = enabled
                     settings.deviceInteractionExperimentalEnabled = enabled
                     if (!enabled) {
-                        ScreenProbeController.clear()
-                        ManualControlController.stop()
+                        ManualControlController.clearDeviceState()
                     }
                 },
             )
@@ -204,16 +201,9 @@ internal fun DeviceInteractionSettings(
             style = MaterialTheme.typography.bodySmall,
         )
         OutlinedButton(
-            onClick = onOpenScreenProbe,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = supported && experimentEnabled && connected && serviceEnabled,
-        ) {
-            Text(context.getString(R.string.device_interaction_open_screen_probe))
-        }
-        OutlinedButton(
             onClick = onOpenManualControl,
             modifier = Modifier.fillMaxWidth(),
-            enabled = supported && experimentEnabled && connected && serviceEnabled && overlayGranted,
+            enabled = supported,
         ) {
             Text(context.getString(R.string.device_interaction_open_manual_control))
         }

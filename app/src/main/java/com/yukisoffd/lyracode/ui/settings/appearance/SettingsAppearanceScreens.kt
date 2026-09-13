@@ -127,24 +127,24 @@ internal fun ThemeSettings(
             Switch(checked = predictiveBackEnabled, onCheckedChange = onPredictiveBackChange)
         }
         KimiDivider()
-        KimiMenuRow(Icons.Default.Palette, uiText(R.string.title_theme_mode), if (settings.customThemeColorEnabled) uiText(R.string.custom_theme_color_value, settings.customThemeColor) else themeName(themeMode), onOpenThemeModeSettings)
+        KimiMenuRow(Icons.Default.Palette, uiText(R.string.title_theme_mode), if (settings.customThemeColorEnabled) uiText(R.string.custom_theme_color_value, settings.customThemeColor) else themeName(themeMode), onClick = onOpenThemeModeSettings)
         KimiDivider()
-        KimiMenuRow(Icons.Default.FormatSize, uiText(R.string.ui_fonts_and_size), fontScaleName(fontScaleMode, customFontScale), onOpenFontSettings)
+        KimiMenuRow(Icons.Default.FormatSize, uiText(R.string.ui_fonts_and_size), fontScaleName(fontScaleMode, customFontScale), onClick = onOpenFontSettings)
         KimiDivider()
-        KimiMenuRow(Icons.Default.Speed, uiText(R.string.title_refresh_rate), refreshRateName(refreshRateMode), onOpenRefreshRateSettings)
+        KimiMenuRow(Icons.Default.Speed, uiText(R.string.title_refresh_rate), refreshRateName(refreshRateMode), onClick = onOpenRefreshRateSettings)
         KimiDivider()
         KimiMenuRow(
             Icons.Default.Animation,
             stringResource(R.string.streaming_output_title),
             streamingAnimationModeName(settings.streamingAnimationMode),
-            onOpenStreamingOutputSettings,
+            onClick = onOpenStreamingOutputSettings,
         )
         KimiDivider()
         KimiMenuRow(
             Icons.Default.Image,
             uiText(R.string.menu_chat_background),
             if (hasBackground) uiText(R.string.background_set) else uiText(R.string.background_solid),
-            onOpenChatBackgroundSettings,
+            onClick = onOpenChatBackgroundSettings,
         )
     }
 }
@@ -371,7 +371,7 @@ internal fun ThemeModeSettings(
             Icons.Default.ColorLens,
             uiText(R.string.ui_set_custom_theme_color),
             uiText(R.string.ui_current_color_1_s, AppSettings.normalizeHexColor(settings.customThemeColor)),
-            onOpenCustomThemeColor,
+            onClick = onOpenCustomThemeColor,
         )
     }
     KimiCardBox {

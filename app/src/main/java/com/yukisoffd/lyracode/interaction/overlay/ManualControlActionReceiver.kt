@@ -13,10 +13,13 @@ import com.yukisoffd.lyracode.interaction.session.ManualControlController
 /** Receives explicit, app-internal commands from the isolated overlay process. */
 class ManualControlActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (!com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported() && intent.action != ManualControlOverlayProtocol.COMMAND_STOP) return
         val sentAt = intent.getLongExtra(ManualControlOverlayProtocol.EXTRA_SENT_AT_ELAPSED, 0L)
         val transportMillis = if (sentAt > 0L) SystemClock.elapsedRealtime() - sentAt else -1L
         Log.i(LOG_TAG, "main_command_received action=${intent.action} transport_ms=$transportMillis pid=${Process.myPid()}")
         when (intent.action) {
+            ManualControlOverlayProtocol.COMMAND_CONFIGURE -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.configure(
+                context, intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_INPUT).orEmpty())
             ManualControlOverlayProtocol.COMMAND_SELECT -> {
                 val handle = intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_HANDLE) ?: return
                 val action = intent.getStringExtra(ManualControlOverlayProtocol.EXTRA_ACTION)

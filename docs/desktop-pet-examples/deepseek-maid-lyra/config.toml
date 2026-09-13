@@ -1,0 +1,9 @@
+[pet]
+size = 112
+autoDock = true
+dockDelayMs = 5000
+dockOpacity = 0.6
+[controls]
+transitionMs = 320
+feedback = true
+pose = "auto"

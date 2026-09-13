@@ -19,7 +19,7 @@ android {
         applicationId = "com.yukisoffd.lyracode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 75
+        versionCode = 76
         versionName = "4.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -48,7 +48,7 @@ android {
         }
         create("beta") {
             applicationIdSuffix = ".beta"
-            versionNameSuffix = "-beta.1"
+            versionNameSuffix = "-beta.2"
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("debug")
         }

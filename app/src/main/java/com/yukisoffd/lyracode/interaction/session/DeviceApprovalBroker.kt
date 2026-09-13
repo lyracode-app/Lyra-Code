@@ -5,7 +5,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 internal data class DeviceApproval(val id: String, val title: String, val detail: String,
-    val packageName: String?, val secondConfirmation: Boolean, val stage: Int = 1)
+    val packageName: String?, val secondConfirmation: Boolean, val stage: Int = 1, val textInput: Boolean = false)
 
 /** Exact single-use foreground approval. Scripts never receive the response channel. */
 internal object DeviceApprovalBroker {

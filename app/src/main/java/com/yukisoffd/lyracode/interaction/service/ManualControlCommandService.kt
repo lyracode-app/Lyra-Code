@@ -36,6 +36,7 @@ class ManualControlCommandService : Service() {
     }
 
     private fun handleCommand(message: Message): Boolean {
+        if (!com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability.isSupported() && message.what !in setOf(STOP, PAUSE, CLEAR_CONTEXT)) return true
         val sentAt = message.data.getLong(ManualControlOverlayProtocol.EXTRA_SENT_AT_ELAPSED, 0L)
         val transportMillis = if (sentAt > 0L) SystemClock.elapsedRealtime() - sentAt else -1L
         Log.i(
@@ -67,6 +68,7 @@ class ManualControlCommandService : Service() {
             APPROVAL -> com.yukisoffd.lyracode.interaction.session.DeviceApprovalBroker.respond(
                 message.data.getString(ManualControlOverlayProtocol.EXTRA_REQUEST_ID).orEmpty(),
                 message.data.getString(ManualControlOverlayProtocol.EXTRA_INPUT) == "approve")
+            CONFIGURE -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.configure(applicationContext, message.data.getString(ManualControlOverlayProtocol.EXTRA_INPUT).orEmpty())
             CLEAR_CONTEXT -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.clearContext()
             PAUSE -> com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator.pause()
             else -> return false
@@ -83,6 +85,7 @@ class ManualControlCommandService : Service() {
         const val PAUSE = 6
         const val APPROVAL = 7
         const val CLEAR_CONTEXT = 8
+        const val CONFIGURE = 9
         private const val COMMAND_THREAD_NAME = "lyra-control-command"
         private const val LOG_TAG = "LyraManualControl"
     }
