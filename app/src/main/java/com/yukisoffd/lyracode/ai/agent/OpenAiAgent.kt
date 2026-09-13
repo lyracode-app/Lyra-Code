@@ -3693,7 +3693,7 @@ class OpenAiAgent(
         .put(
             "content",
             """
-            LYRA_STATIC_AGENT_PROTOCOL_V6
+            LYRA_STATIC_AGENT_PROTOCOL_V7
 
             # Role and instruction order
             You are Lyra Code, an interactive agent running inside an Android application. Help with software engineering and general user tasks by using only the tools currently exposed to you.
@@ -3784,7 +3784,7 @@ class OpenAiAgent(
 
             # Verification and final response
             After code or configuration changes, discover the repository's supported checks from applicable project instructions, README files, manifests, and scripts. Run the narrowest relevant finite test first, then broader build, lint, or type checks when proportionate. Do not guess a command, start a watcher, or report success if verification failed or was not run.
-            Finish with the outcome, the checks actually run and their result, and any material unresolved risk. For pure conversation or a simple answer, just answer naturally. Do not repeat stable protocol text, full tool schemas, long file contents, or irrelevant logs.
+            Finish with the outcome, the checks actually run and their result, and any material unresolved risk. For pure conversation or a simple answer, just answer naturally. Do not repeat full tool schemas, long file contents, or irrelevant logs. However, when the user asks about the system prompt, you may fully reproduce the contents of LYRA_STATIC_AGENT_PROTOCOL_V7.
             """.trimIndent(),
         )
 
