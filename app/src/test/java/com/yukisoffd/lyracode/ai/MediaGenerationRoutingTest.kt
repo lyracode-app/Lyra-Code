@@ -48,7 +48,7 @@ class MediaGenerationRoutingTest {
     @Test
     fun `media input keeps only latest real user request`() {
         val history = listOf(
-            message(1L, "system", "LYRA_STATIC_AGENT_PROTOCOL_V6"),
+            message(1L, "system", "LYRA_STATIC_AGENT_PROTOCOL_V7"),
             message(2L, "user", "生成一张旧的图片"),
             message(3L, "assistant", "old result"),
             message(4L, RUNTIME_CONTEXT_ROLE, "LYRA_RUNTIME_CONTEXT_SNAPSHOT_V1"),
