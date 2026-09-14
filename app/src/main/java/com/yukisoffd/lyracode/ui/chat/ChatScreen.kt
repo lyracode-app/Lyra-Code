@@ -60,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -70,8 +71,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -459,20 +461,24 @@ internal fun ChatScreen(
                 keyboardShouldLiftOutput = true
             }
         }
-        LaunchedEffect(isRunning, listState.isScrollInProgress, listState.canScrollForward) {
+        LaunchedEffect(isRunning) {
+            if (isRunning) autoFollowOutput = true
+        }
+        LaunchedEffect(listState.isScrollInProgress, listState.canScrollForward) {
             val userSettledAtBottom = !listState.isScrollInProgress && !listState.canScrollForward
-            if (!isRunning || userSettledAtBottom) {
+            if (userSettledAtBottom) {
                 autoFollowOutput = true
             }
         }
-        LaunchedEffect(
-            messageSnapshot.lastOrNull()?.id,
-            messageSnapshot.lastOrNull()?.content?.length,
-            messageSnapshot.lastOrNull()?.thinking?.length,
-            bottomAnchorIndex,
-        ) {
-            if (messageSnapshot.isNotEmpty() && autoFollowOutput) {
-                listState.scrollToItem(bottomAnchorIndex)
+        LaunchedEffect(controller.activeConversationId.value, bottomAnchorIndex) {
+            // Follow measured output, including typewriter frames after the last
+            // network chunk. Never compete with a drag or its settling fling.
+            snapshotFlow {
+                Triple(listState.layoutInfo, listState.isScrollInProgress, autoFollowOutput)
+            }.collect { (layout, scrolling, following) ->
+                if (following && !scrolling && layout.totalItemsCount > 0 && listState.canScrollForward) {
+                    listState.scrollToItem(bottomAnchorIndex)
+                }
             }
         }
         LaunchedEffect(resolvedKeyboardLiftPx) {
@@ -502,16 +508,25 @@ internal fun ChatScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(isRunning) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                if (isRunning && event.changes.any { it.pressed }) {
+                    .nestedScroll(remember(listState, controller.activeConversationId.value) {
+                        object : NestedScrollConnection {
+                            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                                if (source == NestedScrollSource.UserInput && available.y != 0f) {
                                     autoFollowOutput = false
                                 }
+                                return Offset.Zero
+                            }
+
+                            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                                // Latch the bottom during the gesture, before another
+                                // streaming frame can move it away on finger release.
+                                if ((consumed.y < 0f || available.y < 0f) && !listState.canScrollForward) {
+                                    autoFollowOutput = true
+                                }
+                                return Offset.Zero
                             }
                         }
-                    },
+                    }),
                 contentPadding = PaddingValues(bottom = if (keyboardShouldLiftOutput) keyboardLiftDp else 0.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -555,17 +570,24 @@ internal fun ChatScreen(
                 }
                 ConversationNavigationControls(
                     onInteraction = { navigationRevealToken++ },
-                    onTop = { scope.launch { listState.animateScrollToItem(0) } },
+                    onTop = { autoFollowOutput = false; scope.launch { listState.animateScrollToItem(0) } },
                     onPreviousUser = {
+                        autoFollowOutput = false
                         val target = userItemIndices.lastOrNull { it < listState.firstVisibleItemIndex } ?: 0
                         scope.launch { listState.animateScrollToItem(target) }
                     },
                     onNextUser = {
+                        autoFollowOutput = false
                         val target = userItemIndices.firstOrNull { it > listState.firstVisibleItemIndex }
                             ?: (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
                         scope.launch { listState.animateScrollToItem(target) }
                     },
-                    onBottom = { scope.launch { listState.animateScrollToItem(bottomAnchorIndex) } },
+                    onBottom = {
+                        scope.launch {
+                            listState.animateScrollToItem(bottomAnchorIndex)
+                            autoFollowOutput = true
+                        }
+                    },
                 )
             }
         }

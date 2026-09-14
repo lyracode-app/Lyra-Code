@@ -241,7 +241,7 @@ internal fun AgentProcessSummary(
     Card(
         Modifier
             .fillMaxWidth()
-            .smoothStreamingHeight(),
+            .then(if (active) Modifier else Modifier.smoothStreamingHeight()),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
@@ -260,7 +260,7 @@ internal fun AgentProcessSummary(
             AnimatedVisibility(expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     messages.forEachIndexed { index, message ->
-                        key(message.id) {
+                        key(sourceMessageId(message.id)) {
                             MessageCard(
                                 message = message,
                                 selectionResetKey = selectionResetKey,
@@ -811,7 +811,7 @@ internal fun MessageCard(
         else -> MaterialTheme.colorScheme.onSurface
     }
     val clipboard = LocalClipboardManager.current
-    var showThinking by rememberSaveable(message.id) { mutableStateOf(false) }
+    var showThinking by rememberSaveable(sourceMessageId(message.id)) { mutableStateOf(false) }
     var showToolResult by rememberSaveable(message.id) { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var localSelectionResetKey by rememberSaveable(message.id) { mutableStateOf(0) }
@@ -929,7 +929,6 @@ internal fun MessageCard(
                                                 mode = streamingAnimationMode,
                                                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                                 color = contentColor,
-                                                smoothHeight = !inProcessRecord,
                                             )
                                         }
                                     }
@@ -1125,10 +1124,12 @@ private fun rememberStreamingTextFrame(
     val latestContent by rememberUpdatedState(content)
     val fadeMode = normalizedMode == AppSettings.STREAMING_ANIMATION_FADE
     var renderedContent by remember {
-        mutableStateOf(if (isStreaming && !fadeMode) "" else content)
+        // A lazy item can be recreated while an answer is still streaming.
+        // Existing text must never disappear and replay from the beginning.
+        mutableStateOf(content)
     }
     val opaquePosition = remember {
-        Animatable(if (isStreaming && fadeMode) 0f else content.length.toFloat())
+        Animatable(content.length.toFloat())
     }
 
     LaunchedEffect(content, isStreaming, normalizedMode) {
@@ -1184,7 +1185,6 @@ private fun StreamingThinkingContent(
     mode: String,
     style: TextStyle,
     color: Color,
-    smoothHeight: Boolean,
 ) {
     val frame = rememberStreamingTextFrame(content, isStreaming, mode)
     val annotated = remember(frame.content, frame.fade, color) {
@@ -1199,7 +1199,7 @@ private fun StreamingThinkingContent(
     }
     Text(
         text = annotated,
-        modifier = if (smoothHeight) Modifier.smoothStreamingHeight() else Modifier,
+        modifier = Modifier.fillMaxWidth(),
         style = style.copy(color = color),
     )
 }
