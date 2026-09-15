@@ -228,7 +228,11 @@ internal class DebianRuntimeManager private constructor(context: Context) {
     private val runtimeDir = File(appContext.filesDir, "debian-runtime")
     internal val rootfsDir = File(runtimeDir, "rootfs")
     private val stagingDir = File(runtimeDir, "rootfs-installing")
-    private val archiveFile = File(appContext.cacheDir, "debian-rootfs/$ROOTFS_ARCHIVE_NAME")
+    private val architecture = ProotArchitecture.installed(
+        File(appContext.applicationInfo.nativeLibraryDir), Build.SUPPORTED_ABIS.toList(),
+    )
+    private val rootfsSource = if (architecture == ProotArchitecture.X86_64) AMD64_ROOTFS else ARM64_ROOTFS
+    private val archiveFile = File(appContext.cacheDir, "debian-rootfs/${rootfsSource.version}.tgz")
     private val preferences = appContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val installMutex = Mutex()
     private val client = OkHttpClient.Builder()
@@ -238,8 +242,7 @@ internal class DebianRuntimeManager private constructor(context: Context) {
     private val _state = MutableStateFlow(currentState())
     val state: StateFlow<DebianRuntimeState> = _state.asStateFlow()
 
-    fun isSupported(): Boolean = Build.SUPPORTED_ABIS.any { it == "arm64-v8a" } &&
-        runCatching { prootFile().isFile && loaderFile().isFile }.getOrDefault(false)
+    fun isSupported(): Boolean = architecture != null
 
     fun isInstalled(): Boolean = File(rootfsDir, "bin/bash").isFile
 
@@ -259,8 +262,11 @@ internal class DebianRuntimeManager private constructor(context: Context) {
     }
 
     fun requireInstalled() {
-        check(isSupported()) { "The internal Debian runtime currently supports arm64-v8a devices only." }
+        check(isSupported()) { "The internal Debian runtime requires arm64-v8a or x86_64 native libraries." }
         check(isInstalled()) { "Internal Debian is not installed. Open Settings > Debian runtime to install it." }
+        check(ProotArchitecture.readElfMachine(File(rootfsDir, "bin/bash")) == architecture?.elfMachine) {
+            "The installed Debian rootfs does not match this device (${architecture?.rootfsName})."
+        }
         check(isEnabled()) { "Internal Debian is disabled in Settings." }
     }
 
@@ -320,7 +326,7 @@ internal class DebianRuntimeManager private constructor(context: Context) {
                 _state.value = currentState()
                 return@withLock
             }
-            check(isSupported()) { "The internal Debian runtime currently supports arm64-v8a devices only." }
+            check(isSupported()) { "The internal Debian runtime requires arm64-v8a or x86_64 native libraries." }
             try {
                 downloadArchive()
                 _state.value = DebianRuntimeState(DebianRuntimePhase.INSTALLING)
@@ -331,7 +337,10 @@ internal class DebianRuntimeManager private constructor(context: Context) {
                     TarExtractor.extract(archive, stagingDir)
                 }
                 check(File(stagingDir, "bin/bash").isFile) { "The downloaded Debian rootfs does not contain /bin/bash." }
-                File(stagingDir, INSTALL_MARKER).writeText(ROOTFS_VERSION)
+                check(ProotArchitecture.readElfMachine(File(stagingDir, "bin/bash")) == architecture?.elfMachine) {
+                    "The downloaded Debian rootfs does not match this device."
+                }
+                File(stagingDir, INSTALL_MARKER).writeText(rootfsSource.version)
                 // rootfsDir cannot exist here unless another/older process installed it. Never
                 // delete such a directory: it may already contain a configured user environment.
                 if (rootfsDir.exists()) {
@@ -375,9 +384,9 @@ internal class DebianRuntimeManager private constructor(context: Context) {
     private fun downloadArchive() {
         archiveFile.parentFile?.mkdirs()
         val part = File(archiveFile.parentFile, "${archiveFile.name}.part")
-        if (archiveFile.isFile && sha256(archiveFile) == ROOTFS_SHA256) return
+        if (archiveFile.isFile && sha256(archiveFile) == rootfsSource.sha256) return
         part.delete()
-        val request = Request.Builder().url(ROOTFS_URL).header("User-Agent", "LyraCode-Android").build()
+        val request = Request.Builder().url(rootfsSource.url).header("User-Agent", "LyraCode-Android").build()
         client.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "Debian download failed: HTTP ${response.code}" }
             val body = response.body ?: error("Debian download returned an empty response.")
@@ -398,7 +407,7 @@ internal class DebianRuntimeManager private constructor(context: Context) {
             }
         }
         val actual = sha256(part)
-        check(actual == ROOTFS_SHA256) { "Debian rootfs SHA-256 mismatch: expected $ROOTFS_SHA256, got $actual" }
+        check(actual == rootfsSource.sha256) { "Debian rootfs SHA-256 mismatch: expected ${rootfsSource.sha256}, got $actual" }
         if (archiveFile.exists()) archiveFile.delete()
         check(part.renameTo(archiveFile)) { "Unable to finalize the Debian rootfs download." }
     }
@@ -417,10 +426,17 @@ internal class DebianRuntimeManager private constructor(context: Context) {
     }
 
     companion object {
-        private const val ROOTFS_URL = "https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/14d91d295c23da6cc04d4bfe8b3d74a8a6c54e5c/trixie/oci/blobs/rootfs.tar.gz"
-        private const val ROOTFS_SHA256 = "018e5aeb5455352b2e96f5c9cb604b5767162ec71fcd22ca9d02b088cdeaf49d"
-        private const val ROOTFS_ARCHIVE_NAME = "debian-trixie-arm64-v8a.tgz"
-        private const val ROOTFS_VERSION = "trixie-arm64-018e5aeb5455352b"
+        private data class RootfsSource(val url: String, val sha256: String, val version: String)
+        private val ARM64_ROOTFS = RootfsSource(
+            "https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/14d91d295c23da6cc04d4bfe8b3d74a8a6c54e5c/trixie/oci/blobs/rootfs.tar.gz",
+            "018e5aeb5455352b2e96f5c9cb604b5767162ec71fcd22ca9d02b088cdeaf49d",
+            "trixie-arm64-018e5aeb5455352b",
+        )
+        private val AMD64_ROOTFS = RootfsSource(
+            "https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/bae6d64d90b4068b09ff9d8b564c2773ef5d8d83/trixie/oci/blobs/rootfs.tar.gz",
+            "27ee9a8250487842a26b1ffa1215982ba9ae27010bce1997d52f9f8628578d17",
+            "trixie-amd64-27ee9a8250487842",
+        )
         private const val INSTALL_MARKER = ".lyra-rootfs-version"
         private const val PROOT_EXECUTABLE = "libproot_exec.so"
         private const val PROOT_LOADER = "libproot_loader.so"
@@ -450,6 +466,9 @@ internal object TarExtractor {
 
         while (readBlock(input, header)) {
             if (header.all { it == 0.toByte() }) break
+            val checksum = tarOctal(header, 148, 8)
+            val actualChecksum = header.indices.sumOf { if (it in 148..155) 32 else header[it].toInt() and 0xff }
+            require(checksum == actualChecksum.toLong()) { "Invalid tar header checksum." }
             val headerName = tarString(header, 0, 100)
             val prefix = tarString(header, 345, 155)
             val archiveName = paxPath ?: longName ?: listOf(prefix, headerName).filter { it.isNotBlank() }.joinToString("/")

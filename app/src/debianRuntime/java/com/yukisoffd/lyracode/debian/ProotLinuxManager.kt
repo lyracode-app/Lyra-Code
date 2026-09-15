@@ -11,6 +11,9 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.EOFException
+import java.util.zip.ZipException
+import kotlinx.coroutines.CancellationException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.util.UUID
@@ -55,6 +58,7 @@ internal data class ProotLinuxState(
     val phase: ProotOperationPhase = ProotOperationPhase.IDLE,
     val progressPercent: Int = 0,
     val message: String = "",
+    val importFailure: RootfsImportException? = null,
 )
 
 internal data class ProotCommandProcess(
@@ -87,8 +91,11 @@ internal class ProotLinuxManager private constructor(context: Context) {
     private val _state = MutableStateFlow(ProotLinuxState(instances = scanInstances()))
     val state: StateFlow<ProotLinuxState> = _state.asStateFlow()
 
-    fun isSupported(): Boolean = Build.SUPPORTED_ABIS.any { it == "arm64-v8a" } &&
-        runCatching { prootFile().isFile && loaderFile().isFile }.getOrDefault(false)
+    fun runtimeArchitecture(): ProotArchitecture? = ProotArchitecture.installed(
+        File(appContext.applicationInfo.nativeLibraryDir), Build.SUPPORTED_ABIS.toList(),
+    )
+
+    fun isSupported(): Boolean = runtimeArchitecture() != null
 
     fun activeInstances(): List<ProotLinuxInstance> = state.value.instances.filter { it.enabled }
 
@@ -187,9 +194,29 @@ internal class ProotLinuxManager private constructor(context: Context) {
             try {
                 _state.value = ProotLinuxState(scanInstances(), ProotOperationPhase.IMPORTING, message = "Copying rootfs archive")
                 archive.parentFile?.mkdirs()
-                copyUri(uri, archive)
+                try {
+                    copyUri(uri, archive)
+                } catch (error: SecurityException) {
+                    throw RootfsImportException(RootfsImportProblem.CANNOT_READ, cause = error)
+                } catch (error: java.io.FileNotFoundException) {
+                    throw RootfsImportException(RootfsImportProblem.CANNOT_READ, cause = error)
+                }
                 stagingRootfs.mkdirs()
-                openTarStream(archive).use { TarExtractor.extract(it, stagingRootfs) }
+                try {
+                    openTarStream(archive).use { input ->
+                        TarExtractor.extract(input, stagingRootfs)
+                        // Consume the gzip trailer too, so a bad CRC or truncated download
+                        // cannot be accepted just because tar reached its end marker first.
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (input.read(buffer) != -1) { /* drain */ }
+                    }
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    if (error is EOFException || error is ZipException ||
+                        error is IllegalArgumentException || error is IllegalStateException
+                    ) throw RootfsImportException(RootfsImportProblem.INVALID_ARCHIVE, cause = error)
+                    throw error
+                }
                 normalizeSingleTopLevelDirectory(stagingRootfs)
                 validateRootfs(stagingRootfs)
                 prepareRootfs(stagingRootfs)
@@ -211,8 +238,14 @@ internal class ProotLinuxManager private constructor(context: Context) {
                 id
             } catch (error: Throwable) {
                 staging.deleteRecursively()
-                publishError(error)
-                throw error
+                if (error is CancellationException) {
+                    _state.value = ProotLinuxState(scanInstances())
+                    throw error
+                }
+                val failure = error as? RootfsImportException
+                    ?: RootfsImportException(RootfsImportProblem.OTHER, cause = error)
+                _state.value = ProotLinuxState(scanInstances(), ProotOperationPhase.ERROR, importFailure = failure)
+                throw failure
             } finally {
                 archive.delete()
             }
@@ -438,6 +471,7 @@ internal class ProotLinuxManager private constructor(context: Context) {
         val target = instance(id)
         check(target.enabled) { "PRoot Linux '$id' is disabled." }
         check(target.shellPath.isNotBlank()) { "PRoot Linux '$id' has no /bin/bash or /bin/sh." }
+        validateRootfs(target.rootfsDir)
         return target
     }
 
@@ -581,16 +615,22 @@ internal class ProotLinuxManager private constructor(context: Context) {
     }
 
     private fun validateRootfs(rootfs: File) {
-        check(hasShell(rootfs)) { "The archive is not a compatible Linux rootfs: /bin/bash or /bin/sh is missing." }
-        val shell = resolveInsideRootfs(
-            rootfs,
-            if (Files.exists(File(rootfs, "bin/bash").toPath(), LinkOption.NOFOLLOW_LINKS)) "bin/bash" else "bin/sh",
-        )
-        check(shell.isFile) { "The imported rootfs shell target is missing or invalid." }
-        val machine = readElfMachine(shell)
-        check(machine == null || machine == ELF_MACHINE_AARCH64) {
-            "The selected rootfs is not arm64/aarch64 (ELF machine $machine)."
+        if (!hasShell(rootfs)) throw RootfsImportException(RootfsImportProblem.MISSING_SHELL)
+        val shell = try {
+            resolveInsideRootfs(
+                rootfs,
+                if (Files.exists(File(rootfs, "bin/bash").toPath(), LinkOption.NOFOLLOW_LINKS)) "bin/bash" else "bin/sh",
+            )
+        } catch (error: Exception) {
+            throw RootfsImportException(RootfsImportProblem.INVALID_SHELL, cause = error)
         }
+        if (!shell.isFile) throw RootfsImportException(RootfsImportProblem.INVALID_SHELL)
+        val architecture = checkNotNull(runtimeArchitecture()) { "No supported PRoot runtime is installed." }
+        val machine = ProotArchitecture.readElfMachine(shell, require64Bit = false)
+        if (machine == null) throw RootfsImportException(RootfsImportProblem.INVALID_SHELL)
+        if (machine != architecture.elfMachine) throw RootfsImportException(
+            RootfsImportProblem.ARCHITECTURE_MISMATCH, architecture, machine,
+        )
     }
 
     private fun resolveInsideRootfs(rootfs: File, relative: String): File {
@@ -621,15 +661,6 @@ internal class ProotLinuxManager private constructor(context: Context) {
         error("Too many symbolic links while validating /$relative")
     }
 
-    private fun readElfMachine(file: File): Int? = runCatching {
-        file.inputStream().use { input ->
-            val header = ByteArray(20)
-            if (input.read(header) != header.size) return@use null
-            if (header[0] != 0x7f.toByte() || header[1] != 'E'.code.toByte() || header[2] != 'L'.code.toByte() || header[3] != 'F'.code.toByte()) return@use null
-            (header[18].toInt() and 0xff) or ((header[19].toInt() and 0xff) shl 8)
-        }
-    }.getOrNull()
-
     private fun prepareRootfs(rootfs: File) {
         File(rootfs, "root").mkdirs()
         listOf("tmp", "var/tmp", "dev", "proc", "sys", "workspace", "storage", "sdcard").forEach {
@@ -659,7 +690,7 @@ internal class ProotLinuxManager private constructor(context: Context) {
         .take(40)
 
     private fun checkSupported() {
-        check(isSupported()) { "PRoot Linux currently supports arm64-v8a devices only." }
+        check(isSupported()) { "PRoot Linux requires a matching arm64-v8a or x86_64 executable and loader." }
     }
 
     private fun publishError(error: Throwable) {
@@ -686,7 +717,6 @@ internal class ProotLinuxManager private constructor(context: Context) {
         private const val PREFERENCES = "proot_linux"
         private const val PROOT_EXECUTABLE = "libproot_exec.so"
         private const val PROOT_LOADER = "libproot_loader.so"
-        private const val ELF_MACHINE_AARCH64 = 183
         private const val BACKGROUND_REAP_INTERVAL_MILLIS = 1_000L
         private const val BACKGROUND_STOP_TIMEOUT_MILLIS = 2_000L
         private const val MAX_BACKGROUND_DRAIN_BYTES_PER_PASS = 256 * 1024
