@@ -563,7 +563,8 @@ class OpenAiAgent(
                         onUpdate(ChatUpdate(current?.content.orEmpty(), current?.thinking.orEmpty(), status, assistantId))
                     },
                     onRetry = { retryNumber, maxRetries, error ->
-                        val retryStatus = context.getString(R.string.status_request_retry, retryNumber, maxRetries)
+                        val retryStatus = context.getString(R.string.status_request_retry, retryNumber, maxRetries) +
+                            error.message.orEmpty().takeIf { it.isNotBlank() }?.let { "\n$it" }.orEmpty()
                         Log.w(
                             AGENT_TAG,
                             "model_request_retry conversation=$conversationId model=$model retry=$retryNumber/$maxRetries error=${error.message}",
@@ -926,7 +927,7 @@ class OpenAiAgent(
     ): StreamingResult {
 
         val mediaGeneration = isMediaGenerationModel(model)
-        val messages = promptMessages(conversationId, excludeMessageId, mediaGeneration).also {
+        val messages = normalizeChatCompletionsMessages(promptMessages(conversationId, excludeMessageId, mediaGeneration)).also {
             if (supportsDeepSeekFilesApi(profile, model)) deepSeekFilesApi.replaceOpenAiInlineImages(it, profile)
         }
         val requestJson = JSONObject()
@@ -1336,11 +1337,7 @@ class OpenAiAgent(
     }
 
     private fun throwModelRequestHttpError(statusCode: Int, body: String): Nothing {
-        val message = uiText(R.string.ui_ai_request_failed) + "$statusCode: ${body.take(600)}"
-        if (isRetryableModelHttpStatus(statusCode)) {
-            throw RetryableModelHttpException(statusCode, message)
-        }
-        error(message)
+        throw modelRequestHttpException(statusCode, body, uiText(R.string.ui_ai_request_failed).trim())
     }
 
     private fun assistantRawMessage(content: String, thinking: String, calls: List<ToolCall>): JSONObject {
