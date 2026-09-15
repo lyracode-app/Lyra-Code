@@ -2,6 +2,7 @@ package com.yukisoffd.lyracode.ai
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import org.json.JSONObject
 import java.io.IOException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
@@ -21,6 +22,29 @@ internal class ModelRequestRetriesExhaustedException(
 
 internal fun isRetryableModelHttpStatus(statusCode: Int): Boolean =
     statusCode in 500..599 || statusCode in setOf(402, 408, 409, 425, 429)
+
+internal fun modelHttpErrorDetail(body: String): String {
+    val root = runCatching { JSONObject(body) }.getOrNull()
+    val detail = root?.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+        ?: (root?.opt("error") as? String)?.takeIf { it.isNotBlank() }
+        ?: root?.optString("message")?.takeIf { it.isNotBlank() }
+        ?: body
+    return detail.trim().take(2_000)
+}
+
+internal fun modelRequestHttpException(statusCode: Int, body: String, prefix: String): Exception {
+    val message = "$prefix HTTP $statusCode: ${modelHttpErrorDetail(body)}"
+    // Some compatible servers report deterministic template/input errors as 500.
+    val templateError = listOf(
+        "jinja exception", "system message must be at the beginning",
+        "roles must alternate", "only supports user and assistant roles",
+    ).any { body.contains(it, ignoreCase = true) }
+    return if (isRetryableModelHttpStatus(statusCode) && !templateError) {
+        RetryableModelHttpException(statusCode, message)
+    } else {
+        IllegalStateException(message)
+    }
+}
 
 internal fun isRetryableModelFailure(error: Throwable): Boolean {
     val causes = generateSequence(error as Throwable?) { it.cause }.toList()

@@ -10,6 +10,34 @@ import javax.net.ssl.SSLHandshakeException
 
 class AiRequestRetryTest {
     @Test
+    fun template500FailsImmediatelyWithServerMessage() = runBlocking {
+        val detail = "Error: Jinja Exception: System message must be at the beginning."
+        val body = org.json.JSONObject().put("error", org.json.JSONObject().put("message", detail)).toString()
+        var attempts = 0
+        val result = runCatching {
+            executeModelRequestWithRetry(retryDelayMillis = 0L) {
+                attempts++
+                throw modelRequestHttpException(500, body, "Request failed")
+            }
+        }
+        assertEquals(1, attempts)
+        assertEquals("Request failed HTTP 500: $detail", result.exceptionOrNull()?.message)
+        assertFalse(isRetryableModelFailure(result.exceptionOrNull()!!))
+    }
+
+    @Test
+    fun preservesTransientErrorsAndReadableNonJsonResponses() {
+        assertTrue(isRetryableModelFailure(modelRequestHttpException(500, "temporarily unavailable", "Failed")))
+        assertTrue(isRetryableModelFailure(modelRequestHttpException(503, "overloaded", "Failed")))
+        assertTrue(isRetryableModelFailure(modelRequestHttpException(429, "rate limit", "Failed")))
+        assertFalse(isRetryableModelFailure(modelRequestHttpException(400, "bad request", "Failed")))
+        assertEquals("plain text", modelHttpErrorDetail("plain text"))
+        assertEquals("bad key", modelHttpErrorDetail("{\"error\":\"bad key\"}"))
+        assertEquals("invalid", modelHttpErrorDetail("{\"message\":\"invalid\"}"))
+        assertEquals(2_000, modelHttpErrorDetail("x".repeat(3_000)).length)
+    }
+
+    @Test
     fun classifiesTransientHttpAndNetworkFailures() {
         assertTrue(isRetryableModelHttpStatus(402))
         assertTrue(isRetryableModelHttpStatus(429))
