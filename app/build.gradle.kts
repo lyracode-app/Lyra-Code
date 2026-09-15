@@ -5,10 +5,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val bundledProotRuntimeDir = layout.projectDirectory.dir("src/debianRuntime/jniLibs/arm64-v8a")
+val bundledProotRuntimeDir = layout.projectDirectory.dir("src/debianRuntime/jniLibs")
 val bundledProotRuntimeHashes = mapOf(
-    "libproot_exec.so" to "ee618f314c472910cf43e774d013676697f4d6d5a25c66f62d66899c043b04d1",
-    "libproot_loader.so" to "39f8d98f345bd2f0cff53b6a9ee54418cec340f4738d6bdd2fb03112654a6183",
+    "arm64-v8a/libproot_exec.so" to "a0628a09b064d60a2281400224b19ac05b22619ab2aeb85e6d946b05b1412238",
+    "arm64-v8a/libproot_loader.so" to "39f8d98f345bd2f0cff53b6a9ee54418cec340f4738d6bdd2fb03112654a6183",
+    "x86_64/libproot_exec.so" to "c5d89b620e7afc3386ecfc3addfeaaaf5090d0a5170d48a418d2e856329aa6b2",
+    "x86_64/libproot_loader.so" to "61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869",
 )
 
 android {
@@ -95,7 +97,7 @@ android {
 
 val verifyBundledProotRuntime by tasks.registering {
     group = "verification"
-    description = "Verifies the repository-local ARM64 PRoot binaries without network access."
+    description = "Verifies the repository-local ARM64 and x86_64 PRoot binaries without network access."
     inputs.files(bundledProotRuntimeHashes.keys.map { bundledProotRuntimeDir.file(it) })
 
     doLast {

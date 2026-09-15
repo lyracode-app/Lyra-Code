@@ -69,6 +69,9 @@ import com.yukisoffd.lyracode.termux.TermuxExecutor
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
 import com.yukisoffd.lyracode.debian.ProotLinuxManager
 import com.yukisoffd.lyracode.debian.ProotOperationPhase
+import com.yukisoffd.lyracode.debian.ProotArchitecture
+import com.yukisoffd.lyracode.debian.RootfsImportException
+import com.yukisoffd.lyracode.debian.RootfsImportProblem
 import kotlinx.coroutines.launch
 import java.net.URL
 import rikka.shizuku.Shizuku
@@ -391,6 +394,8 @@ internal fun ProotLinuxSettings() {
     val runtime = remember(context) { ProotLinuxManager.getInstance(context) }
     val state by runtime.state.collectAsState()
     val scope = rememberCoroutineScope()
+    val architecture = remember(runtime) { runtime.runtimeArchitecture() }
+    var showImportFailure by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var importName by remember { mutableStateOf("") }
     var deleteId by remember { mutableStateOf<String?>(null) }
@@ -418,6 +423,29 @@ internal fun ProotLinuxSettings() {
                 )
             }
         }
+        Column(
+            Modifier.fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(
+                    if (architecture != null) uiText(R.string.proot_linux_device_architecture, architecture.abi)
+                    else uiText(R.string.proot_linux_architecture_unavailable),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Text(
+                if (architecture != null) uiText(R.string.proot_linux_device_rootfs, architecture.rootfsName)
+                else uiText(R.string.debian_runtime_unsupported),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         if (state.phase in setOf(ProotOperationPhase.DOWNLOADING, ProotOperationPhase.IMPORTING)) {
             LinearProgressIndicator(
                 progress = { state.progressPercent / 100f },
@@ -430,7 +458,15 @@ internal fun ProotLinuxSettings() {
             )
         }
         if (state.phase == ProotOperationPhase.ERROR) {
-            Text(state.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Column(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(12.dp)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (state.importFailure != null) {
+                    Text(uiText(R.string.proot_linux_import_failed), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                }
+                Text(state.importFailure?.let { prootImportFailureText(it) } ?: state.message, color = MaterialTheme.colorScheme.onErrorContainer)
+            }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
@@ -454,23 +490,25 @@ internal fun ProotLinuxSettings() {
         SettingsExternalLinkRow(
             icon = Icons.Default.CloudDownload,
             title = "Alpine Linux",
-            subtitle = uiText(R.string.proot_linux_alpine_source_hint),
+            subtitle = uiText(R.string.proot_linux_alpine_source_hint, if (architecture == ProotArchitecture.X86_64) "x86_64" else "aarch64"),
             url = "https://www.alpinelinux.org/downloads/",
         )
         KimiDivider()
         SettingsExternalLinkRow(
             icon = Icons.Default.CloudDownload,
             title = "Ubuntu Base",
-            subtitle = uiText(R.string.proot_linux_ubuntu_source_hint),
+            subtitle = uiText(R.string.proot_linux_ubuntu_source_hint, if (architecture == ProotArchitecture.X86_64) "amd64" else "arm64"),
             url = "https://cdimage.ubuntu.com/ubuntu-base/releases/",
         )
-        KimiDivider()
-        SettingsExternalLinkRow(
-            icon = Icons.Default.CloudDownload,
-            title = "Arch Linux ARM",
-            subtitle = uiText(R.string.proot_linux_arch_source_hint),
-            url = "https://archlinuxarm.org/about/downloads",
-        )
+        if (architecture == ProotArchitecture.ARM64) {
+            KimiDivider()
+            SettingsExternalLinkRow(
+                icon = Icons.Default.CloudDownload,
+                title = "Arch Linux ARM",
+                subtitle = uiText(R.string.proot_linux_arch_source_hint),
+                url = "https://archlinuxarm.org/about/downloads",
+            )
+        }
         KimiDivider()
         SettingsExternalLinkRow(
             icon = Icons.Default.Info,
@@ -509,6 +547,9 @@ internal fun ProotLinuxSettings() {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(uiText(R.string.proot_linux_import_hint))
+                    if (architecture != null) {
+                        Text(uiText(R.string.proot_linux_device_rootfs, architecture.rootfsName), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
                     OutlinedTextField(
                         value = importName,
                         onValueChange = { importName = it },
@@ -521,12 +562,35 @@ internal fun ProotLinuxSettings() {
                 OutlinedButton(
                     onClick = {
                         pendingImportUri = null
-                        scope.launch { runCatching { runtime.importRootfs(uri, importName) } }
+                        val selectedName = importName
+                        scope.launch {
+                            try {
+                                runtime.importRootfs(uri, selectedName)
+                            } catch (error: kotlinx.coroutines.CancellationException) {
+                                throw error
+                            } catch (error: Exception) {
+                                showImportFailure = true
+                            }
+                        }
                     },
                     enabled = importName.isNotBlank(),
                 ) { Text(uiText(R.string.proot_linux_import_action)) }
             },
             dismissButton = { OutlinedButton(onClick = { pendingImportUri = null }) { Text(uiText(R.string.action_cancel)) } },
+        )
+    }
+    if (showImportFailure) {
+        AlertDialog(
+            onDismissRequest = { showImportFailure = false },
+            title = { Text(uiText(R.string.proot_linux_import_failed)) },
+            text = { Text(state.importFailure?.let { prootImportFailureText(it) } ?: uiText(R.string.proot_linux_import_other)) },
+            confirmButton = {
+                OutlinedButton(onClick = {
+                    showImportFailure = false
+                    importLauncher.launch(arrayOf("application/gzip", "application/x-gzip", "application/x-tar", "application/octet-stream"))
+                }) { Text(uiText(R.string.proot_linux_choose_another)) }
+            },
+            dismissButton = { OutlinedButton(onClick = { showImportFailure = false }) { Text(uiText(R.string.action_cancel)) } },
         )
     }
     deleteId?.let { id ->
@@ -548,6 +612,25 @@ internal fun ProotLinuxSettings() {
             )
         }
     }
+}
+
+@Composable
+private fun prootImportFailureText(failure: RootfsImportException): String = when (failure.problem) {
+    RootfsImportProblem.ARCHITECTURE_MISMATCH -> {
+        val actual = when (failure.actualMachine) {
+            183 -> "ARM64 (arm64/aarch64)"
+            62 -> "x86_64 (amd64)"
+            40 -> "ARM (32-bit)"
+            3 -> "x86 (32-bit)"
+            else -> uiText(R.string.proot_linux_unknown_architecture, failure.actualMachine ?: 0)
+        }
+        uiText(R.string.proot_linux_import_architecture_mismatch, actual, failure.expected?.rootfsName.orEmpty())
+    }
+    RootfsImportProblem.MISSING_SHELL -> uiText(R.string.proot_linux_import_missing_shell)
+    RootfsImportProblem.INVALID_SHELL -> uiText(R.string.proot_linux_import_invalid_shell)
+    RootfsImportProblem.INVALID_ARCHIVE -> uiText(R.string.proot_linux_import_invalid_archive)
+    RootfsImportProblem.CANNOT_READ -> uiText(R.string.proot_linux_import_cannot_read)
+    RootfsImportProblem.OTHER -> uiText(R.string.proot_linux_import_other)
 }
 
 internal data class PermissionRow(

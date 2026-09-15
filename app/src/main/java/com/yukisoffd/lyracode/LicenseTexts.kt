@@ -249,9 +249,11 @@ The complete, verbatim LGPL 2.1 text is distributed in the Sora Editor upstream 
 
     const val PROOT_GPL_NOTICE = """PRoot for Android — source, copyright, and license notice
 
-Lyra Code distributes the following ARM64 PRoot object-code files inside the APK:
+Lyra Code distributes the following ARM64 and x86_64 PRoot object-code files inside the APK:
 - lib/arm64-v8a/libproot_exec.so
 - lib/arm64-v8a/libproot_loader.so
+- lib/x86_64/libproot_exec.so
+- lib/x86_64/libproot_loader.so
 
 PRoot copyright remains with STMicroelectronics and the respective PRoot contributors. The source files state that PRoot may be redistributed and modified under GNU GPL version 2 or, at the recipient's option, any later version (SPDX: GPL-2.0-or-later).
 
@@ -264,12 +266,15 @@ Corresponding source and upstream chain:
 
 Binary provenance for this build:
 - Source: https://github.com/Soffd/proot
-- Build target: aarch64-linux-android24
-- PRoot version: 5.1.107.91-lyra.1
-- Toolchain: Android NDK r29
+- Source commit: 817985a61d8cfd27532d15bc9a03540eb7dc561c (main; includes upstream fix 7266fb3)
+- Build targets: aarch64-linux-android24, x86_64-linux-android24
+- PRoot version: 5.1.107.91-lyra.2
+- Toolchain: Android NDK 29.0.14206865; CMake 3.22.1; static talloc 2.5.0
 - Configuration: external loader, ARG_MAX=131072, libandroid-shmem disabled
-- libproot_exec.so SHA-256: ee618f314c472910cf43e774d013676697f4d6d5a25c66f62d66899c043b04d1
-- libproot_loader.so SHA-256: 39f8d98f345bd2f0cff53b6a9ee54418cec340f4738d6bdd2fb03112654a6183
+- arm64-v8a/libproot_exec.so SHA-256: a0628a09b064d60a2281400224b19ac05b22619ab2aeb85e6d946b05b1412238
+- arm64-v8a/libproot_loader.so SHA-256: 39f8d98f345bd2f0cff53b6a9ee54418cec340f4738d6bdd2fb03112654a6183
+- x86_64/libproot_exec.so SHA-256: c5d89b620e7afc3386ecfc3addfeaaaf5090d0a5170d48a418d2e856329aa6b2
+- x86_64/libproot_loader.so SHA-256: 61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869
 
 The executable statically links talloc 2.5.0, copyright its respective Samba contributors, under LGPL-3.0-or-later. Its source and license material are included with the maintained corresponding source. The resulting combined binary is conveyed under GPLv3 as part of this AGPL-v3 application distribution.
 
