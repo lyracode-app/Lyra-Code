@@ -82,6 +82,9 @@ import com.yukisoffd.lyracode.ai.ChatRecord
 import com.yukisoffd.lyracode.ai.MEDIA_MESSAGE_ROLE
 import com.yukisoffd.lyracode.ai.TodoItem
 import com.yukisoffd.lyracode.data.AppSettings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.min
@@ -630,15 +633,24 @@ internal data class ConversationFileChange(
     val key: String = "$messageId:$index:${change.path}"
 }
 
+internal fun recentConversationFileChanges(
+    messages: List<ChatRecord>,
+    checkActive: () -> Unit = {},
+): List<ConversationFileChange> = messages.asReversed().asSequence().flatMap { message ->
+    checkActive()
+    parseFileChanges(message.content).mapIndexed { index, change ->
+        ConversationFileChange(message.id, index, change)
+    }.asReversed().asSequence()
+}.take(20).toList().asReversed()
+
 @Composable
 internal fun ConversationChangesPanel(settings: AppSettings, conversationId: Long, messages: List<ChatRecord>) {
-    val events = remember(messages) {
-        messages.flatMap { message ->
-            parseFileChanges(message.content).mapIndexed { index, change ->
-                ConversationFileChange(message.id, index, change)
-            }
-        }.takeLast(20)
-      }
+    var events by remember(conversationId) { mutableStateOf(emptyList<ConversationFileChange>()) }
+    LaunchedEffect(conversationId, messages) {
+        events = withContext(Dispatchers.Default) {
+            recentConversationFileChanges(messages) { ensureActive() }
+        }
+    }
       if (events.isEmpty()) return
       val signature = remember(events) { events.joinToString("|") { it.key } }
       var hiddenSignature by remember(conversationId) { mutableStateOf(settings.hiddenFileChangesSignature(conversationId)) }
