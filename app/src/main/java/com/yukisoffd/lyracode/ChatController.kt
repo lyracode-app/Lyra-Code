@@ -37,6 +37,11 @@ import com.yukisoffd.lyracode.workspace.WorkspaceFileReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -124,6 +129,12 @@ class ChatController(
     val todoItems = mutableStateListOf<TodoItem>()
     val settingsRevision = mutableIntStateOf(0)
     val contextWindowUsage = mutableStateOf(ContextWindowUsage())
+    val messagesLoading = mutableStateOf(false)
+    private var messageLoadJob: Job? = null
+    private val messageLoadMutex = Mutex()
+    private var usageLoadJob: Job? = null
+    private val usageLoadMutex = Mutex()
+    private val updatesDuringLoad = mutableMapOf<Long, ChatUpdate>()
     private var lastMessageReloadAt = 0L
     private var approvalId = 0L
     private val approvalWaiters = mutableMapOf<Long, CompletableDeferred<ToolApprovalDecision>>()
@@ -262,6 +273,10 @@ class ChatController(
 
     private fun showTransientNewConversation(projectId: Long = 0L) {
         val project = projectId.takeIf { it > 0L }?.let(conversationStore::project)
+        messageLoadJob?.cancel()
+        messagesLoading.value = false
+        usageLoadJob?.cancel()
+        updatesDuringLoad.clear()
         activeConversationId.value = 0L
         _messages.value = emptyList()
         todoItems.clear()
@@ -308,6 +323,9 @@ class ChatController(
     }
 
     fun selectConversation(id: Long) {
+        _messages.value = emptyList()
+        updatesDuringLoad.clear()
+        contextWindowUsage.value = ContextWindowUsage()
         activeConversationId.value = id
         val conversation = conversationStore.conversation(id)
         if (conversation != null) {
@@ -584,6 +602,7 @@ class ChatController(
     }
 
     fun refreshContextWindowUsage() {
+        usageLoadJob?.cancel()
         val conversationId = activeConversationId.value
         if (conversationId <= 0L) {
             contextWindowUsage.value = ContextWindowUsage()
@@ -591,19 +610,34 @@ class ChatController(
         }
         val previous = contextWindowUsage.value
         contextWindowUsage.value = previous.copy(updating = true)
-        scope.launch {
-            val usage = withContext(Dispatchers.IO) { calculateContextWindowUsage(conversationId) }
-            if (activeConversationId.value == conversationId) contextWindowUsage.value = usage
+        usageLoadJob = scope.launch {
+            try {
+                // Prioritize visible history and avoid two full-history reads at opening.
+                messageLoadJob?.join()
+                val usage = withContext(Dispatchers.IO) {
+                    usageLoadMutex.withLock {
+                        ensureActive()
+                        calculateContextWindowUsage(conversationId)
+                    }
+                }
+                if (activeConversationId.value == conversationId) contextWindowUsage.value = usage
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (activeConversationId.value == conversationId) {
+                    contextWindowUsage.value = previous.copy(updating = false)
+                }
+            }
         }
     }
 
     private fun calculateContextWindowUsage(conversationId: Long): ContextWindowUsage {
         val conversation = conversationStore.conversation(conversationId) ?: return ContextWindowUsage()
-        val recent = conversationStore.messages(conversationId).filter { it.id > conversation.compressedThroughMessageId }
+        val counts = conversationStore.contextMessageCounts(conversationId, conversation.compressedThroughMessageId)
         return ContextWindowUsage(
             estimatedTokens = agent.estimatedConversationContextTokens(conversationId),
-            contextMessageCount = recent.size + if (conversation.compressedContext.isNotBlank()) 1 else 0,
-            turnsSinceCompression = recent.count { it.role == "user" },
+            contextMessageCount = counts.first + if (conversation.compressedContext.isNotBlank()) 1 else 0,
+            turnsSinceCompression = counts.second,
             hasCompressedHistory = conversation.compressedContext.isNotBlank(),
         )
     }
@@ -797,8 +831,10 @@ class ChatController(
             status.value = appContext.getString(R.string.status_running)
             agent.chat(conversationId, userInput, profile, model, userMessagePersisted = true, forcedSkillIds = forcedSkillIds) {
                 withContext(Dispatchers.Main) {
-                    applyChatUpdate(it)
-                    status.value = it.status
+                    if (activeConversationId.value == conversationId) {
+                        applyChatUpdate(it)
+                        status.value = it.status
+                    }
                 }
             }
             val compressionError = maybeAutoCompress(conversationId)
@@ -853,8 +889,10 @@ class ChatController(
             status.value = appContext.getString(R.string.status_continue)
             agent.continueConversation(conversationId, profile, model) {
                 withContext(Dispatchers.Main) {
-                    applyChatUpdate(it)
-                    status.value = it.status
+                    if (activeConversationId.value == conversationId) {
+                        applyChatUpdate(it)
+                        status.value = it.status
+                    }
                 }
             }
             val compressionError = maybeAutoCompress(conversationId)
@@ -882,8 +920,10 @@ class ChatController(
             status.value = appContext.getString(R.string.status_regenerate)
             agent.continueConversation(conversationId, profile, model) {
                 withContext(Dispatchers.Main) {
-                    applyChatUpdate(it)
-                    status.value = it.status
+                    if (activeConversationId.value == conversationId) {
+                        applyChatUpdate(it)
+                        status.value = it.status
+                    }
                 }
             }
             val compressionError = maybeAutoCompress(conversationId)
@@ -1107,6 +1147,10 @@ class ChatController(
         if (active > 0 && conversations.none { it.id == active }) {
             val next = conversations.firstOrNull()?.id
             if (next == null) {
+                messageLoadJob?.cancel()
+                usageLoadJob?.cancel()
+                messagesLoading.value = false
+                updatesDuringLoad.clear()
                 activeConversationId.value = 0L
                 _messages.value = emptyList()
                 workspaceManager.setActiveWorkspaceUri("")
@@ -1117,18 +1161,54 @@ class ChatController(
     }
 
     fun reloadMessages() {
+        messageLoadJob?.cancel()
         val id = activeConversationId.value
-        _messages.value = if (id <= 0) {
-            emptyList()
-        } else {
-            enrichToolRecords(
-                conversationStore.messages(id)
-                    .filterNot { it.role == RUNTIME_CONTEXT_ROLE }
-                    .map { it.toRecord() },
-            )
-        }
         lastMessageReloadAt = System.currentTimeMillis()
+        if (id <= 0L) {
+            _messages.value = emptyList()
+            messagesLoading.value = false
+            return
+        }
+        messagesLoading.value = true
+        messageLoadJob = scope.launch {
+            try {
+                val records = withContext(Dispatchers.IO) {
+                    // SQLite/JSON work is blocking: cancellation alone does not stop it.
+                    // Serialize reads so rapid switching cannot retain several full histories.
+                    messageLoadMutex.withLock {
+                        ensureActive()
+                        val stored = conversationStore.messages(id)
+                        ensureActive()
+                        enrichToolRecords(
+                            stored.asSequence()
+                                .filterNot { it.role == RUNTIME_CONTEXT_ROLE }
+                                .map { it.toRecord() }
+                                .toList(),
+                        )
+                    }
+                }
+                if (activeConversationId.value == id) {
+                    _messages.value = records.map { record ->
+                        updatesDuringLoad[record.id]?.let { record.withUpdate(it) } ?: record
+                    }
+                    updatesDuringLoad.clear()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (activeConversationId.value == id) status.value = error.message.orEmpty()
+            } finally {
+                if (isActive && activeConversationId.value == id) messagesLoading.value = false
+            }
+        }
     }
+
+    private fun ChatRecord.withUpdate(update: ChatUpdate): ChatRecord = copy(
+        content = update.content,
+        thinking = update.thinking,
+        tokensPerSecond = update.tokensPerSecond.takeIf { it > 0.0 } ?: tokensPerSecond,
+        deepSeekCacheHitRate = update.deepSeekCacheHitRate ?: deepSeekCacheHitRate,
+    )
 
     private fun enrichToolRecords(records: List<ChatRecord>): List<ChatRecord> {
         val calls = mutableMapOf<String, Pair<String, String>>()
@@ -1264,10 +1344,12 @@ class ChatController(
             reloadMessagesThrottled()
             return
         }
+        if (messageLoadJob?.isActive == true) updatesDuringLoad[update.messageId] = update
         val current = _messages.value
         val index = current.indexOfFirst { it.id == update.messageId }
         if (index < 0) {
-            reloadMessages()
+            // Do not restart a slow history read on every streaming token.
+            if (messageLoadJob?.isActive != true) reloadMessages()
             return
         }
         val updated = current[index].copy(

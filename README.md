@@ -15,14 +15,14 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.0.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.0.1-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" />
   <img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" />
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-orange" />
 </p>
 
-Lyra Code turns an arm64 Android device into an AI-assisted full-stack development environment. Its core is not just chat, file management, or code editing: the Agent can work inside app-managed **PRoot Linux environments** or an existing **Termux environment** to edit projects, install toolchains, run commands, build and test code, start services, and debug applications directly on Android.
+Lyra Code turns an Android device into an AI-assisted full-stack development environment. Its core is not just chat, file management, or code editing: the Agent can work inside app-managed **PRoot Linux environments** or an existing **Termux environment** to edit projects, install toolchains, run commands, build and test code, start services, and debug applications directly on Android.
 
 ## Screenshots
 
@@ -32,7 +32,7 @@ Lyra Code turns an arm64 Android device into an AI-assisted full-stack developme
 
 ## Built for Android full-stack development
 
-- **Complete Linux userspace with PRoot:** download the verified Debian Trixie seed or import compatible arm64 rootfs archives such as Ubuntu and Alpine. Keep multiple environments, use distro package managers and development toolchains, and access each environment from the shared terminal or the Agent's `proot_command` tool.
+- **Complete Linux userspace with PRoot:** download the verified Debian Trixie seed or import compatible rootfs archives such as Ubuntu and Alpine. Keep multiple environments, use distro package managers and development toolchains, and access each environment from the shared terminal or the Agent's `proot_command` tool.
 - **First-class Termux integration:** `run_command` calls Termux RunCommandService and returns the exit code, stdout, and stderr. This lets the Agent use your existing Termux packages, scripts, and workspace; Termux:API is optional.
 - **Agent-driven coding loop:** use OpenAI-compatible, Anthropic, or Gemini APIs to search, read, edit, and review project files; execute commands; inspect diffs; follow TODO plans; search the web; and use Skills.
 - **On-device app and web workflows:** run front-end or back-end development commands in Linux/Termux, then preview static sites with the built-in HTTP/HTTPS mini server and inspect live request and JavaScript-error logs.
@@ -41,7 +41,7 @@ Lyra Code turns an arm64 Android device into an AI-assisted full-stack developme
 
 | | App-internal PRoot Linux | External Termux |
 | --- | --- | --- |
-| Environment | Full ARM64 Linux userspace managed by Lyra Code | Your existing Termux installation and packages |
+| Environment | Full Linux userspace managed by Lyra Code | Your existing Termux installation and packages |
 | Agent tool | `proot_command(linux_id, ...)` | `run_command(...)` |
 | Terminal | Built in; one persistent session per Linux environment | Continue using Termux itself |
 | Best for | Debian/Ubuntu/Alpine toolchains and isolated distro environments | Android-native Termux workflows and an existing setup |
@@ -59,7 +59,7 @@ PRoot is available without installing Termux; the two modes can coexist. PRoot u
 ## Getting started
 
 1. Add a model provider and select a model.
-2. Open **Settings > PRoot Linux**, then download Debian or import a compatible arm64 rootfs. No Termux installation is required for this path.
+2. Open **Settings > PRoot Linux**, then download Debian or import a compatible rootfs. No Termux installation is required for this path.
 3. Open a terminal or let the Agent use `proot_command` to set up the project's language runtimes, dependencies, build tools, and services.
 4. Optionally connect Termux to reuse an existing Termux development environment.
 
@@ -73,7 +73,7 @@ Then grant the Termux `RUN_COMMAND` permission from Lyra Code settings. Without 
 
 ### PRoot Linux notes
 
-- Every APK includes the small PRoot engine, but not a rootfs. The managed runtime currently supports `arm64-v8a` only and does not emulate x86 architectures.
+- Every APK includes the small PRoot engine, but not a rootfs. The managed runtime matches your device's architecture and does not emulate other architectures.
 - Granting Android “All files access” mounts shared storage at `/storage` and primary storage at `/sdcard`; a directly accessible workspace is mounted at `/workspace`. Android app-UID and SELinux restrictions still apply.
 - Linux rootfs instances are mutable app data. Clearing app data or uninstalling Lyra Code removes them, and they are excluded from Android cloud backup/device transfer.
 - See [App-internal PRoot Linux environments](docs/DEBIAN_RUNTIME.md) for supported archives, lifecycle, storage, limitations, and source information.

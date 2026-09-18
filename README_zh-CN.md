@@ -15,14 +15,14 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.0.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.0.1-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" />
   <img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" />
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-orange" />
 </p>
 
-Lyra Code 将 arm64 Android 设备变成 AI 辅助的全栈开发环境。它的核心不只是对话、文件管理或代码编辑：Agent 可以进入应用内管理的 **PRoot Linux 环境**，也能接入已有的 **Termux 环境**，直接在 Android 上编辑项目、安装工具链、执行命令、构建测试、启动服务和调试应用。
+Lyra Code 将 Android 设备变成 AI 辅助的全栈开发环境。它的核心不只是对话、文件管理或代码编辑：Agent 可以进入应用内管理的 **PRoot Linux 环境**，也能接入已有的 **Termux 环境**，直接在 Android 上编辑项目、安装工具链、执行命令、构建测试、启动服务和调试应用。
 
 ## 界面预览
 
@@ -32,7 +32,7 @@ Lyra Code 将 arm64 Android 设备变成 AI 辅助的全栈开发环境。它的
 
 ## 为 Android 端全栈开发而生
 
-- **PRoot 完整 Linux 用户空间：** 可下载经过校验的 Debian Trixie，也可导入 Ubuntu、Alpine 等兼容的 arm64 rootfs；支持多个环境共存，可使用发行版包管理器和开发工具链，并通过共用终端或 Agent 的 `proot_command` 调用。
+- **PRoot 完整 Linux 用户空间：** 可下载经过校验的 Debian Trixie，也可导入 Ubuntu、Alpine 等兼容的 rootfs；支持多个环境共存，可使用发行版包管理器和开发工具链，并通过共用终端或 Agent 的 `proot_command` 调用。
 - **深度集成 Termux：**`run_command` 通过 Termux RunCommandService 执行命令，并返回退出码、stdout 和 stderr，让 Agent 复用已有的 Termux 软件包、脚本和工作区；Termux:API 不是必需项。
 - **Agent 开发闭环：** 支持 OpenAI 兼容接口、Anthropic 和 Gemini，能够搜索、读取、修改及审查项目文件，执行命令、查看 Diff、跟进 TODO、联网检索并使用 Skills。
 - **移动端应用与 Web 工作流：** 可在 Linux/Termux 中运行前后端开发命令，再用内置 HTTP/HTTPS 微型服务器预览静态站点，并查看实时请求和 JavaScript 错误日志。
@@ -41,7 +41,7 @@ Lyra Code 将 arm64 Android 设备变成 AI 辅助的全栈开发环境。它的
 
 | | 应用内 PRoot Linux | 外部 Termux |
 | --- | --- | --- |
-| 环境 | 由 Lyra Code 管理的完整 ARM64 Linux 用户空间 | 用户已有的 Termux 安装及软件包 |
+| 环境 | 由 Lyra Code 管理的完整 Linux 用户空间 | 用户已有的 Termux 安装及软件包 |
 | Agent 工具 | `proot_command(linux_id, ...)` | `run_command(...)` |
 | 终端 | 应用内置；每个 Linux 环境拥有独立持久会话 | 继续使用 Termux 自身终端 |
 | 适合场景 | Debian/Ubuntu/Alpine 工具链与相互独立的发行版环境 | Android 原生 Termux 工作流与已有配置 |
@@ -59,7 +59,7 @@ Lyra Code 将 arm64 Android 设备变成 AI 辅助的全栈开发环境。它的
 ## 快速开始
 
 1. 添加模型服务商并选择模型。
-2. 打开“**设置 > PRoot Linux**”，下载 Debian 或导入兼容的 arm64 rootfs；这条路径不需要安装 Termux。
+2. 打开“**设置 > PRoot Linux**”，下载 Debian 或导入兼容的 rootfs；这条路径不需要安装 Termux。
 3. 打开终端，或让 Agent 通过 `proot_command` 为项目配置语言运行时、依赖、构建工具和服务。
 4. 如需复用已有的 Termux 开发环境，再按需连接 Termux。
 
@@ -73,7 +73,7 @@ mkdir -p ~/.termux && (grep -qxF 'allow-external-apps=true' ~/.termux/termux.pro
 
 ### PRoot Linux 说明
 
-- 每个 APK 都包含小型 PRoot 引擎，但不打包 rootfs。目前仅支持 `arm64-v8a`，不提供 x86 架构模拟。
+- 每个 APK 都包含小型 PRoot 引擎，但不打包 rootfs。运行时与设备本身的架构匹配，不提供其他架构模拟。
 - 授予 Android“所有文件访问”权限后，共享存储挂载到 `/storage`，主存储也可通过 `/sdcard` 访问；可直接访问的工作区挂载到 `/workspace`。访问仍受应用 UID 和 SELinux 限制。
 - Linux rootfs 是可变的应用数据。清除应用数据或卸载 Lyra Code 会将其删除，Android 云备份和设备迁移也不会包含这些环境。
 - 支持的归档格式、生命周期、存储、限制和源码信息详见[应用内 PRoot Linux 环境](docs/DEBIAN_RUNTIME.md)。

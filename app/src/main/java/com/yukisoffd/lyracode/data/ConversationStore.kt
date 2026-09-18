@@ -1046,12 +1046,17 @@ class ConversationStore(private val appContext: Context, inMemory: Boolean = fal
         }
     }
 
-    private fun readMessageContentInChunks(messageId: Long, contentLength: Int): String? = runCatching {
+    private fun readMessageContentInChunks(
+        messageId: Long,
+        contentLength: Int,
+        column: String = "content",
+    ): String? = runCatching {
+        require(column in setOf("content", "thinking", "raw_json"))
         buildString(contentLength.coerceAtLeast(0)) {
             var offset = 1
             while (offset <= contentLength) {
                 val chunk = readableDatabase.rawQuery(
-                    "SELECT substr(content, ?, ?) FROM messages WHERE id=?",
+                    "SELECT substr($column, ?, ?) FROM messages WHERE id=?",
                     arrayOf(offset.toString(), MESSAGE_CONTENT_CHUNK_CHARS.toString(), messageId.toString()),
                 ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0).orEmpty() else "" }
                 if (chunk.isEmpty()) break
@@ -1060,6 +1065,16 @@ class ConversationStore(private val appContext: Context, inMemory: Boolean = fal
             }
         }
     }.getOrNull()
+
+    /** Count context rows without allocating another copy of every message body. */
+    fun contextMessageCounts(conversationId: Long, afterMessageId: Long): Pair<Int, Int> =
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*), COALESCE(SUM(CASE WHEN role='user' THEN 1 ELSE 0 END), 0) FROM messages WHERE conversation_id=? AND id>?",
+            arrayOf(conversationId.toString(), afterMessageId.toString()),
+        ).use { cursor ->
+            cursor.moveToFirst()
+            cursor.getInt(0) to cursor.getInt(1)
+        }
 
     fun messages(conversationId: Long): List<ChatMessage> {
         repairInlineMediaAttachments(conversationId)
@@ -1071,14 +1086,16 @@ class ConversationStore(private val appContext: Context, inMemory: Boolean = fal
                 "role",
                 "CASE WHEN length(content) <= $MAX_CURSOR_MESSAGE_CONTENT_CHARS THEN content ELSE NULL END AS bounded_content",
                 "length(content)",
-                "thinking",
+                "CASE WHEN length(thinking) <= $MAX_CURSOR_MESSAGE_CONTENT_CHARS THEN thinking ELSE NULL END",
                 "profile_id",
                 "model",
                 "tool_call_id",
-                "raw_json",
+                "CASE WHEN length(raw_json) <= $MAX_CURSOR_MESSAGE_CONTENT_CHARS THEN raw_json ELSE NULL END",
                 "tokens_per_second",
                 "deepseek_cache_hit_rate",
                 "created_at",
+                "length(thinking)",
+                "length(raw_json)",
             ),
             "conversation_id=?",
             arrayOf(conversationId.toString()),
@@ -1101,11 +1118,11 @@ class ConversationStore(private val appContext: Context, inMemory: Boolean = fal
                             conversationId = it.getLong(1),
                             role = it.getString(2),
                             content = content,
-                            thinking = it.getString(5),
+                            thinking = if (it.isNull(5)) readMessageContentInChunks(messageId, it.getInt(13), "thinking").orEmpty() else it.getString(5),
                             profileId = it.getString(6),
                             model = it.getString(7),
                             toolCallId = if (it.isNull(8)) null else it.getString(8),
-                            rawJson = if (it.isNull(9)) null else it.getString(9),
+                            rawJson = if (it.isNull(9) && !it.isNull(14)) readMessageContentInChunks(messageId, it.getInt(14), "raw_json") else if (it.isNull(9)) null else it.getString(9),
                             tokensPerSecond = it.getDouble(10),
                             deepSeekCacheHitRate = it.getDouble(11).takeIf { rate -> rate >= 0.0 },
                             createdAt = it.getLong(12),

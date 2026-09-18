@@ -44,6 +44,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -560,6 +561,9 @@ internal fun ChatScreen(
                     Spacer(Modifier.height(1.dp))
                 }
             }
+            }
+            if (controller.messagesLoading.value && messageSnapshot.isEmpty()) {
+                CircularProgressIndicator(Modifier.align(Alignment.Center))
             }
             ConversationNavigationVisibility(
                 visible = navigationVisible && messageSnapshot.isNotEmpty(),
