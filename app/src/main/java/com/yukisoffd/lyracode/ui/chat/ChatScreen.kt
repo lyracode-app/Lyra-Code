@@ -27,6 +27,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -61,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -413,11 +415,13 @@ internal fun ChatScreen(
             ?.let { path -> BitmapFactory.decodeFile(path)?.asImageBitmap() }
     }
     val chatBackgroundMaskAlpha = 1f - settings.chatBackgroundMaskOpacity.coerceIn(0f, 1f)
-    Box(
+    BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
+        // Leave room for messages and the composer even on short windows.
+        val changesListMaxHeight = (maxHeight * 0.3f).coerceAtMost(240.dp)
         if (chatBackground != null) {
             Image(
                 bitmap = chatBackground,
@@ -438,7 +442,7 @@ internal fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
         TodoProgressPanel(settings, controller.activeConversationId.value, controller.todoItems)
-        ConversationChangesPanel(settings, controller.activeConversationId.value, messageSnapshot)
+        ConversationChangesPanel(settings, controller.activeConversationId.value, messageSnapshot, changesListMaxHeight)
         val isNearOutputEnd by remember {
             derivedStateOf {
                 val total = listState.layoutInfo.totalItemsCount
@@ -472,13 +476,26 @@ internal fun ChatScreen(
             }
         }
         LaunchedEffect(controller.activeConversationId.value, bottomAnchorIndex) {
-            // Follow measured output, including typewriter frames after the last
-            // network chunk. Never compete with a drag or its settling fling.
+            val guard = ChatOutputFollowGuard()
             snapshotFlow {
-                Triple(listState.layoutInfo, listState.isScrollInProgress, autoFollowOutput)
-            }.collect { (layout, scrolling, following) ->
-                if (following && !scrolling && layout.totalItemsCount > 0 && listState.canScrollForward) {
-                    listState.scrollToItem(bottomAnchorIndex)
+                val layout = listState.layoutInfo
+                val last = layout.visibleItemsInfo.lastOrNull()
+                Triple(
+                    ChatOutputGeometry(layout.totalItemsCount, layout.viewportStartOffset,
+                        layout.viewportEndOffset, layout.viewportSize.height,
+                        last?.index, last?.offset, last?.size),
+                    listState.isScrollInProgress,
+                    autoFollowOutput,
+                )
+            }.collect { (geometry, scrolling, following) ->
+                if (guard.shouldScroll(geometry, bottomAnchorIndex, following, scrolling, listState.canScrollForward)) {
+                    // Yield to input/draw between measurements, even if scrolling makes no progress.
+                    withFrameNanos { }
+                    if (autoFollowOutput && !listState.isScrollInProgress &&
+                        listState.layoutInfo.viewportSize.height > 0 &&
+                        bottomAnchorIndex < listState.layoutInfo.totalItemsCount) {
+                        listState.scrollToItem(bottomAnchorIndex)
+                    }
                 }
             }
         }

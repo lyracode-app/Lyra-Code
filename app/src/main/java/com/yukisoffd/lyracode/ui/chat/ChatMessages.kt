@@ -644,7 +644,12 @@ internal fun recentConversationFileChanges(
 }.take(20).toList().asReversed()
 
 @Composable
-internal fun ConversationChangesPanel(settings: AppSettings, conversationId: Long, messages: List<ChatRecord>) {
+internal fun ConversationChangesPanel(
+    settings: AppSettings,
+    conversationId: Long,
+    messages: List<ChatRecord>,
+    maxListHeight: androidx.compose.ui.unit.Dp = 240.dp,
+) {
     var events by remember(conversationId) { mutableStateOf(emptyList<ConversationFileChange>()) }
     LaunchedEffect(conversationId, messages) {
         events = withContext(Dispatchers.Default) {
@@ -659,8 +664,8 @@ internal fun ConversationChangesPanel(settings: AppSettings, conversationId: Lon
       val animatedDragX by animateFloatAsState(targetValue = dragX, label = "changes-panel-drag")
       val panelDragX = if (isDragging) dragX else animatedDragX
 
-      var expanded by rememberSaveable { mutableStateOf(true) }
-    var openedKey by rememberSaveable { mutableStateOf<String?>(null) }
+      var expanded by rememberSaveable(conversationId) { mutableStateOf(true) }
+    var openedKey by rememberSaveable(conversationId) { mutableStateOf<String?>(null) }
     val totalAdded = events.sumOf { it.change.added }
     val totalRemoved = events.sumOf { it.change.removed }
 
@@ -714,7 +719,7 @@ internal fun ConversationChangesPanel(settings: AppSettings, conversationId: Lon
                 LazyColumn(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 520.dp),
+                        .heightIn(max = maxListHeight),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(events.asReversed(), key = { it.key }) { event ->

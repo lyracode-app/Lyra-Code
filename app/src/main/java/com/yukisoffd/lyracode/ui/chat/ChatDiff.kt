@@ -9,12 +9,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -60,41 +69,48 @@ internal fun CodeSnapshot(title: String, content: String, color: Color, modifier
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(title, color = color, style = MaterialTheme.typography.labelMedium)
-        SelectionContainer {
-            Text(
-                content.ifBlank { uiText(R.string.ui_empty) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 220.dp)
-                    .horizontalScroll(rememberScrollState())
-                    .verticalScroll(rememberScrollState()),
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            )
-        }
+        CodeLines(
+            content.ifBlank { uiText(R.string.ui_empty) },
+            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+        )
     }
 }
 
 @Composable
 internal fun DiffView(diff: String) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(max = 240.dp)
-            .verticalScroll(rememberScrollState())
-            .horizontalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        diff.lineSequence().forEach { line ->
-            val color = when {
-                line.startsWith("+ ") -> Color(0xFF188038)
-                line.startsWith("- ") -> Color(0xFFD93025)
-                else -> MaterialTheme.colorScheme.onSurface
+    CodeLines(diff, isDiff = true, modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp))
+}
+
+@Composable
+private fun CodeLines(content: String, modifier: Modifier, isDiff: Boolean = false) {
+    var lines by remember(content) { mutableStateOf<List<CodeDisplayLine>?>(null) }
+    LaunchedEffect(content) {
+        lines = withContext(Dispatchers.Default) { codeDisplayLines(content) { ensureActive() } }
+    }
+    val visibleLines = lines
+    if (visibleLines == null) {
+        androidx.compose.material3.CircularProgressIndicator(Modifier.padding(8.dp))
+        return
+    }
+    SelectionContainer {
+        LazyColumn(
+            modifier.horizontalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            items(visibleLines, key = { it.start }) { line ->
+                val color = when {
+                    isDiff && content.startsWith("+", line.sourceLineStart) -> Color(0xFF188038)
+                    isDiff && content.startsWith("-", line.sourceLineStart) -> Color(0xFFD93025)
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+                Text(
+                    content.substring(line.start, line.end),
+                    color = color,
+                    softWrap = false,
+                    maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
             }
-            Text(
-                line,
-                color = color,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            )
         }
     }
 }
