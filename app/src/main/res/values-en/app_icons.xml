@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_icon_title">App icon</string>
+    <string name="app_icon_default">Default</string>
+    <string name="app_icon_angel">White-winged angel</string>
+    <string name="app_icon_description">Choose the icon shown in your launcher. Your choice is saved automatically and takes effect after restarting the app.</string>
+    <string name="app_icon_restart_required">Saved. Tap Restart now to apply the new icon, or close and reopen the app later. Your launcher may take a moment to refresh.</string>
+    <string name="app_icon_restart_now">Restart now</string>
+</resources>

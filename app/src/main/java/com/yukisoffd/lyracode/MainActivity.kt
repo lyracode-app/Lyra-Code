@@ -237,7 +237,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(AppIcon.fromId(AppSettings(this).appIconId).splashTheme)
         super.onCreate(savedInstanceState)
+        AppIconManager.onActivityCreated(this, restoringActivity = savedInstanceState != null)
         enableEdgeToEdge()
         if (!FirstUseConsentStore(this).isAccepted) {
             AppStrings.initialize(this)
@@ -491,6 +493,14 @@ class MainActivity : ComponentActivity() {
                     .penaltyLog()
                     .build(),
             )
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) {
+            AppIconManager.syncSplashTheme(this)
+            AppIconManager.applySavedIcon(applicationContext)
         }
     }
 

@@ -237,6 +237,10 @@ class AppSettings(context: Context) {
         get() = plainPrefs.getBoolean(KEY_DARK_MODE, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_DARK_MODE, value).apply()
 
+    var appIconId: String
+        get() = com.yukisoffd.lyracode.AppIcon.fromId(plainPrefs.getString("app_icon_id", null)).id
+        set(value) = plainPrefs.edit().putString("app_icon_id", com.yukisoffd.lyracode.AppIcon.fromId(value).id).apply()
+
     var themeMode: String
         get() = plainPrefs.getString(KEY_THEME_MODE, if (darkMode) THEME_DARK else THEME_SYSTEM)
             .orEmpty()
@@ -1459,6 +1463,7 @@ class AppSettings(context: Context) {
     fun exportSettingsJson(includeSecrets: Boolean): JSONObject {
         return JSONObject()
             .put("schema", "lyra_settings_backup_v1")
+            .put("appIconId", appIconId)
             .put("themeMode", themeMode)
             .put("dynamicColorEnabled", dynamicColorEnabled)
             .put("predictiveBackEnabled", predictiveBackEnabled)
@@ -1607,6 +1612,7 @@ class AppSettings(context: Context) {
     fun importSettingsJson(root: JSONObject, mode: String): String {
         val supplement = mode != "replace"
         val messages = mutableListOf<String>()
+        if (root.has("appIconId")) appIconId = root.optString("appIconId")
         root.optString("themeMode").takeIf { it.isNotBlank() }?.let { themeMode = it }
         if (root.has("customThemeColorEnabled")) customThemeColorEnabled = root.optBoolean("customThemeColorEnabled")
         root.optString("customThemeColor").takeIf { it.isNotBlank() }?.let { customThemeColor = it }
