@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keep these names stable: Android persists the selected splash theme by name. -->
+    <style name="Theme.LyraCode.Splash.Default" parent="Theme.LyraCode">
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:windowSplashScreenBackground">?android:attr/colorBackground</item>
+    </style>
+    <style name="Theme.LyraCode.Splash.Angel" parent="Theme.LyraCode">
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_angel</item>
+        <item name="android:windowSplashScreenBackground">?android:attr/colorBackground</item>
+    </style>
+</resources>

@@ -65,12 +65,40 @@
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.LyraCode">
+        </activity>
+        <activity
+            android:name=".AppLauncherActivity"
+            android:exported="false"
+            android:taskAffinity=""
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+        <activity-alias
+            android:name=".DefaultLauncher"
+            android:targetActivity=".AppLauncherActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+        <activity-alias
+            android:name=".AngelLauncher"
+            android:targetActivity=".AppLauncherActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_angel"
+            android:roundIcon="@mipmap/ic_launcher_angel"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <service
             android:name=".interaction.service.LyraAccessibilityService"
             android:description="@string/accessibility_service_description"

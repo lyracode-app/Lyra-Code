@@ -98,6 +98,7 @@ internal fun ThemeSettings(
     onOpenRefreshRateSettings: () -> Unit,
     onOpenChatBackgroundSettings: () -> Unit,
     onOpenStreamingOutputSettings: () -> Unit,
+    onOpenAppIconSettings: () -> Unit,
 ) {
     val hasBackground = !settings.chatBackgroundPath.isNullOrBlank()
     KimiCardBox {
@@ -128,6 +129,8 @@ internal fun ThemeSettings(
         }
         KimiDivider()
         KimiMenuRow(Icons.Default.Palette, uiText(R.string.title_theme_mode), if (settings.customThemeColorEnabled) uiText(R.string.custom_theme_color_value, settings.customThemeColor) else themeName(themeMode), onClick = onOpenThemeModeSettings)
+        KimiDivider()
+        KimiMenuRow(Icons.Default.Apps, stringResource(R.string.app_icon_title), stringResource(AppIcon.fromId(settings.appIconId).title), onClick = onOpenAppIconSettings)
         KimiDivider()
         KimiMenuRow(Icons.Default.FormatSize, uiText(R.string.ui_fonts_and_size), fontScaleName(fontScaleMode, customFontScale), onClick = onOpenFontSettings)
         KimiDivider()

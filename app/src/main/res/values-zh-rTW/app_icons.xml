@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_icon_title">應用程式圖示</string>
+    <string name="app_icon_default">預設圖示</string>
+    <string name="app_icon_angel">白羽天使</string>
+    <string name="app_icon_description">選擇應用程式在桌面顯示的圖示。選擇會自動儲存，重新啟動應用程式後生效。</string>
+    <string name="app_icon_restart_required">已儲存。點選「立即重新啟動」套用新圖示，也可以稍後退出並重新開啟應用程式；桌面更新可能稍有延遲。</string>
+    <string name="app_icon_restart_now">立即重新啟動</string>
+</resources>

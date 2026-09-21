@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_icon_title">应用图标</string>
+    <string name="app_icon_default">默认图标</string>
+    <string name="app_icon_angel">白羽天使</string>
+    <string name="app_icon_description">选择应用在桌面显示的图标。选择会自动保存，重新启动应用后生效。</string>
+    <string name="app_icon_restart_required">已保存。点击“立即重启”应用新图标，也可以稍后退出并重新打开应用；桌面刷新可能稍有延迟。</string>
+    <string name="app_icon_restart_now">立即重启</string>
+</resources>
