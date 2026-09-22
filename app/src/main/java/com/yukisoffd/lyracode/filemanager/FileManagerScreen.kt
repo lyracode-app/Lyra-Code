@@ -1854,7 +1854,7 @@ private fun FileEditorScreen(
     val workspaceDisplayPath = remember(workspaceRevision, workspaceConversationId) {
         controller.workspaceDisplayPath()
     }
-    val workspaceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+    val workspaceLauncher = com.yukisoffd.lyracode.workspace.rememberWorkspacePicker { uri ->
         uri?.let {
             runCatching { controller.persistWorkspaceForActiveSession(it) }
                 .onFailure { error -> showError(context, error) }
@@ -2390,7 +2390,7 @@ private fun FileEditorScreen(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                                IconButton(onClick = { workspaceLauncher.launch(null) }) {
+                                IconButton(onClick = { workspaceLauncher() }) {
                                     Icon(Icons.Default.Add, contentDescription = context.getString(R.string.file_editor_add_workspace))
                                 }
                                 IconButton(onClick = { aiOpen = false }) { Icon(Icons.Default.Close, contentDescription = null) }

@@ -153,6 +153,18 @@ internal class ProotCommandExecutor(context: Context) {
             return ProotWorkContext(workspace, if (workspace == null) "/root" else WORKSPACE_DIR)
         }
 
+        // Workspace metadata may contain an Android-private rootfs path. Translate it
+        // to the bind mount before interpreting absolute paths as Linux guest paths.
+        if (workspace != null && (raw == workspace.path || raw.startsWith(workspace.path + "/"))) {
+            val relative = raw.removePrefix(workspace.path).trim('/')
+            validateRelative(relative)
+            val directory = File(workspace, relative).canonicalFile
+            require(isInside(workspace, directory) && directory.isDirectory) {
+                "proot_command workDir is not an accessible workspace directory: $raw"
+            }
+            return ProotWorkContext(workspace, if (relative.isEmpty()) WORKSPACE_DIR else "$WORKSPACE_DIR/$relative")
+        }
+
         if (raw == WORKSPACE_DIR || raw.startsWith("$WORKSPACE_DIR/")) {
             require(workspace != null) { "workDir uses /workspace but no directly accessible workspace is selected." }
             val relative = raw.removePrefix(WORKSPACE_DIR).trim('/')

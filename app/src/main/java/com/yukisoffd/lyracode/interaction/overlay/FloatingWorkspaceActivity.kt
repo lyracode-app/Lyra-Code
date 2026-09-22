@@ -1,27 +1,36 @@
 package com.yukisoffd.lyracode.interaction.overlay
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
+import com.yukisoffd.lyracode.data.AppSettings
+import com.yukisoffd.lyracode.AppStrings
+import com.yukisoffd.lyracode.localizedContext
 import com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator
+import com.yukisoffd.lyracode.workspace.WorkspaceManager
+import com.yukisoffd.lyracode.workspace.rememberWorkspacePicker
 import org.json.JSONObject
 
-/** Owns the SAF result in the main process; the overlay never receives account credentials. */
+/** Owns workspace selection in the main process. */
 class FloatingWorkspaceActivity : ComponentActivity() {
-    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            runCatching {
-                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                DeviceTaskCoordinator.configure(this, JSONObject().put("workspace", uri.toString()).toString())
-            }.onFailure {
-                android.widget.Toast.makeText(this, it.message.orEmpty(), android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
-        finish()
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(newBase.localizedContext(AppSettings(newBase).languageMode))
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) picker.launch(null)
+        AppStrings.initialize(this)
+        setContent {
+            MaterialTheme {
+                val picker = rememberWorkspacePicker(onDismiss = { finish() }) { uri ->
+                    val workspace = WorkspaceManager(this, AppSettings(this)).persistWorkspace(uri)
+                    DeviceTaskCoordinator.configure(this, JSONObject().put("workspace", workspace).toString())
+                    finish()
+                }
+                LaunchedEffect(Unit) { if (savedInstanceState == null) picker() }
+            }
+        }
     }
 }

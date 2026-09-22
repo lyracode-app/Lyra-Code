@@ -2,6 +2,8 @@ package com.yukisoffd.lyracode.workspace
 
 import android.content.Context
 import android.content.Intent
+import com.yukisoffd.lyracode.R
+import com.yukisoffd.lyracode.uiText
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
@@ -16,7 +18,12 @@ class WorkspaceManager(
 
     fun persistWorkspace(uri: Uri): String {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        context.contentResolver.takePersistableUriPermission(uri, flags)
+        if (uri.scheme == ProotWorkspace.SCHEME) {
+            ProotWorkspace.directory(context, uri)
+        } else {
+            require(uri.scheme == "content") { uiText(R.string.workspace_error_unsupported) }
+            context.contentResolver.takePersistableUriPermission(uri, flags)
+        }
         val nextUri = uri.toString()
         if (activeWorkspaceUri != nextUri) {
             activeWorkspaceUri = nextUri
@@ -37,15 +44,25 @@ class WorkspaceManager(
 
     fun rootUri(): Uri? = activeWorkspaceUri.takeIf { it.isNotBlank() }?.let(Uri::parse)
 
+    fun prootLinuxId(): String? = rootUri()?.takeIf { it.scheme == ProotWorkspace.SCHEME }?.authority
+
+    fun prootGuestPath(): String? = rootUri()?.takeIf { it.scheme == ProotWorkspace.SCHEME }?.path
+
     fun root(): DocumentFile? {
         val uri = rootUri() ?: return null
+        if (uri.scheme == ProotWorkspace.SCHEME) {
+            return runCatching { ProotWorkspace.document(context, uri) }.getOrNull()
+        }
         return DocumentFile.fromTreeUri(context, uri)
     }
 
-    fun displayName(): String = root()?.name ?: "未选择工作目录"
+    fun displayName(): String = if (prootLinuxId() != null) {
+        "${prootLinuxId()}:${prootGuestPath()}"
+    } else root()?.name ?: "未选择工作目录"
 
     fun displayPath(): String? {
         val uri = rootUri() ?: return null
+        if (uri.scheme == ProotWorkspace.SCHEME) return "${uri.authority}:${uri.path}"
         val docId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull() ?: return root()?.name
         val split = docId.split(":", limit = 2)
         if (split.size != 2) return root()?.name
@@ -70,6 +87,9 @@ class WorkspaceManager(
 
     fun termuxRootPath(): String? {
         val uri = rootUri() ?: return null
+        if (uri.scheme == ProotWorkspace.SCHEME) {
+            return runCatching { ProotWorkspace.directory(context, uri).absolutePath }.getOrNull()
+        }
         val docId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull() ?: return null
         val split = docId.split(":", limit = 2)
         if (split.size != 2) return null

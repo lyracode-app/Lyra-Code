@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.0.1-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.0.3-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" />
   <img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" />
@@ -75,6 +75,7 @@ mkdir -p ~/.termux && (grep -qxF 'allow-external-apps=true' ~/.termux/termux.pro
 
 - 每个 APK 都包含小型 PRoot 引擎，但不打包 rootfs。运行时与设备本身的架构匹配，不提供其他架构模拟。
 - 授予 Android“所有文件访问”权限后，共享存储挂载到 `/storage`，主存储也可通过 `/sdcard` 访问；可直接访问的工作区挂载到 `/workspace`。访问仍受应用 UID 和 SELinux 限制。
+- 选择工作区时，可先选择“共享存储”或“proot”。共享存储沿用系统目录授权；proot 则先选择 Linux ID，再浏览并选择实例内部目录。proot 工作区直接使用应用私有文件系统，无需共享存储授权，适合需要 Unix 权限、符号链接和二进制文件的开发工作。
 - Linux rootfs 是可变的应用数据。清除应用数据或卸载 Lyra Code 会将其删除，Android 云备份和设备迁移也不会包含这些环境。
 - 支持的归档格式、生命周期、存储、限制和源码信息详见[应用内 PRoot Linux 环境](docs/DEBIAN_RUNTIME.md)。
 
