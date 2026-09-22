@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import androidx.documentfile.provider.ProotDocumentFile
 import java.io.File
 import java.nio.file.LinkOption
 import java.nio.file.Files
@@ -75,6 +76,10 @@ internal class WorkspaceFileIndexer(
 
     private fun createState(workspaceUri: String): WorkspaceIndexState {
         val state = WorkspaceIndexState(workspaceUri, Uri.parse(workspaceUri))
+        if (workspaceManager.prootLinuxId() != null) {
+            switchToDocumentFile(state)
+            return state
+        }
         val directRoot = workspaceManager.termuxRootPath()
             ?.let(::File)
             ?.takeIf { runCatching { it.isDirectory }.getOrDefault(false) }
@@ -275,7 +280,7 @@ internal class WorkspaceFileIndexer(
                 modifiedAt = child.lastModified().coerceAtLeast(0L),
             )
             matchesAdded += addEntry(state, reference, matcher, basePath, includeDirectories)
-            if (directoryEntry && !state.complete) {
+            if (directoryEntry && !state.complete && !(child is ProotDocumentFile && child.isSymbolicLink)) {
                 enqueueDirectory(
                     state.documentFileDirectories,
                     state.deferredDocumentFileDirectories,

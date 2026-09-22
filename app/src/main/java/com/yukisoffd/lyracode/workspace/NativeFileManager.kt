@@ -247,7 +247,8 @@ class NativeFileManager(
         if (clean.startsWith("./")) clean = clean.removePrefix("./")
 
         workspaceManager.termuxRootPath()?.trimEnd('/')?.let { root ->
-            val aliases = listOf(root, root.replace("/storage/emulated/0", "/sdcard"))
+            val aliases = listOf(root, root.replace("/storage/emulated/0", "/sdcard")) +
+                if (workspaceManager.prootLinuxId() != null) listOfNotNull("/workspace", workspaceManager.prootGuestPath()?.trimEnd('/')) else emptyList()
             aliases.forEach { alias ->
                 when {
                     clean == alias -> return ""

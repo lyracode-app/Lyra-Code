@@ -281,13 +281,13 @@ internal fun LyraCodeApp(
             drawerState.snapTo(DrawerValue.Closed)
         }
     }
-    val treeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+    val treeLauncher = com.yukisoffd.lyracode.workspace.rememberWorkspacePicker { uri: Uri? ->
         if (uri != null) {
             val selectedName = controller.persistWorkspaceForActiveSession(uri)
             appNotice = context.getString(R.string.notice_workspace_selected_current_chat, selectedName)
         }
     }
-    val projectTreeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+    val projectTreeLauncher = com.yukisoffd.lyracode.workspace.rememberWorkspacePicker { uri: Uri? ->
         if (uri != null) {
             controller.createProject(uri)?.let { project ->
                 selectedPage = PAGE_CHAT
@@ -436,7 +436,7 @@ internal fun LyraCodeApp(
             actions = {
                 if (page == PAGE_CHAT) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { treeLauncher.launch(null) }) {
+                        IconButton(onClick = { treeLauncher() }) {
                             PlusBadgeIcon(
                                 baseIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
                             )
@@ -501,7 +501,7 @@ internal fun LyraCodeApp(
                             scope.launch { drawerState.close() }
                         },
                         onCreateProject = {
-                            projectTreeLauncher.launch(null)
+                            projectTreeLauncher()
                         },
                         onNewProjectConversation = { projectId ->
                             if (controller.startProjectConversation(projectId)) {

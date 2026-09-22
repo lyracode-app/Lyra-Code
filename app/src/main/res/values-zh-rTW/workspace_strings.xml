@@ -1,0 +1,22 @@
+<resources>
+    <string name="workspace_picker_location">選擇工作區位置</string>
+    <string name="workspace_picker_linux">選擇 Linux 執行個體</string>
+    <string name="workspace_picker_directory">選擇 Linux 內部目錄</string>
+    <string name="workspace_picker_shared">共用儲存空間</string>
+    <string name="workspace_picker_proot">proot · 應用程式私有目錄</string>
+    <string name="workspace_picker_no_linux">尚無 Linux 執行個體，請先在設定中安裝或匯入。</string>
+    <string name="workspace_picker_linux_id">Linux ID：%1$s</string>
+    <string name="workspace_picker_parent">上一層</string>
+    <string name="workspace_picker_empty">沒有子目錄，可選擇目前目錄。</string>
+    <string name="workspace_picker_select">選擇目前目錄</string>
+    <string name="workspace_error_read_directory">無法讀取目錄</string>
+    <string name="workspace_error_not_proot">不是 proot 工作區</string>
+    <string name="workspace_error_linux_missing">Linux 執行個體目錄不存在</string>
+    <string name="workspace_error_parent_path">工作區路徑不能包含 ..</string>
+    <string name="workspace_error_outside_linux">工作區必須位於所選 Linux 執行個體內部</string>
+    <string name="workspace_error_missing">工作區目錄不存在</string>
+    <string name="workspace_error_unsupported">不支援的工作區類型</string>
+    <string name="workspace_error_escape">路徑超出 Linux 根目錄</string>
+    <string name="workspace_error_symlink_loop">符號連結循環或層數過多</string>
+    <string name="workspace_error_invalid_name">無效檔案名稱</string>
+</resources>

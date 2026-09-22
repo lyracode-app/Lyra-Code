@@ -53,7 +53,11 @@ internal object DeviceTaskCoordinator {
         }
         if (value.has("workspace")) {
             val uri = value.optString("workspace")
-            if (uri.isNotBlank() && context.contentResolver.persistedUriPermissions.none { it.uri.toString() == uri && it.isReadPermission }) return
+            val parsed = android.net.Uri.parse(uri)
+            val privateWorkspace = parsed.scheme == com.yukisoffd.lyracode.workspace.ProotWorkspace.SCHEME
+            if (privateWorkspace) {
+                if (runCatching { com.yukisoffd.lyracode.workspace.ProotWorkspace.directory(context, parsed) }.isFailure) return
+            } else if (uri.isNotBlank() && context.contentResolver.persistedUriPermissions.none { it.uri.toString() == uri && it.isReadPermission }) return
             floatingWorkspace = uri
             conversationId?.let { id -> ConversationStore(context).use { it.setConversationMeta(id, workspaceUri = uri) } }
         }

@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.0.1-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.0.3-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" />
   <img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" />
@@ -75,6 +75,7 @@ Then grant the Termux `RUN_COMMAND` permission from Lyra Code settings. Without 
 
 - Every APK includes the small PRoot engine, but not a rootfs. The managed runtime matches your device's architecture and does not emulate other architectures.
 - Granting Android “All files access” mounts shared storage at `/storage` and primary storage at `/sdcard`; a directly accessible workspace is mounted at `/workspace`. Android app-UID and SELinux restrictions still apply.
+- Workspace selection starts with shared storage or proot. Shared storage keeps the system directory permission flow; proot lets you choose a Linux ID and then a directory inside that instance. Proot workspaces use the app-private filesystem without shared-storage permissions, supporting development with Unix permissions, symbolic links, and binary files.
 - Linux rootfs instances are mutable app data. Clearing app data or uninstalling Lyra Code removes them, and they are excluded from Android cloud backup/device transfer.
 - See [App-internal PRoot Linux environments](docs/DEBIAN_RUNTIME.md) for supported archives, lifecycle, storage, limitations, and source information.
 

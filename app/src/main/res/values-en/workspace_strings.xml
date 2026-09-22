@@ -1,0 +1,22 @@
+<resources>
+    <string name="workspace_picker_location">Choose workspace location</string>
+    <string name="workspace_picker_linux">Choose a Linux instance</string>
+    <string name="workspace_picker_directory">Choose a directory inside Linux</string>
+    <string name="workspace_picker_shared">Shared storage</string>
+    <string name="workspace_picker_proot">proot · App-private directories</string>
+    <string name="workspace_picker_no_linux">No Linux instances available. Install or import one in Settings first.</string>
+    <string name="workspace_picker_linux_id">Linux ID: %1$s</string>
+    <string name="workspace_picker_parent">Parent directory</string>
+    <string name="workspace_picker_empty">No subdirectories. You can select the current directory.</string>
+    <string name="workspace_picker_select">Select this directory</string>
+    <string name="workspace_error_read_directory">Unable to read the directory</string>
+    <string name="workspace_error_not_proot">This is not a proot workspace</string>
+    <string name="workspace_error_linux_missing">The Linux instance directory does not exist</string>
+    <string name="workspace_error_parent_path">The workspace path cannot contain ..</string>
+    <string name="workspace_error_outside_linux">The workspace must be inside the selected Linux instance</string>
+    <string name="workspace_error_missing">The workspace directory does not exist</string>
+    <string name="workspace_error_unsupported">Unsupported workspace type</string>
+    <string name="workspace_error_escape">The path escapes the Linux root directory</string>
+    <string name="workspace_error_symlink_loop">Symbolic link cycle or too many symbolic links</string>
+    <string name="workspace_error_invalid_name">Invalid file name</string>
+</resources>

@@ -3519,6 +3519,8 @@ class OpenAiAgent(
             .put("schema", "lyra_session_context_v1")
             .put("workspace_termux_path", workspaceManager.termuxRootPath() ?: "")
             .put("workspace_display_name", workspaceManager.displayName())
+            .put("workspace_linux_id", workspaceManager.prootLinuxId() ?: "")
+            .put("workspace_linux_path", workspaceManager.prootGuestPath() ?: "")
             .put("path_rule", "Native workspace file tools require relative paths; use . or an empty string for the root.")
             .put("global_file_rule", "Use global_* tools for Android shared-storage files outside the workspace. Download and Downloads map to /storage/emulated/0/Download. Mutations require approval.")
             .put("file_edit_rule", "Read relevant context before editing. Use line readers for large files, then prefer precise edit_file/global_edit_file changes. Use write_file/global_write_file only for creation or intentional full replacement.")
