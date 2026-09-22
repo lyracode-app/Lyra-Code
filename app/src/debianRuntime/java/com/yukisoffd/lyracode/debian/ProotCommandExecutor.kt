@@ -13,6 +13,7 @@ import org.json.JSONObject
 
 internal class ProotCommandExecutor(context: Context) {
     private val manager = ProotLinuxManager.getInstance(context)
+    private val auditLogStore = com.yukisoffd.lyracode.data.AuditLogStore(context)
 
     fun isAvailable(): Boolean = manager.hasActiveInstances()
 
@@ -21,6 +22,35 @@ internal class ProotCommandExecutor(context: Context) {
     fun hasAllFilesAccess(): Boolean = manager.hasAllFilesAccess()
 
     suspend fun execute(
+        linuxId: String,
+        command: String,
+        workspaceRoot: String?,
+        workDir: String?,
+        timeoutSeconds: Int,
+        background: Boolean = false,
+    ): String = withContext(Dispatchers.IO) {
+        val started = System.nanoTime()
+        val id = runCatching {
+            auditLogStore.add("proot", command, "linux_id=$linuxId\nwork_dir=${workDir.orEmpty()}").also { id ->
+                auditLogStore.section(id, "execution.request", JSONObject()
+                    .put("linux_id", linuxId).put("command", command)
+                    .put("workspace_root", workspaceRoot ?: JSONObject.NULL).put("work_dir", workDir ?: JSONObject.NULL)
+                    .put("timeout_seconds", timeoutSeconds).put("background", background).toString())
+            }
+        }.getOrDefault(-1L)
+        try {
+            executeCommand(linuxId, command, workspaceRoot, workDir, timeoutSeconds, background).also { result ->
+                runCatching { auditLogStore.section(id, "execution.result", result) }
+            }
+        } catch (error: Exception) {
+            runCatching { auditLogStore.section(id, "execution.error", error.toString()) }
+            throw error
+        } finally {
+            runCatching { auditLogStore.section(id, "duration_ms", ((System.nanoTime() - started) / 1_000_000).toString()) }
+        }
+    }
+
+    private suspend fun executeCommand(
         linuxId: String,
         command: String,
         workspaceRoot: String?,

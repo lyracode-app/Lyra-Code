@@ -116,7 +116,13 @@ class OpenAiAgent(
         )
     }
 
+    private val httpAudit = ModelHttpAudit(
+        StoreHttpAuditSink(com.yukisoffd.lyracode.data.AuditLogStore(context)),
+        File(context.cacheDir, "http-audit"),
+    )
     private val client = OkHttpClient.Builder()
+        .addInterceptor(httpAudit.application)
+        .addNetworkInterceptor(httpAudit.network)
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
         .build()
@@ -210,7 +216,7 @@ class OpenAiAgent(
         val instruction = "Create a short title for the new conversation below. Use 4-12 Chinese characters for Chinese content or 2-6 words for English content. Output only the title, with no quotes, prefix, punctuation, or explanation."
         val rawTitle = when (profile.apiFormat) {
             ApiProfile.API_FORMAT_ANTHROPIC -> {
-                val payload = JSONObject().put("model", model).put("max_tokens", 48).put("temperature", 0.2)
+                val payload = JSONObject().put("model", model).put("max_tokens", TOPIC_SUMMARY_MAX_OUTPUT_TOKENS).put("temperature", 0.2)
                     .put("system", instruction).put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", input)))
                 val request = Request.Builder().url(profile.chatEndpoint).apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
                     .addHeader("anthropic-version", ANTHROPIC_VERSION).addHeader("Content-Type", "application/json")
@@ -226,21 +232,21 @@ class OpenAiAgent(
                 val payload = JSONObject()
                     .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", input)))))
                     .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction))))
-                    .put("generationConfig", JSONObject().put("temperature", 0.2).put("maxOutputTokens", 48))
+                    .put("generationConfig", JSONObject().put("temperature", 0.2).put("maxOutputTokens", TOPIC_SUMMARY_MAX_OUTPUT_TOKENS))
                 val request = Request.Builder().url(profile.geminiGenerateContentEndpoint(model)).apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
                     .addHeader("Content-Type", "application/json").post(payload.toString().toRequestBody("application/json".toMediaType())).build()
                 client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
                     val parts = JSONObject(body).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
-                    buildString { for (index in 0 until parts.length()) parts.optJSONObject(index)?.optString("text")?.let(::append) }
+                    buildString { for (index in 0 until parts.length()) parts.optJSONObject(index)?.takeUnless { it.optBoolean("thought") }?.optString("text")?.let(::append) }
                 }
             }
-            else -> requestOpenAiText(profile, model, instruction, input, 48, 0.2) { code, body ->
+            else -> requestOpenAiText(profile, model, instruction, input, TOPIC_SUMMARY_MAX_OUTPUT_TOKENS, 0.2) { code, body ->
                 "话题总结请求失败 $code: ${body.take(300)}"
             }
         }
-        sanitizeConversationTopic(rawTitle)
+        sanitizeConversationTopic(splitInlineThink(rawTitle, "").first)
     }
 
     fun estimatedConversationContextTokens(conversationId: Long): Long {
@@ -470,8 +476,7 @@ class OpenAiAgent(
             JSONObject()
                 .put("model", model)
                 .put("messages", JSONArray().put(JSONObject().put("role", "system").put("content", instruction)).put(JSONObject().put("role", "user").put("content", input)))
-                .put("temperature", temperature)
-                .put("max_tokens", maxOutputTokens)
+                .also { configureTextCompletionOutput(it, modelLooksOpenAiReasoningEffortCapable(model), maxOutputTokens, temperature) }
                 .put("stream", false)
         }
         if (modelLooksReasoningCapable(model)) {
@@ -783,7 +788,7 @@ class OpenAiAgent(
                 .apply { addModelTools(settings.purePromptMode, automaticChoice = true) { responsesToolDefinitions(conversationId, profile) } }
             if (!modelLooksReasoningCapable(model)) requestJson.put("temperature", 0.2)
             applyProviderCacheHints(requestJson, profile, model, conversationId)
-            applyReasoningDepthHint(requestJson, profile, model)
+            applyReasoningDepthHint(requestJson, profile)
         }
 
         val body = stableJson(requestJson).toRequestBody("application/json".toMediaType())
@@ -939,7 +944,7 @@ class OpenAiAgent(
                 .apply { addModelTools(settings.purePromptMode, automaticChoice = true) { toolDefinitionsFor(conversationId) } }
                 .put("temperature", 0.2)
             applyProviderCacheHints(requestJson, profile, model, conversationId)
-            applyReasoningDepthHint(requestJson, profile, model)
+            applyReasoningDepthHint(requestJson, profile)
         }
 
         val allowLocalResponseCache = profile.modelRequestOverrides[model] == null && !mediaGeneration && !isFreshSingleUserTurn(conversationId, excludeMessageId)
@@ -1078,31 +1083,8 @@ class OpenAiAgent(
             history.none { it.role == "assistant" || it.role == "tool" }
     }
 
-    private fun applyReasoningDepthHint(requestJson: JSONObject, profile: ApiProfile, model: String) {
-        val depth = settings.reasoningDepth
-        if (depth == AppSettings.REASONING_AUTO) return
-        val effort = when (depth) {
-            AppSettings.REASONING_LOW -> "low"
-            AppSettings.REASONING_MEDIUM -> "medium"
-            AppSettings.REASONING_HIGH -> "high"
-            AppSettings.REASONING_XHIGH -> "xhigh"
-            AppSettings.REASONING_MAX -> "max"
-            else -> return
-        }
-        when (profile.apiFormat) {
-            ApiProfile.API_FORMAT_OPENAI -> {
-                if (!modelLooksReasoningCapable(model)) return
-                if (profile.useResponsesApi) {
-                    requestJson.put("reasoning", JSONObject().put("effort", effort).put("summary", "auto"))
-                } else {
-                    requestJson.put("reasoning_effort", effort)
-                }
-            }
-            ApiProfile.API_FORMAT_ANTHROPIC -> {
-                if (!modelLooksAnthropicEffortCapable(model)) return
-                requestJson.put("output_config", JSONObject().put("effort", effort))
-            }
-        }
+    private fun applyReasoningDepthHint(requestJson: JSONObject, profile: ApiProfile) {
+        applyReasoningDepth(requestJson, profile, settings.reasoningDepth)
     }
 
     private fun modelLooksReasoningCapable(model: String): Boolean {
@@ -1114,19 +1096,6 @@ class OpenAiAgent(
     private fun modelLooksOpenAiReasoningEffortCapable(model: String): Boolean {
         val clean = model.lowercase(Locale.US)
         return listOf("o1", "o3", "o4", "gpt-5").any { clean.contains(it) }
-    }
-
-    private fun modelLooksAnthropicEffortCapable(model: String): Boolean {
-        val clean = model.lowercase(Locale.US)
-        return clean.contains("claude") && listOf(
-            "opus-4-5", "opus-4.5",
-            "opus-4-6", "opus-4.6",
-            "opus-4-7", "opus-4.7",
-            "opus-4-8", "opus-4.8",
-            "sonnet-4-6", "sonnet-4.6",
-            "opus-5", "sonnet-5", "fable-5", "mythos-5", "mythos-preview",
-        )
-            .any { clean.contains(it) }
     }
 
     private suspend fun requestAnthropicModel(
@@ -1148,7 +1117,7 @@ class OpenAiAgent(
                 .put("temperature", 0.2)
                 .apply { providerSystemText(conversationId).takeIf { it.isNotBlank() }?.let { put("system", it) } }
                 .apply { addModelTools(settings.purePromptMode) { anthropicToolsFor(conversationId) } }
-            applyReasoningDepthHint(requestJson, profile, model)
+            applyReasoningDepthHint(requestJson, profile)
         }
         val requestBuilder = Request.Builder()
             .url(profile.chatEndpoint)
@@ -2902,13 +2871,6 @@ class OpenAiAgent(
             .toList()
     }
 
-    private fun sanitizeConversationTopic(rawTitle: String): String {
-        return rawTitle.lineSequence().firstOrNull().orEmpty()
-            .replace(Regex("""^(标题|话题|主题|title|topic)\s*[:：]\s*""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""[\r\n\t]+"""), " ").replace(Regex("""\s+"""), " ")
-            .trim().trim('"', '\'', '“', '”', '‘', '’', '。', '.', ':', '：', '#', '*').take(24).trim()
-            .also { require(it.isNotBlank()) { "话题总结模型未返回有效标题" } }
-    }
     private suspend fun executeMcpTool(
         server: McpServerConfig,
         tool: McpToolDefinition,

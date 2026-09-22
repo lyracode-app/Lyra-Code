@@ -2290,6 +2290,24 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="floating_clear_workspace">取消工作区选择</string>
     <string name="device_interaction_upgrade_hint">当前设备系统版本过低，无法使用设备交互。建议升级至 Android 15 或更高版本，或更换高版本设备后重新尝试。</string>
     <string name="pet_builtin_name">默认悬浮球</string>
+    <string name="log_search">搜索模型、网址、命令或字段</string>
+    <string name="log_filter_all">全部</string>
+    <string name="log_load_more">加载更多</string>
+    <string name="log_raw_text">原始文本</string>
+    <string name="log_previous">上一页</string>
+    <string name="log_next">下一页</string>
+    <string name="log_confirm_clear">删除全部日志及完整请求、响应详情？此操作不可撤销。</string>
+    <string name="log_confirm_delete">删除此日志及其完整详情？此操作不可撤销。</string>
+    <string name="log_request_headers">请求标头</string>
+    <string name="log_request_body">请求体</string>
+    <string name="log_response_headers">响应标头</string>
+    <string name="log_response_body">响应体</string>
+    <string name="log_request_metadata">请求信息</string>
+    <string name="log_response_metadata">响应信息</string>
+    <string name="log_response_state">响应状态</string>
+    <string name="log_duration">耗时</string>
+    <string name="log_char_count">%1$d 字符</string>
+    <string name="log_effort_absent">此请求未发送推理强度字段。</string>
 </resources>
 
 
