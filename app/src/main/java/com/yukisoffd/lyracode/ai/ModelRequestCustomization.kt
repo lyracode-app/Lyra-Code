@@ -98,13 +98,14 @@ internal fun customizedModelBody(source: JSONObject, config: ModelRequestCustomi
 }
 
 internal fun Request.customizedFor(profile: ApiProfile, model: String, pureMode: Boolean = false): Request {
+    val tagged = newBuilder().tag(ModelAuditTag::class.java, ModelAuditTag(profile.id, model)).build()
     val buffer = Buffer()
-    body?.writeTo(buffer) ?: return this
-    val original = runCatching { JSONObject(buffer.readUtf8()) }.getOrNull() ?: return this
+    body?.writeTo(buffer) ?: return tagged
+    val original = runCatching { JSONObject(buffer.readUtf8()) }.getOrNull() ?: return tagged
     ModelRequestPreviews.record(profile, model, this, original)
-    val config = profile.modelRequestOverrides[model] ?: return this
+    val config = profile.modelRequestOverrides[model] ?: return tagged
     val payload = customizedModelBody(original, config, pureMode)
-    val builder = newBuilder()
+    val builder = tagged.newBuilder()
     config.removedHeaders.forEach(builder::removeHeader)
     config.headers.forEach { (name, value) -> builder.header(name, value.replace("{{apiKey}}", profile.apiKey)) }
     val contentType = builder.build().header("Content-Type")

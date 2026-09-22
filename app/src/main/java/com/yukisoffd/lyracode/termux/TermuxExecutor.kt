@@ -81,7 +81,7 @@ class TermuxExecutor(
         auditLogStore.add(
             kind = "command",
             title = normalizedCommand.take(160),
-            detail = "workDir=${workDir.orEmpty()}\nbackground=$runDetached\n${result.message}",
+            detail = "command=$normalizedCommand\nworkDir=${workDir.orEmpty()}\nbackground=$runDetached\n${result.message}",
         )
         result
     }

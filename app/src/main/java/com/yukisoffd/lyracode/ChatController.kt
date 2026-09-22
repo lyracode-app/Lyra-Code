@@ -794,7 +794,10 @@ class ChatController(
         val model = activeModel.value.ifBlank { profile.selectedModel }
         val userInput = composeUserInput(text, uploads, workspaceFiles)
         val titleBeforeSend = activeConversation()?.title
-        val provisionalTitle = if (titleBeforeSend == appContext.getString(R.string.default_conversation_title)) {
+        val provisionalTitle = if (titleBeforeSend in setOf(
+                appContext.getString(R.string.default_conversation_title),
+                appContext.getString(R.string.title_new_chat),
+            )) {
             fallbackConversationTitle(userInput)
         } else {
             null
@@ -824,6 +827,14 @@ class ChatController(
                             conversationStore.setConversationMeta(conversationId, title = title)
                             reloadConversations()
                         }
+                    }
+                    .onFailure { error ->
+                        if (error is CancellationException) throw error
+                        android.util.Log.w(
+                            "LyraTopicSummary",
+                            "Title generation failed: conversation=$conversationId profile=${topicProfile.id} model=$topicModel",
+                            error,
+                        )
                     }
             }
         }

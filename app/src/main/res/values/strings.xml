@@ -2207,4 +2207,22 @@ Revocation stops new access through that permission but does not automatically e
     <string name="floating_clear_workspace">Clear workspace selection</string>
     <string name="device_interaction_upgrade_hint">This device’s Android version is too old for device interaction. Upgrade to Android 15 or later, or try again on a device running a newer version.</string>
     <string name="pet_builtin_name">Default floating ball</string>
+    <string name="log_search">Search model, URL, command or fields</string>
+    <string name="log_filter_all">All</string>
+    <string name="log_load_more">Load more</string>
+    <string name="log_raw_text">Raw text</string>
+    <string name="log_previous">Previous</string>
+    <string name="log_next">Next</string>
+    <string name="log_confirm_clear">Delete all logs, including full request and response details? This cannot be undone.</string>
+    <string name="log_confirm_delete">Delete this log and its full details? This cannot be undone.</string>
+    <string name="log_request_headers">Request headers</string>
+    <string name="log_request_body">Request body</string>
+    <string name="log_response_headers">Response headers</string>
+    <string name="log_response_body">Response body</string>
+    <string name="log_request_metadata">Request metadata</string>
+    <string name="log_response_metadata">Response metadata</string>
+    <string name="log_response_state">Response state</string>
+    <string name="log_duration">Duration</string>
+    <string name="log_char_count">%1$d characters</string>
+    <string name="log_effort_absent">No reasoning effort field was sent in this request.</string>
 </resources>
