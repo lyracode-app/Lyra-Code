@@ -55,6 +55,14 @@
 static bool seccomp_after_ptrace_enter = false;
 static bool seccomp_ptrace_event_supported = false;
 
+/* Whether the kernel lets PTRACE_GETEVENTMSG read the message of the
+ * last ptrace event, see handle_tracee_event().  */
+static enum {
+	EVENTMSG_UNKNOWN = 0,
+	EVENTMSG_RELIABLE,
+	EVENTMSG_LOST,
+} eventmsg_state = EVENTMSG_UNKNOWN;
+
 /**
  * Return true if the running kernel is new enough to generate
  * PTRACE_EVENT_SECCOMP stops (requires Linux >= 3.5).  Old Android
@@ -586,6 +594,12 @@ int handle_tracee_event(Tracee *tracee, int tracee_status)
 
 					translate_syscall(tracee);
 
+					/* The exit of a fork-like syscall whose
+					 * event didn't name the new child: its
+					 * result does (see new_child()).  */
+					if (!was_sysenter && tracee->pending_child)
+						resolve_pending_child(tracee);
+
 					/* In case we've changed on enter sysnum to PR_void,
 					 * the outer seccomp policy may check the syscall
 					 * after our change and raise SIGSYS on the avoider
@@ -692,6 +706,33 @@ int handle_tracee_event(Tracee *tracee, int tracee_status)
 			if (status < 0)
 				break;
 
+			/* Some kernels (seen on aarch64 4.14.357 builds)
+			 * clear the message of the last ptrace event on
+			 * every ptrace request, so reading it always
+			 * yields 0 and the flags of the filter are lost.
+			 * PRoot knows them anyway: the filter was built
+			 * from its own lists.  Tell such kernels apart on
+			 * the first stop of a syscall listed with
+			 * FILTER_SYSEXIT; that very stop and all the later
+			 * ones then rely on the lists, which costs one more
+			 * ptrace request per stop on those kernels only.  */
+			if (eventmsg_state != EVENTMSG_RELIABLE && fetch_regs(tracee) >= 0) {
+				int expected = filtered_sysnum_flags(tracee, get_sysnum(tracee, CURRENT));
+
+				if (eventmsg_state == EVENTMSG_UNKNOWN && (expected & FILTER_SYSEXIT) != 0) {
+					if ((flags & FILTER_SYSEXIT) != 0)
+						eventmsg_state = EVENTMSG_RELIABLE;
+					else {
+						eventmsg_state = EVENTMSG_LOST;
+						VERBOSE(tracee, 1, "this kernel loses ptrace event messages "
+							"(PTRACE_GETEVENTMSG reads 0), working around it");
+					}
+				}
+
+				if (eventmsg_state != EVENTMSG_RELIABLE)
+					flags |= expected;
+			}
+
 			/* Use the common ptrace flow when
 			 * sysexit has to be handled.  */
 			if ((flags & FILTER_SYSEXIT) != 0 || sysexit_necessary) {
@@ -761,6 +802,12 @@ int handle_tracee_event(Tracee *tracee, int tracee_status)
 			if (tracee->exe == NULL) {
 				tracee->sigstop = SIGSTOP_PENDING;
 				signal = -1;
+
+				/* Unless that notification came without
+				 * the child's PID and its parent can't go
+				 * on before the child has run (see
+				 * new_child()).  */
+				adopt_held_children();
 			}
 
 			/* For each tracee, the first SIGSTOP

@@ -178,7 +178,7 @@ class ProotRuntimeInstrumentedTest {
 
     @Test fun packagedPairMatchesAndroidAndExecutes() {
         assertNotNull(ProotArchitecture.installed(nativeDir, Build.SUPPORTED_ABIS.toList()))
-        assertTrue(runProot(listOf("--version")).contains("5.1.107.91-lyra.2"))
+        assertTrue(runProot(listOf("--version")).contains("5.1.107.91-lyra.3"))
         assertTrue(runProot(listOf("-l", "/system/bin/sh", "-c", "echo NATIVE_EXEC_OK")).contains("NATIVE_EXEC_OK"))
     }
 

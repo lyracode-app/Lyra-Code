@@ -13,7 +13,7 @@ foreach ($abi in $Abis) {
         "-DCMAKE_MAKE_PROGRAM=$Ninja" `
         "-DCMAKE_TOOLCHAIN_FILE=$NdkPath/build/cmake/android.toolchain.cmake" `
         "-DANDROID_ABI=$abi" -DANDROID_PLATFORM=android-24 `
-        "-DPROOT_VERSION=5.1.107.91-lyra.2"
+        "-DPROOT_VERSION=5.1.107.91-lyra.3"
     if ($LASTEXITCODE -ne 0) { throw "Configure failed: $abi" }
     & $CMake --build $build --parallel 8
     if ($LASTEXITCODE -ne 0) { throw "Build failed: $abi" }

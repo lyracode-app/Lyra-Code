@@ -40,4 +40,4 @@ cmake --build build/android-arm64
 - 本仓库的适配修改：以 GPLv3 协议分发（见 `LICENSE`）。
 - 附带的 `talloc-2.5.0`：LGPLv3 协议（见 `talloc-2.5.0/LICENSE`）。
 
-See [android/README.md](android/README.md) for the dual-ABI build and the 7266fb3 link2symlink fix on main.
+See [android/README.md](android/README.md) for the Lyra .3 dual-ABI build, five upstream fixes through d4d2a19, and Android runtime regression checks.
