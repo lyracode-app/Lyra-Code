@@ -18,7 +18,7 @@ get_filename_component(PROOT_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../src" REALP
 set(TALLOC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../talloc-2.5.0" CACHE PATH
     "Path to the unpacked talloc 2.5.0 source tree")
 get_filename_component(TALLOC_SOURCE_DIR "${TALLOC_SOURCE_DIR}" REALPATH)
-set(PROOT_VERSION "5.1.107.91-lyra.2" CACHE STRING "Version embedded in proot --version")
+set(PROOT_VERSION "5.1.107.91-lyra.3" CACHE STRING "Version embedded in proot --version")
 
 if(NOT EXISTS "${TALLOC_SOURCE_DIR}/talloc.c" OR
    NOT EXISTS "${TALLOC_SOURCE_DIR}/talloc.h" OR

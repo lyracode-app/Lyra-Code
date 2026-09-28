@@ -55,4 +55,4 @@ and the comparison against the RikkaHub binaries.
 - Modifications in this fork: distributed under the GPLv3 license (see `LICENSE`).
 - Bundled `talloc-2.5.0`: LGPLv3 (see `talloc-2.5.0/LICENSE`).
 
-See [android/README.md](android/README.md) for the dual-ABI build and the 7266fb3 link2symlink fix on main.
+See [android/README.md](android/README.md) for the Lyra .3 dual-ABI build, five upstream fixes through d4d2a19, and Android runtime regression checks.
