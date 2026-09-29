@@ -2371,7 +2371,7 @@ class AppSettings(context: Context) {
         private const val KEY_AUDIO_GENERATION_MODEL = "audio_generation_model"
         const val MIN_HISTORY_COMPRESSION_CHUNKS = 1
         const val MAX_HISTORY_COMPRESSION_CHUNKS = 16
-        const val DEFAULT_HISTORY_COMPRESSION_CHUNKS = 4
+        const val DEFAULT_HISTORY_COMPRESSION_CHUNKS = 1
         const val VISION_SOURCE_MODEL = "model"
         const val VISION_SOURCE_MCP = "mcp"
         const val DEFAULT_VISION_RELAY_PROMPT = "You are a visual relay for another AI model. Describe only what is actually visible in the supplied image, faithfully and in sufficient detail for the main model to reason from your report. Follow the requested focus, but do not answer the user's underlying question, infer unsupported facts, or take actions. Preserve exact visible text, numbers, spatial relationships, UI state, uncertainty, and relevant visual details. Clearly distinguish observation from uncertainty. Return only the visual report."

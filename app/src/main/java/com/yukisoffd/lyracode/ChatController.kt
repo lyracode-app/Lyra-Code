@@ -102,6 +102,7 @@ class ChatController(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val jobs = mutableMapOf<Long, Job>()
+    private val conversationRunGate = ConversationRunGate()
     private val conversationOperations = mutableStateMapOf<Long, ConversationOperation>()
     private var editorContextPath = ""
     private var editorMutationId = 0L
@@ -669,9 +670,9 @@ class ChatController(
             AppSettings.MAX_HISTORY_COMPRESSION_CHUNKS,
         )
         settings.historyCompressionChunkCount = normalizedChunkCount
-        conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_RUNNING)
-        reloadConversations()
         launchConversationJob(conversationId, ConversationOperation.COMPRESSING) {
+            conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_RUNNING)
+            reloadConversations()
             status.value = appContext.getString(R.string.status_compressing_history)
             val result = runCatching {
                 val summary = agent.compressConversationHistory(
@@ -681,8 +682,10 @@ class ChatController(
                     customInstruction,
                     normalizedChunkCount,
                 )
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 conversationStore.setCompressedContext(conversationId, summary, throughMessageId)
             }
+            result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
             conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_IDLE)
             reloadMessages()
             reloadConversations()
@@ -729,8 +732,12 @@ class ChatController(
                 settings.historyCompressionChunkCount,
             )
         }
-            .onSuccess { summary -> conversationStore.setCompressedContext(conversationId, summary, throughMessageId) }
+            .onSuccess { summary ->
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                conversationStore.setCompressedContext(conversationId, summary, throughMessageId)
+            }
             .onFailure { error ->
+                if (error is CancellationException) throw error
                 status.value = error.message.orEmpty().ifBlank { appContext.getString(R.string.error_history_compression_failed) }
             }
             .exceptionOrNull()
@@ -858,7 +865,7 @@ class ChatController(
 
     fun stopActive() {
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
-        jobs.remove(conversationId)?.cancel()
+        jobs[conversationId]?.cancel()
         conversationOperations.remove(conversationId)
         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_INTERRUPTED)
         pendingToolApproval.value?.takeIf { it.request.conversationId == conversationId }?.let { pending ->
@@ -886,17 +893,14 @@ class ChatController(
         conversationStore.conversation(conversationId)?.let { workspaceManager.setActiveWorkspaceUri(it.workspaceUri) }
         val profile = currentProfile()
         val model = activeModel.value.ifBlank { profile.selectedModel }
-        // Publish the running state before starting the request so Compose
-        // removes the interrupted action in the same update that starts the
-        // streaming layout. The agent repeats this write defensively on IO.
-        conversationStore.setConversationMeta(
-            conversationId,
-            status = ConversationStore.STATUS_RUNNING,
-            profileId = profile.id,
-            model = model,
-        )
-        reloadConversations()
         launchConversationJob(conversationId, ConversationOperation.GENERATING) {
+            conversationStore.setConversationMeta(
+                conversationId,
+                status = ConversationStore.STATUS_RUNNING,
+                profileId = profile.id,
+                model = model,
+            )
+            reloadConversations()
             status.value = appContext.getString(R.string.status_continue)
             agent.continueConversation(conversationId, profile, model) {
                 withContext(Dispatchers.Main) {
@@ -1267,7 +1271,7 @@ class ChatController(
         lateinit var launchedJob: Job
         launchedJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                block()
+                conversationRunGate.run(conversationId) { block() }
             } finally {
                 // A cancelled job may finish after a new operation has already
                 // started for this conversation. Only clear our own state.

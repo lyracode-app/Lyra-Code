@@ -604,7 +604,7 @@
     <string name="label_history_compression_model">Conversation history compression model</string>
     <string name="current_conversation_model">Current conversation model: %1$s</string>
     <string name="label_compression_chunk_count">Segment count</string>
-    <string name="compression_chunk_count_hint">Range: %1$d–%2$d. More segments shorten each request but increase request count and duration. Segment results are progressively merged into structured context.</string>
+    <string name="compression_chunk_count_hint">Range: %1$d–%2$d. Use 1 when the history fits the compression model’s context window. Increase only when needed; more segments require extra summaries and merges.</string>
     <string name="label_custom_compression_instruction">Custom compression instructions (optional)</string>
     <string name="custom_compression_instruction_hint">For example: prioritize code changes and unfinished work. By default, results are organized into goals, facts, tasks, attention items, and other structured fields.</string>
     <string name="action_compress_history">Compress history</string>

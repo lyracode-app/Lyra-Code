@@ -6,4 +6,8 @@
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:backgroundDimEnabled">false</item>
     </style>
+    <style name="Animation.LyraCode.LogDetail" parent="@android:style/Animation.Dialog">
+        <item name="android:windowEnterAnimation">@anim/log_detail_enter</item>
+        <item name="android:windowExitAnimation">@anim/log_detail_exit</item>
+    </style>
 </resources>

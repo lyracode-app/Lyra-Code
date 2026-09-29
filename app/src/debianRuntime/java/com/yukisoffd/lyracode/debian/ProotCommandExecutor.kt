@@ -8,6 +8,10 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -73,76 +77,87 @@ internal class ProotCommandExecutor(context: Context) {
         val process = started.process
         process.outputStream.close()
 
-        val stdout = CapturedOutputBuffer()
-        val stderr = CapturedOutputBuffer()
-        val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.toLong())
-        var shellExitCode: Int? = null
-        while (process.isAlive && shellExitCode == null && System.nanoTime() < deadlineNanos) {
-            drainAvailable(process.inputStream, stdout)
-            drainAvailable(process.errorStream, stderr)
-            shellExitCode = readCompletionCode(started.completionFile)
-            if (process.isAlive && shellExitCode == null) Thread.sleep(COMMAND_POLL_INTERVAL_MILLIS)
-        }
-        drainAvailable(process.inputStream, stdout)
-        drainAvailable(process.errorStream, stderr)
-        shellExitCode = shellExitCode ?: readCompletionCode(started.completionFile)
-
-        val timedOut = process.isAlive && shellExitCode == null && System.nanoTime() >= deadlineNanos
-        val supervisorPid = readSupervisorPid(started.supervisorPidFile)
-        var retainedBackgroundProcesses = false
-        if (timedOut) {
-            manager.terminateCommandProcess(process, supervisorPid)
-            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
-        } else if (shellExitCode != null && process.isAlive) {
-            // The command shell is done, but PRoot is still tracing one or more detached
-            // descendants. Keep this exact PRoot Process alive; later calls get their own tracer.
-            waitForNaturalProotExit(process, stdout, stderr)
-            if (process.isAlive) {
-                manager.retainBackgroundCommand(executionId, linuxId, process, supervisorPid)
-                retainedBackgroundProcesses = true
+        try {
+            val stdout = CapturedOutputBuffer()
+            val stderr = CapturedOutputBuffer()
+            val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.toLong())
+            var shellExitCode: Int? = null
+            while (process.isAlive && shellExitCode == null && System.nanoTime() < deadlineNanos) {
+                currentCoroutineContext().ensureActive()
+                drainAvailable(process.inputStream, stdout)
+                drainAvailable(process.errorStream, stderr)
+                shellExitCode = readCompletionCode(started.completionFile)
+                if (process.isAlive && shellExitCode == null) delay(COMMAND_POLL_INTERVAL_MILLIS)
             }
-        }
-
-        if (!process.isAlive) {
-            captureRemaining(process.inputStream, stdout)
-            captureRemaining(process.errorStream, stderr)
-        } else if (timedOut) {
             drainAvailable(process.inputStream, stdout)
             drainAvailable(process.errorStream, stderr)
-        }
-        if (!retainedBackgroundProcesses) {
+            shellExitCode = shellExitCode ?: readCompletionCode(started.completionFile)
+
+            val timedOut = process.isAlive && shellExitCode == null && System.nanoTime() >= deadlineNanos
+            val supervisorPid = readSupervisorPid(started.supervisorPidFile)
+            var retainedBackgroundProcesses = false
+            if (timedOut) {
+                manager.terminateCommandProcess(process, supervisorPid)
+                if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
+            } else if (shellExitCode != null && process.isAlive) {
+                // The command shell is done, but PRoot is still tracing one or more detached
+                // descendants. Keep this exact PRoot Process alive; later calls get their own tracer.
+                waitForNaturalProotExit(process, stdout, stderr)
+                if (process.isAlive) {
+                    manager.retainBackgroundCommand(executionId, linuxId, process, supervisorPid)
+                    retainedBackgroundProcesses = true
+                }
+            }
+
+            if (!process.isAlive) {
+                captureRemaining(process.inputStream, stdout)
+                captureRemaining(process.errorStream, stderr)
+            } else if (timedOut) {
+                drainAvailable(process.inputStream, stdout)
+                drainAvailable(process.errorStream, stderr)
+            }
+            if (!retainedBackgroundProcesses) {
+                runCatching { process.inputStream.close() }
+                runCatching { process.errorStream.close() }
+            }
+            started.completionFile.delete()
+            started.supervisorPidFile.delete()
+
+            val processFinished = !process.isAlive
+            val exitCode = when {
+                timedOut -> 124
+                shellExitCode != null -> shellExitCode
+                processFinished -> process.exitValue()
+                else -> 124
+            }
+            val stdoutResult = stdout.result()
+            val stderrResult = stderr.result()
+
+            JSONObject()
+                .put("exit_code", exitCode)
+                .put("stdout", stdoutResult.text)
+                .put("stderr", stderrResult.text)
+                .put("stdout_original_bytes", stdoutResult.originalBytes)
+                .put("stderr_original_bytes", stderrResult.originalBytes)
+                .put("stdout_truncated", stdoutResult.truncated)
+                .put("stderr_truncated", stderrResult.truncated)
+                .put("timed_out", timedOut)
+                .put("background_requested", background)
+                .put("background_processes_retained", retainedBackgroundProcesses)
+                .put("environment", "internal-proot-linux")
+                .put("linux_id", linuxId)
+                .put("work_dir", workContext.guestWorkDir)
+                .put("shared_storage_mounted", manager.hasAllFilesAccess())
+                .toString()
+        } catch (error: CancellationException) {
+            manager.terminateCommandProcess(process, readSupervisorPid(started.supervisorPidFile))
+            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
             runCatching { process.inputStream.close() }
             runCatching { process.errorStream.close() }
+            started.completionFile.delete()
+            started.supervisorPidFile.delete()
+            throw error
         }
-        started.completionFile.delete()
-        started.supervisorPidFile.delete()
-
-        val processFinished = !process.isAlive
-        val exitCode = when {
-            timedOut -> 124
-            shellExitCode != null -> shellExitCode
-            processFinished -> process.exitValue()
-            else -> 124
-        }
-        val stdoutResult = stdout.result()
-        val stderrResult = stderr.result()
-
-        JSONObject()
-            .put("exit_code", exitCode)
-            .put("stdout", stdoutResult.text)
-            .put("stderr", stderrResult.text)
-            .put("stdout_original_bytes", stdoutResult.originalBytes)
-            .put("stderr_original_bytes", stderrResult.originalBytes)
-            .put("stdout_truncated", stdoutResult.truncated)
-            .put("stderr_truncated", stderrResult.truncated)
-            .put("timed_out", timedOut)
-            .put("background_requested", background)
-            .put("background_processes_retained", retainedBackgroundProcesses)
-            .put("environment", "internal-proot-linux")
-            .put("linux_id", linuxId)
-            .put("work_dir", workContext.guestWorkDir)
-            .put("shared_storage_mounted", manager.hasAllFilesAccess())
-            .toString()
     }
 
     private fun resolveWorkContext(workspaceRoot: String?, rawWorkDir: String?): ProotWorkContext {
@@ -234,7 +249,7 @@ internal class ProotCommandExecutor(context: Context) {
     private fun isInside(root: File, candidate: File): Boolean =
         candidate == root || candidate.absolutePath.startsWith(root.absolutePath + File.separator)
 
-    private fun waitForNaturalProotExit(
+    private suspend fun waitForNaturalProotExit(
         process: Process,
         stdout: CapturedOutputBuffer,
         stderr: CapturedOutputBuffer,
@@ -243,7 +258,7 @@ internal class ProotCommandExecutor(context: Context) {
         while (process.isAlive && System.nanoTime() < deadline) {
             drainAvailable(process.inputStream, stdout)
             drainAvailable(process.errorStream, stderr)
-            if (process.isAlive) Thread.sleep(COMMAND_POLL_INTERVAL_MILLIS)
+            if (process.isAlive) delay(COMMAND_POLL_INTERVAL_MILLIS)
         }
         drainAvailable(process.inputStream, stdout)
         drainAvailable(process.errorStream, stderr)
