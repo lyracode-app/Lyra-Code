@@ -126,6 +126,15 @@ class OpenAiAgent(
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
         .build()
+    private val modelClient = client.newBuilder()
+        .readTimeout(MODEL_RESPONSE_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .build()
+    private val compressionClient = modelClient.newBuilder()
+        // Non-streaming generation may be silent until the full summary is ready.
+        // Each call has a finite total timeout scaled to its output budget below.
+        .readTimeout(0, TimeUnit.SECONDS)
+        .callTimeout(600, TimeUnit.SECONDS)
+        .build()
     private val deepSeekFilesApi = DeepSeekFilesApi(context, client)
     private val mediaGenerationClient = MediaGenerationClient(context, client)
     private val reachabilityClient = client.newBuilder()
@@ -272,15 +281,16 @@ class OpenAiAgent(
         val history = contextHistory(conversationId, -1L)
         require(history.isNotEmpty()) { "当前会话没有可压缩的历史" }
         val transcript = buildCompressionTranscript(history)
+        val outputCeiling = compressionOutputCeiling(profile, model)
+        val finalOutputBudget = compressionOutputBudget(estimateCompressionTokens(transcript), outputCeiling)
         val segments = splitCompressionTranscript(
             transcript,
             requestedChunkCount.coerceIn(MIN_HISTORY_COMPRESSION_CHUNKS, MAX_HISTORY_COMPRESSION_CHUNKS),
         )
-        var segmentStartOffset = 0
-        val segmentSummaries = segments.mapIndexed { index, segment ->
+        val segmentOffsets = segments.scan(0) { offset, segment -> offset + segment.length }
+        val segmentSummaries = mapCompressionChunks(segments) { index, segment ->
             currentCoroutineContext().ensureActive()
-            val sourceContext = compressionSegmentSourceContext(transcript, segmentStartOffset)
-            segmentStartOffset += segment.length
+            val sourceContext = compressionSegmentSourceContext(transcript, segmentOffsets[index])
             val input = buildString {
                 append("LYRA_HISTORY_SEGMENT_V2 ").append(index + 1).append('/').append(segments.size).append('\n')
                 append("This is a consecutive literal slice of the history. It may begin or end inside one message.\n\n")
@@ -291,16 +301,18 @@ class OpenAiAgent(
                 requestHistoryCompressionText(
                     profile = profile,
                     model = model,
-                    instruction = historyCompressionSegmentInstruction(index + 1, segments.size, customInstruction),
+                    instruction = if (segments.size == 1) historyCompressionSingleInstruction(customInstruction)
+                        else historyCompressionSegmentInstruction(index + 1, segments.size, customInstruction),
                     input = input,
-                    maxOutputTokens = HISTORY_COMPRESSION_SEGMENT_MAX_OUTPUT_TOKENS,
+                    maxOutputTokens = compressionOutputBudget(estimateCompressionTokens(segment), outputCeiling),
                 ),
             )
         }
+        if (segmentSummaries.size == 1) return@withContext normalizeCompressionSummary(segmentSummaries.single())
         var mergeRound = 1
         var partials = segmentSummaries
         while (partials.size > HISTORY_COMPRESSION_MERGE_BATCH_SIZE) {
-            partials = partials.chunked(HISTORY_COMPRESSION_MERGE_BATCH_SIZE).mapIndexed { batchIndex, batch ->
+            partials = mapCompressionChunks(partials.chunked(HISTORY_COMPRESSION_MERGE_BATCH_SIZE)) { batchIndex, batch ->
                 currentCoroutineContext().ensureActive()
                 requireCompressionOutput(
                     requestHistoryCompressionText(
@@ -308,7 +320,7 @@ class OpenAiAgent(
                         model = model,
                         instruction = historyCompressionMergeInstruction(finalMerge = false, customInstruction = customInstruction),
                         input = buildCompressionMergeInput(batch, mergeRound, batchIndex + 1),
-                        maxOutputTokens = HISTORY_COMPRESSION_INTERMEDIATE_MAX_OUTPUT_TOKENS,
+                        maxOutputTokens = finalOutputBudget,
                     ),
                 )
             }
@@ -321,29 +333,19 @@ class OpenAiAgent(
                 model = model,
                 instruction = historyCompressionMergeInstruction(finalMerge = true, customInstruction = customInstruction),
                 input = buildCompressionMergeInput(partials, mergeRound, 1),
-                maxOutputTokens = HISTORY_COMPRESSION_FINAL_MAX_OUTPUT_TOKENS,
+                maxOutputTokens = finalOutputBudget,
             ),
         )
-        val structuredSummary = if (finalSummary.startsWith("LYRA_STRUCTURED_CONTEXT_V2")) {
-            finalSummary
-        } else {
-            requireCompressionOutput(
-                requestHistoryCompressionText(
-                    profile = profile,
-                    model = model,
-                    instruction = historyCompressionMergeInstruction(finalMerge = true, customInstruction = customInstruction) +
-                        "\n\nThe supplied content is already compressed. Reformat it into the required field envelope without dropping or adding information.",
-                    input = finalSummary,
-                    maxOutputTokens = HISTORY_COMPRESSION_FINAL_MAX_OUTPUT_TOKENS,
-                ),
-            )
-        }
-        if (structuredSummary.startsWith("LYRA_STRUCTURED_CONTEXT_V2")) {
-            structuredSummary
-        } else {
-            "LYRA_STRUCTURED_CONTEXT_V2\nattention_items:\n- The compression model did not preserve the requested field envelope; its information is preserved below.\n\npreserved_unstructured_context: |\n" +
-                structuredSummary.lineSequence().joinToString("\n") { "  $it" }
-        }
+        normalizeCompressionSummary(finalSummary)
+    }
+
+    private fun historyCompressionSingleInstruction(customInstruction: String): String = buildString {
+        append("Summarize this chronological conversation into its authoritative continuation context. ")
+        append("Keep user goals, constraints, verified facts, decisions, pending work, exact paths and identifiers, important results and errors. ")
+        append("Distinguish completed work from plans and uncertainty. Deduplicate repetition and omit boilerplate; do not reproduce bulk logs or full file contents. ")
+        append("Return the summary directly, without a thinking narrative or analysis of how to summarize. Use only this field envelope:\n\n")
+        append(HISTORY_COMPRESSION_SCHEMA_V2)
+        appendCustomCompressionInstruction(customInstruction)
     }
 
     private fun historyCompressionSegmentInstruction(segmentIndex: Int, segmentCount: Int, customInstruction: String): String = buildString {
@@ -398,50 +400,53 @@ class OpenAiAgent(
         require(it.isNotBlank()) { "会话历史压缩模型未返回有效摘要，原上下文已保留" }
     }
 
-    private fun requestHistoryCompressionText(
+    private suspend fun requestHistoryCompressionText(
         profile: ApiProfile,
         model: String,
         instruction: String,
         input: String,
         maxOutputTokens: Int,
     ): String {
-        return when (profile.apiFormat) {
-            ApiProfile.API_FORMAT_ANTHROPIC -> {
-                val payload = JSONObject().put("model", model).put("max_tokens", maxOutputTokens)
-                    .put("temperature", 0.1).put("system", instruction)
-                    .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", input)))
-                val request = Request.Builder().url(profile.chatEndpoint).apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
-                    .addHeader("anthropic-version", ANTHROPIC_VERSION).addHeader("Content-Type", "application/json")
-                    .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-                client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
+        var budget = maxOutputTokens
+        repeat(2) { attempt ->
+            currentCoroutineContext().ensureActive()
+            val payload = historyCompressionPayload(profile, model, instruction, input, budget)
+            val endpoint = when (profile.apiFormat) {
+                ApiProfile.API_FORMAT_GEMINI -> profile.geminiGenerateContentEndpoint(model)
+                else -> if (profile.useResponsesApi && profile.apiFormat == ApiProfile.API_FORMAT_OPENAI) profile.responsesEndpoint else profile.chatEndpoint
+            }
+            val request = Request.Builder().url(endpoint)
+                .apply {
+                    when (profile.apiFormat) {
+                        ApiProfile.API_FORMAT_ANTHROPIC -> {
+                            if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey)
+                            addHeader("anthropic-version", ANTHROPIC_VERSION)
+                        }
+                        ApiProfile.API_FORMAT_GEMINI -> if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey)
+                        else -> if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}")
+                    }
+                }
+                .addHeader("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+                .customizedFor(profile, model, pureMode = true)
+                .forCompressionResponse(profile, budget)
+            try {
+                val call = compressionClient.newCall(request).apply {
+                    timeout().timeout(compressionRequestTimeoutSeconds(budget), TimeUnit.SECONDS)
+                }
+                return call.useModelResponse { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error(historyCompressionHttpError(response.code, body))
-                    extractModelResponseText(JSONObject(body), ApiProfile.API_FORMAT_ANTHROPIC)
+                    extractCompressionSummary(JSONObject(body), profile)
                 }
+            } catch (error: CompressionOutputLimitException) {
+                val ceiling = compressionOutputCeiling(profile, model)
+                if (attempt > 0 || budget >= ceiling) throw error
+                budget = (budget * 2).coerceAtMost(ceiling)
             }
-            ApiProfile.API_FORMAT_GEMINI -> {
-                val payload = JSONObject()
-                    .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", input)))))
-                    .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", instruction))))
-                    .put("generationConfig", JSONObject().put("temperature", 0.1).put("maxOutputTokens", maxOutputTokens))
-                val request = Request.Builder().url(profile.geminiGenerateContentEndpoint(model)).apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
-                    .addHeader("Content-Type", "application/json").post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-                client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error(historyCompressionHttpError(response.code, body))
-                    extractModelResponseText(JSONObject(body), ApiProfile.API_FORMAT_GEMINI)
-                }
-            }
-            else -> requestOpenAiText(
-                profile,
-                model,
-                instruction,
-                input,
-                maxOutputTokens,
-                0.1,
-                ::historyCompressionHttpError,
-            )
         }
+        error("会话历史压缩未完成，原上下文已保留")
     }
 
     private fun buildCompressionTranscript(history: List<ChatMessage>): String = buildString {
@@ -554,6 +559,7 @@ class OpenAiAgent(
                 }
                 val assistantId = conversationStore.addMessage(conversationId, "assistant", "", profileId = profile.id, model = model)
                 activeAssistantId = assistantId
+                onUpdate(ChatUpdate("", "", uiText(R.string.ui_generating), assistantId))
                 val result = streamModel(
                     conversationId = conversationId,
                     excludeMessageId = assistantId,
@@ -585,6 +591,7 @@ class OpenAiAgent(
                         )
                     },
                 )
+                currentCoroutineContext().ensureActive()
                 conversationStore.updateMessage(
                     assistantId,
                     content = result.content,
@@ -619,6 +626,7 @@ class OpenAiAgent(
                     val toolResult = executeTool(conversationId, call) { toolStatus ->
                         onUpdate(ChatUpdate(result.content, result.thinking, toolStatus, assistantId))
                     }
+                    currentCoroutineContext().ensureActive()
                     conversationStore.addMessage(
                         conversationId,
                         "tool",
@@ -761,6 +769,7 @@ class OpenAiAgent(
                 thinking = mergedThinking,
                 rawMessage = assistantRawMessage(mergedContent, mergedThinking, result.toolCalls).also {
                     copyReplayableResponseItems(result.rawMessage, it)
+                    copyGeminiParts(result.rawMessage, it)
                 },
             )
         }
@@ -807,7 +816,7 @@ class OpenAiAgent(
         var streamCompleted = false
         val toolBuilders = linkedMapOf<Int, ToolCallBuilder>()
         val replayableItems = JSONArray()
-        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
+        modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) throwModelRequestHttpError(response.code, source.string())
             if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
@@ -819,91 +828,90 @@ class OpenAiAgent(
                 collectReplayableResponseItems(completed, replayableItems)
                 streamCompleted = true
                 onDelta(content.toString(), thinking.toString())
-                return@use
+                return@useModelResponse
             }
-            source.byteStream().bufferedReader().useLines { lines ->
-                var sseEventType = ""
-                lines.forEach { line ->
-                    if (line.startsWith("event:")) {
-                        sseEventType = line.removePrefix("event:").trim()
-                        return@forEach
-                    }
-                    if (!line.startsWith("data:")) return@forEach
-                    val data = line.removePrefix("data:").trim()
-                    if (data.isBlank()) return@forEach
-                    if (data == "[DONE]") {
-                        streamCompleted = true
-                        return@forEach
-                    }
-                    val event = runCatching { JSONObject(data) }.getOrNull() ?: return@forEach
-                    val eventType = responsesStreamEventType(event, sseEventType)
-                    sseEventType = ""
-                    val outputIndex = event.optInt("output_index", 0)
-                    when (eventType) {
-                        "response.output_text.delta" -> {
-                            event.stringFieldOrNull("delta")?.let(content::append)
-                            onDelta(content.toString(), thinking.toString())
-                        }
-                        "response.reasoning_summary_text.delta", "response.reasoning_text.delta" -> {
-                            event.stringFieldOrNull("delta")?.let(thinking::append)
-                            onDelta(content.toString(), thinking.toString())
-                        }
-                        "response.output_item.added", "response.output_item.done" -> {
-                            event.optJSONObject("item")?.let { item ->
-                                if (eventType == "response.output_item.done") {
-                                    collectReplayableResponseItem(item, replayableItems)
-                                }
-                                if (item.optString("type") == "function_call") {
-                                    val builder = toolBuilders.getOrPut(outputIndex) { ToolCallBuilder() }
-                                    builder.id = item.optString("call_id").ifBlank { item.optString("id") }
-                                    builder.name = item.optString("name")
-                                    item.stringFieldOrNull("arguments")?.let {
-                                        builder.arguments.clear()
-                                        builder.arguments.append(it)
-                                    }
-                                }
-                            }
-                        }
-                        "response.function_call_arguments.delta" -> {
-                            val builder = toolBuilders.getOrPut(outputIndex) { ToolCallBuilder() }
-                            if (builder.id.isBlank()) builder.id = event.optString("item_id")
-                            event.stringFieldOrNull("delta")?.let(builder.arguments::append)
-                        }
-                        "response.function_call_arguments.done" -> {
-                            val builder = toolBuilders.getOrPut(outputIndex) { ToolCallBuilder() }
-                            if (builder.id.isBlank()) builder.id = event.optString("item_id")
-                            builder.name = event.optString("name").ifBlank { builder.name }
-                            event.stringFieldOrNull("arguments")?.let {
-                                builder.arguments.clear()
-                                builder.arguments.append(it)
-                            }
-                        }
-                        "response.web_search_call.in_progress", "response.web_search_call.searching" -> {
-                            onStatus(context.getString(R.string.status_native_web_search))
-                        }
-                        "response.web_search_call.completed" -> {
-                            onStatus(context.getString(R.string.status_native_web_search_completed))
-                        }
-                        "response.completed", "response.incomplete" -> {
-                            streamCompleted = true
-                            event.optJSONObject("response")?.let { completed ->
-                                val usage = completed.optJSONObject("usage")
-                                outputTokens = usage?.optLong("output_tokens", outputTokens) ?: outputTokens
-                                if (isDeepSeekApiProfile(profile)) cacheHitRate = deepSeekCacheHitRate(usage)
-                                collectCompletedResponseItems(completed, content, thinking, toolBuilders)
-                                collectReplayableResponseItems(completed, replayableItems)
-                            }
-                        }
-                        "response.failed" -> {
-                            val failed = event.optJSONObject("response")
-                            val message = (failed?.optJSONObject("error") ?: event.optJSONObject("error"))?.optString("message")
-                                .orEmpty()
-                                .ifBlank { "Responses API 请求失败" }
-                            throw IOException(message)
-                        }
-                        "error" -> throw IOException(event.optJSONObject("error")?.optString("message").orEmpty().ifBlank { "Responses API 请求失败" })
-                    }
+            var sseEventType = ""
+            source.byteStream().bufferedReader().consumeModelStream { line ->
+                if (line.startsWith("event:")) {
+                    sseEventType = line.removePrefix("event:").trim()
+                    return@consumeModelStream true
                 }
+                if (!line.startsWith("data:")) return@consumeModelStream true
+                val data = line.removePrefix("data:").trim()
+                if (data.isBlank()) return@consumeModelStream true
+                if (data == "[DONE]") {
+                    streamCompleted = true
+                    return@consumeModelStream false
+                }
+                val event = runCatching { JSONObject(data) }.getOrNull() ?: return@consumeModelStream true
+                val eventType = responsesStreamEventType(event, sseEventType)
+                sseEventType = ""
+                val outputIndex = event.optInt("output_index", 0)
+                when (eventType) {
+                    "response.output_text.delta" -> {
+                        event.stringFieldOrNull("delta")?.let(content::append)
+                        onDelta(content.toString(), thinking.toString())
+                    }
+                    "response.reasoning_summary_text.delta", "response.reasoning_text.delta" -> {
+                        event.stringFieldOrNull("delta")?.let(thinking::append)
+                        onDelta(content.toString(), thinking.toString())
+                    }
+                    "response.output_item.added", "response.output_item.done" -> {
+                        event.optJSONObject("item")?.let { item ->
+                            if (eventType == "response.output_item.done") {
+                                collectReplayableResponseItem(item, replayableItems)
+                            }
+                            if (item.optString("type") == "function_call") {
+                                val builder = toolBuilders.getOrPut(outputIndex) { ToolCallBuilder() }
+                                builder.id = item.optString("call_id").ifBlank { item.optString("id") }
+                                builder.name = item.optString("name")
+                                item.stringFieldOrNull("arguments")?.let {
+                                    builder.arguments.clear()
+                                    builder.arguments.append(it)
+                                }
+                            }
+                        }
+                    }
+                    "response.function_call_arguments.delta" -> {
+                        val builder = toolBuilders.getOrPut(outputIndex) { ToolCallBuilder() }
+                        if (builder.id.isBlank()) builder.id = event.optString("item_id")
+                        event.stringFieldOrNull("delta")?.let(builder.arguments::append)
+                    }
+                    "response.function_call_arguments.done" -> {
+                        val builder = toolBuilders.getOrPut(outputIndex) { ToolCallBuilder() }
+                        if (builder.id.isBlank()) builder.id = event.optString("item_id")
+                        builder.name = event.optString("name").ifBlank { builder.name }
+                        event.stringFieldOrNull("arguments")?.let {
+                            builder.arguments.clear()
+                            builder.arguments.append(it)
+                        }
+                    }
+                    "response.web_search_call.in_progress", "response.web_search_call.searching" -> {
+                        onStatus(context.getString(R.string.status_native_web_search))
+                    }
+                    "response.web_search_call.completed" -> {
+                        onStatus(context.getString(R.string.status_native_web_search_completed))
+                    }
+                    "response.completed", "response.incomplete" -> {
+                        streamCompleted = true
+                        event.optJSONObject("response")?.let { completed ->
+                            val usage = completed.optJSONObject("usage")
+                            outputTokens = usage?.optLong("output_tokens", outputTokens) ?: outputTokens
+                            if (isDeepSeekApiProfile(profile)) cacheHitRate = deepSeekCacheHitRate(usage)
+                            collectCompletedResponseItems(completed, content, thinking, toolBuilders)
+                            collectReplayableResponseItems(completed, replayableItems)
+                        }
+                    }
+                    "response.failed" -> {
+                        val failed = event.optJSONObject("response")
+                        val message = (failed?.optJSONObject("error") ?: event.optJSONObject("error"))?.optString("message")
+                            .orEmpty()
+                            .ifBlank { "Responses API 请求失败" }
+                        throw IOException(message)
+                    }
+                    "error" -> throw IOException(event.optJSONObject("error")?.optString("message").orEmpty().ifBlank { "Responses API 请求失败" })
+                }
+                !streamCompleted
             }
         }
         if (!streamCompleted) throw IOException("Responses API 流式连接在完成标志之前中断")
@@ -978,7 +986,7 @@ class OpenAiAgent(
         var cacheHitRate: Double? = null
         var streamCompleted = false
         val toolBuilders = linkedMapOf<Int, ToolCallBuilder>()
-        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
+        modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val text = source.string()
@@ -1001,40 +1009,39 @@ class OpenAiAgent(
                 }
                 streamCompleted = true
                 onDelta(content.toString(), thinking.toString())
-                return@use
+                return@useModelResponse
             }
-            source.byteStream().bufferedReader().useLines { lines ->
-                lines.forEach { line ->
-                    if (!line.startsWith("data:")) return@forEach
-                    val data = line.removePrefix("data:").trim()
-                    if (data == "[DONE]") {
-                        streamCompleted = true
-                        return@forEach
-                    }
-                    val root = runCatching { JSONObject(data) }.getOrNull() ?: return@forEach
-                    root.optJSONObject("error")?.let { apiError ->
-                        throw IOException(apiError.optString("message").ifBlank { apiError.toString() })
-                    }
-                    root.optJSONObject("usage")?.let { usage ->
-                        promptTokens = usage.optLong("prompt_tokens", promptTokens)
-                        completionTokens = usage.optLong("completion_tokens", completionTokens)
-                        cachedPromptTokens = usage.optJSONObject("prompt_tokens_details")
-                            ?.optLong("cached_tokens", cachedPromptTokens)
-                            ?: cachedPromptTokens
-                        if (isDeepSeekApiProfile(profile)) cacheHitRate = deepSeekCacheHitRate(usage)
-                    }
-                    val choice = root.optJSONArray("choices")?.optJSONObject(0) ?: return@forEach
-                    if (!choice.isNull("finish_reason")) streamCompleted = true
-                    val delta = choice.optJSONObject("delta") ?: return@forEach
-                    val thinkDelta = delta.stringFieldOrNull("reasoning_content")
-                        ?: delta.stringFieldOrNull("thinking_content")
-                        ?: delta.stringFieldOrNull("reasoning")
-                    if (thinkDelta != null) thinking.append(thinkDelta)
-                    val contentDelta = delta.stringFieldOrNull("content")
-                    if (contentDelta != null) content.append(contentDelta)
-                    parseToolDelta(delta, toolBuilders)
-                    if (contentDelta != null || thinkDelta != null) onDelta(content.toString(), thinking.toString())
+            source.byteStream().bufferedReader().consumeModelStream { line ->
+                if (!line.startsWith("data:")) return@consumeModelStream true
+                val data = line.removePrefix("data:").trim()
+                if (data == "[DONE]") {
+                    streamCompleted = true
+                    return@consumeModelStream false
                 }
+                val root = runCatching { JSONObject(data) }.getOrNull() ?: return@consumeModelStream true
+                root.optJSONObject("error")?.let { apiError ->
+                    throw IOException(apiError.optString("message").ifBlank { apiError.toString() })
+                }
+                root.optJSONObject("usage")?.let { usage ->
+                    promptTokens = usage.optLong("prompt_tokens", promptTokens)
+                    completionTokens = usage.optLong("completion_tokens", completionTokens)
+                    cachedPromptTokens = usage.optJSONObject("prompt_tokens_details")
+                        ?.optLong("cached_tokens", cachedPromptTokens)
+                        ?: cachedPromptTokens
+                    if (isDeepSeekApiProfile(profile)) cacheHitRate = deepSeekCacheHitRate(usage)
+                }
+                val choice = root.optJSONArray("choices")?.optJSONObject(0) ?: return@consumeModelStream true
+                if (!choice.isNull("finish_reason")) streamCompleted = true
+                val delta = choice.optJSONObject("delta") ?: return@consumeModelStream true
+                val thinkDelta = delta.stringFieldOrNull("reasoning_content")
+                    ?: delta.stringFieldOrNull("thinking_content")
+                    ?: delta.stringFieldOrNull("reasoning")
+                if (thinkDelta != null) thinking.append(thinkDelta)
+                val contentDelta = delta.stringFieldOrNull("content")
+                if (contentDelta != null) content.append(contentDelta)
+                parseToolDelta(delta, toolBuilders)
+                if (contentDelta != null || thinkDelta != null) onDelta(content.toString(), thinking.toString())
+                true
             }
         }
         if (!streamCompleted) throw IOException("模型流式连接在完成标志之前中断")
@@ -1137,71 +1144,70 @@ class OpenAiAgent(
         val nonStreamingBody = StringBuilder()
         var sawStreamingData = false
         var streamCompleted = false
-        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
+        modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val body = source.string()
                 throwModelRequestHttpError(response.code, body)
             }
-            source.byteStream().bufferedReader().useLines { lines ->
-                lines.forEach { line ->
-                    if (!line.startsWith("data:")) {
-                        if (line.isNotBlank() && !line.startsWith("event:")) nonStreamingBody.appendLine(line)
-                        return@forEach
-                    }
-                    sawStreamingData = true
-                    val data = line.removePrefix("data:").trim()
-                    if (data.isBlank()) return@forEach
-                    if (data == "[DONE]") {
-                        streamCompleted = true
-                        return@forEach
-                    }
-                    val root = runCatching { JSONObject(data) }.getOrNull() ?: return@forEach
-                    root.optJSONObject("usage")?.let { usage ->
-                        outputTokens = usage.optLong("output_tokens", outputTokens)
-                    }
-                    when (root.optString("type")) {
-                        "message_stop" -> streamCompleted = true
-                        "error" -> throw IOException(
-                            root.optJSONObject("error")?.optString("message").orEmpty().ifBlank { "Anthropic 流式请求失败" },
-                        )
-                        "content_block_start" -> {
-                            val blockIndex = root.optInt("index")
-                            val block = root.optJSONObject("content_block") ?: JSONObject()
-                            val builder = blockBuilders.getOrPut(blockIndex) { AnthropicBlockBuilder() }
-                            builder.type = block.optString("type")
-                            builder.id = block.optString("id")
-                            builder.name = block.optString("name")
-                            block.stringFieldOrNull("text")?.let {
-                                builder.text.append(it)
-                                content.append(it)
-                                onDelta(content.toString(), thinking.toString())
-                            }
-                            block.stringFieldOrNull("thinking")?.let {
-                                builder.thinking.append(it)
-                                thinking.append(it)
-                                onDelta(content.toString(), thinking.toString())
-                            }
-                            block.optJSONObject("input")?.takeIf { it.length() > 0 }?.let { builder.input.append(it.toString()) }
+            source.byteStream().bufferedReader().consumeModelStream { line ->
+                if (!line.startsWith("data:")) {
+                    if (line.isNotBlank() && !line.startsWith("event:")) nonStreamingBody.appendLine(line)
+                    return@consumeModelStream true
+                }
+                sawStreamingData = true
+                val data = line.removePrefix("data:").trim()
+                if (data.isBlank()) return@consumeModelStream true
+                if (data == "[DONE]") {
+                    streamCompleted = true
+                    return@consumeModelStream false
+                }
+                val root = runCatching { JSONObject(data) }.getOrNull() ?: return@consumeModelStream true
+                root.optJSONObject("usage")?.let { usage ->
+                    outputTokens = usage.optLong("output_tokens", outputTokens)
+                }
+                when (root.optString("type")) {
+                    "message_stop" -> streamCompleted = true
+                    "error" -> throw IOException(
+                        root.optJSONObject("error")?.optString("message").orEmpty().ifBlank { "Anthropic 流式请求失败" },
+                    )
+                    "content_block_start" -> {
+                        val blockIndex = root.optInt("index")
+                        val block = root.optJSONObject("content_block") ?: JSONObject()
+                        val builder = blockBuilders.getOrPut(blockIndex) { AnthropicBlockBuilder() }
+                        builder.type = block.optString("type")
+                        builder.id = block.optString("id")
+                        builder.name = block.optString("name")
+                        block.stringFieldOrNull("text")?.let {
+                            builder.text.append(it)
+                            content.append(it)
+                            onDelta(content.toString(), thinking.toString())
                         }
-                        "content_block_delta" -> {
-                            val blockIndex = root.optInt("index")
-                            val builder = blockBuilders.getOrPut(blockIndex) { AnthropicBlockBuilder() }
-                            val delta = root.optJSONObject("delta") ?: JSONObject()
-                            delta.stringFieldOrNull("text")?.let {
-                                builder.text.append(it)
-                                content.append(it)
-                                onDelta(content.toString(), thinking.toString())
-                            }
-                            delta.stringFieldOrNull("thinking")?.let {
-                                builder.thinking.append(it)
-                                thinking.append(it)
-                                onDelta(content.toString(), thinking.toString())
-                            }
-                            delta.stringFieldOrNull("partial_json")?.let { builder.input.append(it) }
+                        block.stringFieldOrNull("thinking")?.let {
+                            builder.thinking.append(it)
+                            thinking.append(it)
+                            onDelta(content.toString(), thinking.toString())
                         }
+                        block.optJSONObject("input")?.takeIf { it.length() > 0 }?.let { builder.input.append(it.toString()) }
+                    }
+                    "content_block_delta" -> {
+                        val blockIndex = root.optInt("index")
+                        val builder = blockBuilders.getOrPut(blockIndex) { AnthropicBlockBuilder() }
+                        val delta = root.optJSONObject("delta") ?: JSONObject()
+                        delta.stringFieldOrNull("text")?.let {
+                            builder.text.append(it)
+                            content.append(it)
+                            onDelta(content.toString(), thinking.toString())
+                        }
+                        delta.stringFieldOrNull("thinking")?.let {
+                            builder.thinking.append(it)
+                            thinking.append(it)
+                            onDelta(content.toString(), thinking.toString())
+                        }
+                        delta.stringFieldOrNull("partial_json")?.let { builder.input.append(it) }
                     }
                 }
+                !streamCompleted
             }
         }
         if (!sawStreamingData && nonStreamingBody.isNotBlank()) {
@@ -1270,7 +1276,7 @@ class OpenAiAgent(
             .post(stableJson(requestJson).toRequestBody("application/json".toMediaType()))
             .build()
         val startedAtNanos = System.nanoTime()
-        client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
+        modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
             val body = source.string()
             if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
@@ -1301,6 +1307,7 @@ class OpenAiAgent(
             val cleanContent = cleanGeneratedText(content.toString())
             onDelta(cleanContent, "")
             val raw = assistantRawMessage(cleanContent, "", calls)
+            storeGeminiParts(raw, parts)
             return StreamingResult(cleanContent, "", raw, calls, outputTokensPerSecond(cleanContent, outputTokens, startedAtNanos))
         }
     }
@@ -1728,7 +1735,7 @@ class OpenAiAgent(
                         ),
                     ),
                 )
-                "assistant" -> output.put(JSONObject().put("role", "model").put("parts", geminiAssistantParts(message)))
+                "assistant" -> output.put(JSONObject().put("role", "model").put("parts", geminiAssistantParts(cleanGeneratedText(message.content), message.rawJson)))
                 "tool" -> output.put(JSONObject().put("role", "user").put("parts", JSONArray().put(geminiFunctionResponse(message))))
             }
         }
@@ -1766,22 +1773,6 @@ class OpenAiAgent(
                     }
                 }
             }
-        }
-    }
-
-    private fun geminiAssistantParts(message: ChatMessage): JSONArray {
-        val raw = message.rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
-        return JSONArray().also { output ->
-            val text = cleanGeneratedText(message.content)
-            if (text.isNotBlank()) output.put(JSONObject().put("text", text))
-            val calls = raw?.optJSONArray("tool_calls") ?: JSONArray()
-            for (index in 0 until calls.length()) {
-                val call = calls.optJSONObject(index) ?: continue
-                val function = call.optJSONObject("function") ?: JSONObject()
-                val args = runCatching { JSONObject(function.optString("arguments").ifBlank { "{}" }) }.getOrElse { JSONObject() }
-                output.put(JSONObject().put("functionCall", JSONObject().put("name", function.optString("name")).put("args", args)))
-            }
-            if (output.length() == 0) output.put(JSONObject().put("text", " "))
         }
     }
 
@@ -2213,6 +2204,7 @@ class OpenAiAgent(
                 output
             },
             onFailure = {
+                if (it is CancellationException) throw it
                 val correctionHint = if (call.name in FILE_TEXT_ARGUMENT_TOOLS) {
                     """
 
@@ -3276,7 +3268,10 @@ class OpenAiAgent(
         routeVisualAttachments: Boolean = settings.isVisionSupplementRoutingEnabled(),
     ): JSONObject {
         val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
-            ?.also { sanitizeAssistantRaw(it) }
+            ?.also {
+                sanitizeAssistantRaw(it)
+                it.remove(GEMINI_REPLAY_PARTS_KEY)
+            }
         if (raw == null && role == "user" && hasUploadedAttachments(content)) {
             return userPromptWithAttachments(content, id, routeVisualAttachments)
         }
@@ -3886,9 +3881,6 @@ class OpenAiAgent(
         private const val MIN_HISTORY_COMPRESSION_CHUNKS = 1
         private const val MAX_HISTORY_COMPRESSION_CHUNKS = 16
         private const val HISTORY_COMPRESSION_MERGE_BATCH_SIZE = 4
-        private const val HISTORY_COMPRESSION_SEGMENT_MAX_OUTPUT_TOKENS = 4096
-        private const val HISTORY_COMPRESSION_INTERMEDIATE_MAX_OUTPUT_TOKENS = 4096
-        private const val HISTORY_COMPRESSION_FINAL_MAX_OUTPUT_TOKENS = 4096
         private const val PROMPT_CACHE_KEY_HASH_CHARS = 32
         private const val MESSAGE_WRAPPER_TOKENS = 8L
         private const val MAX_IMAGE_PROMPT_BYTES = 8 * 1024 * 1024

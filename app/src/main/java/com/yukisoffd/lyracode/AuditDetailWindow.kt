@@ -15,13 +15,22 @@ import androidx.core.view.WindowCompat
 
 /** A non-floating window: system bars and content share the same background and bounds. */
 @Composable
-internal fun AuditDetailWindow(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun AuditDetailWindow(
+    onDismiss: () -> Unit,
+    animateTransitions: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     val context = LocalContext.current
     val composition = rememberCompositionContext()
     val currentContent by rememberUpdatedState(content)
     val currentDismiss by rememberUpdatedState(onDismiss)
     val background = MaterialTheme.colorScheme.background
-    val dialog = remember(context) { ComponentDialog(context, R.style.AuditLogWindowTheme) }
+    val dialog = remember(context, animateTransitions) {
+        ComponentDialog(context, R.style.AuditLogWindowTheme).apply {
+            // Window animations also cover removal after deleting the selected log.
+            if (animateTransitions) window?.setWindowAnimations(R.style.Animation_LyraCode_LogDetail)
+        }
+    }
     DisposableEffect(dialog, composition) {
         val view = ComposeView(context).apply {
             setParentCompositionContext(composition)

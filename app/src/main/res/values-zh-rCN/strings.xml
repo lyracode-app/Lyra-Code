@@ -625,7 +625,7 @@
     <string name="label_history_compression_model">会话历史压缩模型</string>
     <string name="current_conversation_model">当前会话模型：%1$s</string>
     <string name="label_compression_chunk_count">分段块数</string>
-    <string name="compression_chunk_count_hint">范围 %1$d–%2$d。块数越多，单次输入越短，但请求次数和耗时越多；分段结果会逐级合并为结构化上下文。</string>
+    <string name="compression_chunk_count_hint">范围 %1$d–%2$d。历史可放入压缩模型的上下文窗口时，建议设为 1；仅在需要时增加分段，避免额外的摘要和合并请求。</string>
     <string name="label_custom_compression_instruction">自定义压缩指令（可选）</string>
     <string name="custom_compression_instruction_hint">例如：重点保留代码改动与未完成事项。默认结果会按目标、事实、任务、注意事项等字段整理。</string>
     <string name="action_compress_history">压缩历史</string>

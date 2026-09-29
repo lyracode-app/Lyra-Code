@@ -39,10 +39,12 @@ internal fun LogScreen(auditLogStore: AuditLogStore) {
     var deleteTarget by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(kind, query) { limit = 100 }
     LaunchedEffect(refresh, kind, query, limit) {
+        val requestVersion = refresh
         loading = true
-        delay(200)
         try {
+            delay(200)
             val result = withContext(Dispatchers.IO) { auditLogStore.recent(limit, kind, query) to auditLogStore.kinds() }
+            if (requestVersion != refresh) return@LaunchedEffect
             logs = result.first
             kinds = result.second
             error = null
@@ -64,9 +66,20 @@ internal fun LogScreen(auditLogStore: AuditLogStore) {
                 scope.launch {
                     try {
                         withContext(Dispatchers.IO) { if (target == 0L) auditLogStore.clear() else auditLogStore.delete(target) }
-                        if (target == 0L || selectedLog?.id == target) selectedLog = null
+                        // Update visible state immediately, before the debounced reload.
+                        // Invalidating older queries prevents deleted rows from reappearing.
                         refresh++
-                    } catch (e: Exception) { error = e.message }
+                        logs = if (target == 0L) emptyList() else logs.filterNot { it.id == target }
+                        if (target == 0L) {
+                            kinds = emptyList()
+                            limit = 100
+                        }
+                        error = null
+                        if (target == 0L || selectedLog?.id == target) selectedLog = null
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        error = e.message
+                    }
                 }
             }) { Text(context.getString(R.string.action_delete)) } },
             dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text(context.getString(R.string.action_cancel)) } },

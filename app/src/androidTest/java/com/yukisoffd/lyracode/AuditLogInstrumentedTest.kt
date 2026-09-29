@@ -83,6 +83,7 @@ class AuditLogInstrumentedTest {
                 clickText(context.getString(R.string.action_delete))
                 waitForText(context.getString(R.string.notice_no_log))
                 assertTrue(store.recent().isEmpty())
+                assertNull(findText("audit-ui-fixture"))
             }
         }
     }
@@ -134,6 +135,37 @@ class AuditLogInstrumentedTest {
                 }
                 expandedDetail.recycle()
             }
+        }
+    }
+
+    @Test fun toolDetailsCanScrollResultAboveNavigation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.setContent {
+                    MaterialTheme {
+                        ToolCallDetailPage(
+                            toolName = "tool-insets-fixture",
+                            toolInput = org.json.JSONArray((1..100).map { "input line $it" }).toString(),
+                            toolOutput = """{"result":"TOOL_RESULT_TAIL"}""",
+                            onClose = {},
+                        )
+                    }
+                }
+            }
+            waitForText("tool-insets-fixture")
+            scrollToText("TOOL_RESULT_TAIL")
+            instrumentation.uiAutomation.waitForIdle(500, 5000)
+            val viewport = android.graphics.Rect()
+            auditScrollableNode().getBoundsInScreen(viewport)
+            val result = android.graphics.Rect()
+            checkNotNull(findText("TOOL_RESULT_TAIL")).getBoundsInScreen(result)
+            assertFalse(result.isEmpty)
+            assertTrue("Result must fit within the safe viewport", viewport.contains(result))
+            val screen = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            try {
+                assertViewportAboveNavigation(screen.height)
+            } finally { screen.recycle() }
         }
     }
 

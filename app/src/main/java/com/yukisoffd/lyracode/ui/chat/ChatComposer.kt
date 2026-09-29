@@ -529,8 +529,11 @@ internal fun ContextWindowInfoDialog(
             ) { Text(stringResource(R.string.action_compress_history)) }
         },
         dismissButton = {
-            TextButton(enabled = dialogState.canDismiss, onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            TextButton(onClick = {
+                if (isCompressing) controller.stopActive()
+                onDismiss()
+            }) {
+                Text(stringResource(if (isCompressing) R.string.action_cancel else R.string.action_close))
             }
         },
     )

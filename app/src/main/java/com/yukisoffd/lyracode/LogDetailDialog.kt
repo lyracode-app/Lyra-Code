@@ -102,9 +102,9 @@ internal fun LogDetailDialog(entry: AuditEntry, store: AuditLogStore, onDismiss:
             }
         }
     }
-    AuditDetailWindow(onDismiss) {
+    AuditDetailWindow(onDismiss, animateTransitions = true) {
         Column(Modifier.fillMaxSize().clipToBounds().background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.safeGestures))
+            .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.safeGestures.only(WindowInsetsSides.Bottom)))
             .padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(context.getString(R.string.title_log_detail), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)

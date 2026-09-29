@@ -78,6 +78,13 @@ internal fun customizedModelBody(source: JSONObject, config: ModelRequestCustomi
                         val clean = JSONArray()
                         for (j in 0 until blocks.length()) {
                             val block = blocks.optJSONObject(j)
+                            // Gemini signatures are protocol state, not optional thinking text.
+                            // Signed parts must remain intact even when thinking replay is off.
+                            if (key == "contents" && field == "parts" && block != null &&
+                                (block.has("thoughtSignature") || block.has("thought_signature"))) {
+                                clean.put(block)
+                                continue
+                            }
                             if (block != null && (block.optString("type") in setOf("thinking", "redacted_thinking", "reasoning") || block.optBoolean("thought"))) continue
                             block?.remove("thoughtSignature")
                             block?.remove("thought_signature")

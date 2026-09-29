@@ -77,6 +77,7 @@ private fun extractVisibleText(value: Any?): String = when (value) {
         }
     }.joinToString("\n")
     is JSONObject -> {
+        if (value.optBoolean("thought", false)) "" else
         when (value.optString("type")) {
             "reasoning", "thinking", "function_call", "tool_call" -> ""
             else -> listOf("text", "output_text", "content", "value")

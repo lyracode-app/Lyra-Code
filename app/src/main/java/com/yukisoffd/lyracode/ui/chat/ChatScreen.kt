@@ -310,7 +310,7 @@ internal fun ChatScreen(
         if (navigationRevealToken == token) navigationVisible = false
     }
     val isInterrupted = controller.activeConversation()?.status == ConversationStore.STATUS_INTERRUPTED
-    val showInterruptedAction = isInterrupted && messageSnapshot.isNotEmpty()
+    val showInterruptedAction = showContinueConversation(isInterrupted, isRunning, messageSnapshot.isNotEmpty())
     // This is the declarative index of the final anchor, independent of the
     // previous LazyColumn measurement kept in listState.layoutInfo.
     val bottomAnchorIndex = renderItems.size + if (showInterruptedAction) 1 else 0
