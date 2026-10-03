@@ -50,7 +50,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -99,7 +98,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.min
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 
 @Composable
@@ -753,98 +751,11 @@ internal fun AttachmentActionBottomSheet(
                             }
                         }
                         "reasoning" -> {
-                            val reasoningOptions = AppSettings.reasoningDepthValues
-                            val selectedIndex = reasoningOptions.indexOf(settings.reasoningDepth).coerceAtLeast(0)
-                            val showBilingualLabels = reasoningDepthLabel(AppSettings.REASONING_AUTO) == "自动"
-                            var sliderPosition by remember(settings.reasoningDepth) {
-                                mutableStateOf(selectedIndex.toFloat())
-                            }
-                            Text(
-                                stringResource(R.string.label_reasoning_depth),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
+                            ReasoningDepthSelector(
+                                selectedDepth = settings.reasoningDepth,
+                                modelName = controller.activeModel.value,
+                                onDepthSelected = controller::selectReasoningDepth,
                             )
-                            Column(
-                                Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Lightbulb,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(58.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                val previewOption = reasoningOptions[
-                                    sliderPosition.roundToInt().coerceIn(reasoningOptions.indices)
-                                ]
-                                Text(
-                                    reasoningDepthLabel(previewOption),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                if (showBilingualLabels) {
-                                    Text(
-                                        reasoningDepthEnglishLabel(previewOption),
-                                        color = KimiMuted,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                            Text(
-                                stringResource(R.string.reasoning_depth_hint),
-                                color = KimiMuted,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            Slider(
-                                value = sliderPosition,
-                                onValueChange = { sliderPosition = it },
-                                onValueChangeFinished = {
-                                    controller.selectReasoningDepth(
-                                        reasoningOptions[sliderPosition.roundToInt().coerceIn(reasoningOptions.indices)],
-                                    )
-                                },
-                                valueRange = 0f..reasoningOptions.lastIndex.toFloat(),
-                                steps = (reasoningOptions.size - 2).coerceAtLeast(0),
-                            )
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                reasoningOptions.forEach { option ->
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable {
-                                                sliderPosition = reasoningOptions.indexOf(option).toFloat()
-                                                controller.selectReasoningDepth(option)
-                                            },
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(1.dp),
-                                    ) {
-                                        val labelColor = if (option == settings.reasoningDepth) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            KimiMuted
-                                        }
-                                        Text(
-                                            reasoningDepthLabel(option),
-                                            color = labelColor,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            maxLines = 1,
-                                        )
-                                        if (showBilingualLabels) {
-                                            Text(
-                                                reasoningDepthEnglishLabel(option),
-                                                color = labelColor,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                maxLines = 1,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
                         }
                         "auto_compression" -> {
                             SheetBackTitle(stringResource(R.string.title_auto_compression)) { onPageChange("root") }
@@ -1015,7 +926,7 @@ internal fun AttachmentActionBottomSheet(
 }
 
 @Composable
-private fun reasoningDepthLabel(value: String): String = when (value) {
+internal fun reasoningDepthLabel(value: String): String = when (value) {
     AppSettings.REASONING_LOW -> stringResource(R.string.reasoning_low)
     AppSettings.REASONING_MEDIUM -> stringResource(R.string.reasoning_medium)
     AppSettings.REASONING_HIGH -> stringResource(R.string.reasoning_high)
@@ -1024,7 +935,7 @@ private fun reasoningDepthLabel(value: String): String = when (value) {
     else -> stringResource(R.string.reasoning_auto)
 }
 
-private fun reasoningDepthEnglishLabel(value: String): String = when (value) {
+internal fun reasoningDepthEnglishLabel(value: String): String = when (value) {
     AppSettings.REASONING_LOW -> "Low"
     AppSettings.REASONING_MEDIUM -> "Medium"
     AppSettings.REASONING_HIGH -> "High"

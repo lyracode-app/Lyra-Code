@@ -3002,88 +3002,95 @@ class OpenAiAgent(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                if (call.name == "edit_file") "精确修改文件: ${args.optString("path")}" else "写入或覆盖文件: ${args.optString("path")}",
-                "会修改工作区文件内容。",
+                uiText(
+                    if (call.name == "edit_file") R.string.approval_edit_file else R.string.approval_write_file,
+                    args.optString("path"),
+                ),
+                uiText(R.string.approval_workspace_file_risk),
             )
             "append_file" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "追加文件: ${args.optString("path")}",
-                "会修改工作区文件内容。",
+                uiText(R.string.approval_append_file, args.optString("path")),
+                uiText(R.string.approval_workspace_file_risk),
             )
             "create_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "创建目录: ${args.optString("path")}",
-                "会改变工作区目录结构。",
+                uiText(R.string.approval_create_folder, args.optString("path")),
+                uiText(R.string.approval_workspace_folder_risk),
             )
             "delete_file_or_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "删除文件或目录: ${args.optString("path")}",
-                "会删除工作区内容，可能无法恢复。",
+                uiText(R.string.approval_delete_file_or_folder, args.optString("path")),
+                uiText(R.string.approval_workspace_delete_risk),
             )
             "rename_move" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "重命名或移动: ${args.optString("from")} -> ${args.optString("to")}",
-                "会改变工作区文件路径。",
+                uiText(R.string.approval_rename_move, args.optString("from"), args.optString("to")),
+                uiText(R.string.approval_workspace_move_risk),
             )
             "global_write_file", "global_edit_file" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                if (call.name == "global_edit_file") "精确修改共享存储文件: ${args.optString("path")}" else "写入共享存储文件: ${args.optString("path")}",
-                "会修改工作区外的 Android 共享存储文件。",
+                uiText(
+                    if (call.name == "global_edit_file") R.string.approval_global_edit_file else R.string.approval_global_write_file,
+                    args.optString("path"),
+                ),
+                uiText(R.string.approval_global_file_risk),
             )
             "global_append_file" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "追加共享存储文件: ${args.optString("path")}",
-                "会修改工作区外的 Android 共享存储文件。",
+                uiText(R.string.approval_global_append_file, args.optString("path")),
+                uiText(R.string.approval_global_file_risk),
             )
             "global_create_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "创建共享存储目录: ${args.optString("path")}",
-                "会改变工作区外的 Android 共享存储目录结构。",
+                uiText(R.string.approval_global_create_folder, args.optString("path")),
+                uiText(R.string.approval_global_folder_risk),
             )
             "global_delete_file_or_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "删除共享存储文件或目录: ${args.optString("path")}",
-                "会删除工作区外的 Android 共享存储内容，可能无法恢复。",
+                uiText(R.string.approval_global_delete_file_or_folder, args.optString("path")),
+                uiText(R.string.approval_global_delete_risk),
             )
             "global_rename_move" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "移动共享存储文件: ${args.optString("from")} -> ${args.optString("to")}",
-                "会改变工作区外的 Android 共享存储文件路径。",
+                uiText(R.string.approval_global_rename_move, args.optString("from"), args.optString("to")),
+                uiText(R.string.approval_global_move_risk),
             )
             "download_file" -> {
                 val destination = args.optString("destination", "workspace")
                 val target = when {
-                    destination.equals("global", true) -> "Android 共享存储"
-                    !nativeFileManager.hasWorkspaceRoot() -> "Android 共享存储 Download/LyraCode（未选择工作区）"
-                    else -> "当前工作区"
+                    destination.equals("global", true) -> uiText(R.string.approval_download_target_global)
+                    !nativeFileManager.hasWorkspaceRoot() -> uiText(R.string.approval_download_target_no_workspace)
+                    else -> uiText(R.string.approval_download_target_workspace)
                 }
                 ToolApprovalRequest(
                     conversationId,
                     call.name,
                     call.rawArguments,
-                    "下载文件到$target: ${args.optString("path")}",
+                    uiText(R.string.approval_download_file, target, args.optString("path")),
                     buildString {
-                        append("将从 ${args.optString("url")} 联网下载并写入文件，可能覆盖同名内容。")
+                        append(uiText(R.string.approval_download_file_risk, args.optString("url")))
                         if (args.optString("url").startsWith("http://", true)) {
-                            append(" 当前使用明文 HTTP，内容可能被监听或篡改。")
+                            append(' ')
+                            append(uiText(R.string.approval_download_http_risk))
                         }
                     },
                 )
@@ -3181,29 +3188,29 @@ class OpenAiAgent(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "从 WebDAV 下载到工作区: ${args.optString("remote_path")} -> ${args.optString("local_path")}",
-                "会把远程文件写入当前工作区，可能覆盖同名文件。",
+                uiText(R.string.approval_webdav_download, args.optString("remote_path"), args.optString("local_path")),
+                uiText(R.string.approval_webdav_download_risk),
             )
             "webdav_upload_from_workspace" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "上传工作区文件到 WebDAV: ${args.optString("local_path")} -> ${args.optString("remote_path")}",
-                "会把本机工作区文件发送到远程 WebDAV 服务器。",
+                uiText(R.string.approval_webdav_upload, args.optString("local_path"), args.optString("remote_path")),
+                uiText(R.string.approval_webdav_upload_risk),
             )
             "file_transfer_download_to_workspace" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "从文件传输服务器下载到工作区: ${args.optString("remote_path")} -> ${args.optString("local_path")}",
-                "会把 FTP/FTPS/SFTP 远程文件写入当前工作区，可能覆盖同名文件。",
+                uiText(R.string.approval_file_transfer_download, args.optString("remote_path"), args.optString("local_path")),
+                uiText(R.string.approval_file_transfer_download_risk),
             )
             "file_transfer_upload_from_workspace" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "上传工作区文件到文件传输服务器: ${args.optString("local_path")} -> ${args.optString("remote_path")}",
-                "会把本机工作区文件发送到远程 FTP/FTPS/SFTP 服务器。",
+                uiText(R.string.approval_file_transfer_upload, args.optString("local_path"), args.optString("remote_path")),
+                uiText(R.string.approval_file_transfer_upload_risk),
             )
             "export_backup" -> ToolApprovalRequest(
                 conversationId,
