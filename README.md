@@ -54,6 +54,7 @@ PRoot is available without installing Termux; the two modes can coexist. PRoot u
 - Sora Editor with TextMate highlighting, line numbers, search, navigation, wrapping, `.bak` backups, and an AI editing panel; plus a dual-pane Android file manager.
 - MCP client/server, SSH, SMTP/IMAP, WebDAV, FTP/FTPS/SFTP, native HTTP/HTTPS downloads, and natural-language configuration.
 - Importable Skills, image input and annotation, Markdown/LaTeX/media rendering, device diagnostics, usage statistics, and local/WebDAV backups.
+- AI charts rendered offline in answers: flowcharts, sequence diagrams, Gantt charts, line/bar/pie charts, mind maps, architecture and relationship diagrams, with fullscreen viewing and PNG/SVG/source export. See [inline charts](docs/CHARTS.md).
 - Optional Shizuku and Root tools, each independently switchable.
 
 ## Getting started

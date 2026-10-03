@@ -852,6 +852,10 @@ internal fun KatexWebView(
 
 @Composable
 internal fun CodeBlock(block: MarkdownBlock.Code) {
+    if (com.yukisoffd.lyracode.charts.isChartLanguage(block.language)) {
+        ChartBlock(block.language, block.code)
+        return
+    }
     val clipboard = LocalClipboardManager.current
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -2225,4 +2225,17 @@ Revocation stops new access through that permission but does not automatically e
     <string name="log_duration">Duration</string>
     <string name="log_char_count">%1$d characters</string>
     <string name="log_effort_absent">No reasoning effort field was sent in this request.</string>
+    <string name="tool_create_chart">Create chart</string>
+    <string name="tool_create_chart_desc">Create inline diagrams and data charts with fullscreen viewing and file export.</string>
+    <string name="chart_title">Chart</string>
+    <string name="chart_source">Show source</string>
+    <string name="chart_save">Save chart as</string>
+    <string name="chart_save_png">Save PNG image</string>
+    <string name="chart_save_svg">Save SVG image</string>
+    <string name="chart_save_source">Save source</string>
+    <string name="chart_fullscreen">View fullscreen</string>
+    <string name="chart_close_fullscreen">Close fullscreen</string>
+    <string name="chart_saved">Chart saved</string>
+    <string name="chart_save_failed">Could not save chart</string>
+    <string name="chart_render_failed">Could not render chart: %1$s</string>
 </resources>

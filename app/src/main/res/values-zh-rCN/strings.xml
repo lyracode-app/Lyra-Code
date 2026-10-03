@@ -2308,6 +2308,19 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="log_duration">耗时</string>
     <string name="log_char_count">%1$d 字符</string>
     <string name="log_effort_absent">此请求未发送推理强度字段。</string>
+    <string name="tool_create_chart">创建图表</string>
+    <string name="tool_create_chart_desc">创建正文内的流程图、时序图、甘特图、思维导图和数据图表，支持全屏浏览和另存。</string>
+    <string name="chart_title">图表</string>
+    <string name="chart_source">查看源码</string>
+    <string name="chart_save">图表另存为</string>
+    <string name="chart_save_png">另存为 PNG 图片</string>
+    <string name="chart_save_svg">另存为 SVG 图片</string>
+    <string name="chart_save_source">另存图表源码</string>
+    <string name="chart_fullscreen">全屏浏览</string>
+    <string name="chart_close_fullscreen">退出全屏</string>
+    <string name="chart_saved">图表已保存</string>
+    <string name="chart_save_failed">图表保存失败</string>
+    <string name="chart_render_failed">图表渲染失败：%1$s</string>
 </resources>
 
 

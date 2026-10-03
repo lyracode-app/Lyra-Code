@@ -255,6 +255,7 @@ internal class AgentToolSchemaFactory(
         }
         if (prootAvailable()) definitions.put(prootCommandToolDefinition())
         definitions
+        .put(chartToolDefinition())
         .put(function("web_search", "Search the web in the embedded WebView and return candidate titles, URLs, and snippets. User-blocked sites are filtered. Use for current or web-specific information, then verify candidates with read_web_page.", "query" to "string", "limit" to "integer"))
         .put(function("read_web_page", "Open an HTTP/HTTPS page in the embedded WebView and extract its body. User-blocked domains are rejected. Read trustworthy candidates and base factual claims on page content, not search snippets.", "url" to "string"))
         .put(function("mark_web_sources", "Declare the web pages actually used in the answer. Call only when the answer relies on web content. sources is an array of objects with title, url, and used_for. Then cite those pages with nearby Markdown links.", "sources" to "array:object"))

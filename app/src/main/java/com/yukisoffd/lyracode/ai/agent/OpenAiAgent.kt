@@ -2174,6 +2174,7 @@ class OpenAiAgent(
                 "web_search" -> ToolExecution(webAgent.search(args.getString("query"), args.optInt("limit", 6)))
                 "read_web_page" -> ToolExecution(webAgent.readPage(args.getString("url")))
                 "mark_web_sources" -> ToolExecution(webSourceMarkResult(args))
+                "create_chart" -> ToolExecution(com.yukisoffd.lyracode.charts.chartToolResult(args))
                 "manage_app_config" -> ToolExecution(configTools.manageAppConfig(args))
                 "run_sub_agents" -> ToolExecution(runSubAgents(conversationId, args, onStatus))
                 "ask_user" -> ToolExecution(
@@ -3732,6 +3733,7 @@ class OpenAiAgent(
             Submit independent subtasks together with precise scope, relevant paths, constraints, and expected evidence. Lyra currently executes the batch as orchestrated sub-agent tasks; do not assume concurrency or delegate solely for speed. Sub-agents have a restricted tool set and cannot delegate, run commands, mutate shared storage, or perform unscoped writes. Treat results as unverified input: inspect important evidence, resolve conflicts, and integrate the final answer yourself.
 
             # Attachments, media, and history
+            For charts and diagrams, use create_chart and embed its returned markdown verbatim in the answer at the relevant place. Lyra renders chart, mermaid, and echarts fenced blocks inline with fullscreen and export controls. Choose Mermaid for flowcharts, sequence, Gantt, mind maps, architecture and ER diagrams; choose ECharts JSON options for line, bar, pie, scatter, tree and relationship graphs. Do not use image generation for data charts. Pass only data and diagram syntax, never executable JavaScript. Use clear labels and a short title. Do not invent data; distinguish illustrative values from user-provided facts.
             User attachments may arrive as multimodal content parts or extracted text. If the current model cannot consume a media type, state the limitation and offer a practical alternative.
             LYRA_WITHHELD_IMAGE_V1 means Lyra intentionally withheld that image from this model. When its contents matter, call the available analyze_image for a faithful visual report or extract_image_text for exact visible text before answering. Never claim to have inspected a withheld image without a successful tool result.
             When returning generated media, use a directly accessible Markdown media link, data URL, or complete local path. Avoid repeating large base64 payloads.
@@ -3949,6 +3951,7 @@ class OpenAiAgent(
             "import_backup",
         )
         private val CONFIGURABLE_AGENT_TOOLS = listOf(
+            "create_chart",
             "list_directory",
             "read_file",
             "read_file_lines",
@@ -4067,6 +4070,6 @@ internal val DEVICE_WORKSPACE_TOOLS = setOf(
     "create_folder", "delete_file_or_folder", "rename_move", "search_files", "get_file_info",
     "global_list_directory", "global_read_file", "global_read_file_lines", "global_write_file", "global_edit_file",
     "global_append_file", "global_create_folder", "global_delete_file_or_folder", "global_rename_move", "global_search_files",
-    "web_search", "read_web_page", "mark_web_sources", "get_current_time", "get_current_location",
+    "web_search", "read_web_page", "mark_web_sources", "create_chart", "get_current_time", "get_current_location",
     "get_device_hardware_info", "list_installed_apps", "set_todo_list", "update_todo_item", "list_skill_files", "read_skill_file"
 )
