@@ -282,7 +282,11 @@
     <string name="ask_user_multi_select_hint">可選擇多個選項，也可以在下方補充其他內容。</string>
     <string name="ask_user_free_text_label">補充回答</string>
     <string name="ask_user_free_text_support">可填寫選項中沒有的答案，或補充已選內容。</string>
-    <string name="ask_user_idle_timeout_hint">連續 10 分鐘沒有點選、滾動、選擇或輸入時，此追問會自動撤回。</string>
+    <string name="ask_user_idle_timeout_hint">彈窗開啟時，連續 10 分鐘沒有點選、滾動、選擇或輸入會自動撤回。可暫時收起以瀏覽之前的訊息，收起期間暫停計時，重新開啟後開始新一輪 10 分鐘無操作計時。</string>
+    <string name="ask_user_recommended">推薦</string>
+    <string name="ask_user_minimize">暫時收起</string>
+    <string name="ask_user_restore">重新開啟追問</string>
+    <string name="ask_user_timeout_paused">計時已暫停 · 點選繼續回答</string>
     <string name="ask_user_submit">提交回答</string>
     <string name="ask_user_confirm_title">確認提交回答？</string>
     <string name="ask_user_confirm_body">提交後 AI 會依據這些內容繼續當前任務。</string>

@@ -280,7 +280,11 @@
     <string name="ask_user_multi_select_hint">You may select multiple options and add other details below.</string>
     <string name="ask_user_free_text_label">Additional answer</string>
     <string name="ask_user_free_text_support">Enter an answer not listed above, or add details to your selections.</string>
-    <string name="ask_user_idle_timeout_hint">This question is withdrawn after 10 minutes without a click, scroll, selection, or input.</string>
+    <string name="ask_user_idle_timeout_hint">While open, this question is withdrawn after 10 minutes without a click, scroll, selection, or input. Minimize it to review earlier messages and pause the timeout; reopening starts a new 10-minute idle period.</string>
+    <string name="ask_user_recommended">Recommended</string>
+    <string name="ask_user_minimize">Minimize</string>
+    <string name="ask_user_restore">Reopen question</string>
+    <string name="ask_user_timeout_paused">Timeout paused · Tap to answer</string>
     <string name="ask_user_submit">Submit answer</string>
     <string name="ask_user_confirm_title">Submit this answer?</string>
     <string name="ask_user_confirm_body">After submission, the AI will continue the current task using these details.</string>

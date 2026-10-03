@@ -7,11 +7,13 @@ import kotlinx.coroutines.CompletableDeferred
 internal object DeviceQuestionBroker {
     private var pending: CompletableDeferred<String>? = null
     private var session = 0L
-    suspend fun ask(request: UserQuestionRequest): UserQuestionAnswer {
+    suspend fun ask(request: UserQuestionRequest, recommendedLabel: String): UserQuestionAnswer {
         val reply = CompletableDeferred<String>()
         synchronized(this) { check(pending == null); pending = reply; session = ManualControlController.state.value.sessionId }
         val proposal = DeviceApproval(java.util.UUID.randomUUID().toString(), request.title,
-            request.question + request.options.joinToString(separator = "\n", prefix = if (request.options.isEmpty()) "" else "\n") + "\n请在输入框中回复。",
+            request.question + request.options.joinToString(separator = "\n", prefix = if (request.options.isEmpty()) "" else "\n") {
+                if (it in request.recommendedOptions) "$it ($recommendedLabel)" else it
+            } + "\n请在输入框中回复。",
             null, false, textInput = true)
         ManualControlController.setApproval(proposal)
         try { return UserQuestionAnswer(UserQuestionAnswer.STATUS_ANSWERED, freeText = reply.await()) }

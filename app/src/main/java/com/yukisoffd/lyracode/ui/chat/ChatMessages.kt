@@ -45,6 +45,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -69,6 +70,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -76,6 +79,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.ai.ChatRecord
@@ -399,14 +403,17 @@ internal fun ToolApprovalDialog(
 internal fun UserQuestionDialog(
     pending: PendingUserQuestion,
     onActivity: () -> Unit,
+    onMinimize: () -> Unit,
     onSubmit: (selectedOptions: List<String>, freeText: String) -> Unit,
 ) {
-    var selectedOptions by remember(pending.id) { mutableStateOf(emptyList<String>()) }
+    var selectedOptions by rememberSaveable(pending.id) { mutableStateOf(emptyList<String>()) }
     var freeText by rememberSaveable(pending.id) { mutableStateOf("") }
     var confirming by rememberSaveable(pending.id) { mutableStateOf(false) }
+    // Keep draft state in the composition while the dialog is minimized.
+    if (pending.isMinimized) return
     val canSubmit = selectedOptions.isNotEmpty() || freeText.isNotBlank()
     AlertDialog(
-        onDismissRequest = { onActivity() },
+        onDismissRequest = onMinimize,
         title = { Text(pending.request.title) },
         text = {
             Column(
@@ -455,6 +462,20 @@ internal fun UserQuestionDialog(
                             Checkbox(checked = selected, onCheckedChange = null)
                             Spacer(Modifier.width(6.dp))
                             Text(option, modifier = Modifier.weight(1f))
+                            if (option in pending.request.recommendedOptions) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    shape = RoundedCornerShape(6.dp),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.ask_user_recommended),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -486,6 +507,13 @@ internal fun UserQuestionDialog(
                 },
             ) {
                 Text(stringResource(R.string.ask_user_submit))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onMinimize) {
+                Icon(Icons.Default.UnfoldLess, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.ask_user_minimize))
             }
         },
     )
@@ -537,6 +565,31 @@ internal fun UserQuestionDialog(
                 }
             },
         )
+    }
+}
+
+@Composable
+internal fun MinimizedUserQuestionButton(
+    onRestore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pausedDescription = stringResource(R.string.ask_user_timeout_paused)
+    Surface(
+        onClick = onRestore,
+        modifier = modifier.size(48.dp).semantics { stateDescription = pausedDescription },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 4.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Default.QuestionMark,
+                contentDescription = stringResource(R.string.ask_user_restore),
+                modifier = Modifier.size(24.dp),
+            )
+        }
     }
 }
 
