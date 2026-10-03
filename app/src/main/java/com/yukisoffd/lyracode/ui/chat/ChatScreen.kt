@@ -338,6 +338,7 @@ internal fun ChatScreen(
         UserQuestionDialog(
             pending = pending,
             onActivity = { controller.markUserQuestionInteraction(pending.id) },
+            onMinimize = { controller.minimizeUserQuestion(pending.id) },
             onSubmit = { selectedOptions, freeText ->
                 controller.answerUserQuestion(selectedOptions, freeText)
             },
@@ -545,7 +546,10 @@ internal fun ChatScreen(
                             }
                         }
                     }),
-                contentPadding = PaddingValues(bottom = if (keyboardShouldLiftOutput) keyboardLiftDp else 0.dp),
+                contentPadding = PaddingValues(
+                    bottom = (if (keyboardShouldLiftOutput) keyboardLiftDp else 0.dp) +
+                        (if (controller.pendingUserQuestion.value?.isMinimized == true) 64.dp else 0.dp),
+                ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 items(renderItems, key = { it.key }) { item ->
@@ -609,6 +613,12 @@ internal fun ChatScreen(
                             autoFollowOutput = true
                         }
                     },
+                )
+            }
+            controller.pendingUserQuestion.value?.takeIf { it.isMinimized }?.let { pending ->
+                MinimizedUserQuestionButton(
+                    onRestore = { controller.restoreUserQuestion(pending.id) },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                 )
             }
         }

@@ -255,6 +255,7 @@ internal class AgentToolSchemaFactory(
         }
         if (prootAvailable()) definitions.put(prootCommandToolDefinition())
         definitions
+        .put(chartToolDefinition())
         .put(function("web_search", "Search the web in the embedded WebView and return candidate titles, URLs, and snippets. User-blocked sites are filtered. Use for current or web-specific information, then verify candidates with read_web_page.", "query" to "string", "limit" to "integer"))
         .put(function("read_web_page", "Open an HTTP/HTTPS page in the embedded WebView and extract its body. User-blocked domains are rejected. Read trustworthy candidates and base factual claims on page content, not search snippets.", "url" to "string"))
         .put(function("mark_web_sources", "Declare the web pages actually used in the answer. Call only when the answer relies on web content. sources is an array of objects with title, url, and used_for. Then cite those pages with nearby Markdown links.", "sources" to "array:object"))
@@ -472,13 +473,14 @@ internal class AgentToolSchemaFactory(
         .put(
             functionWithOptional(
                 "ask_user",
-                "Pause and ask the user one focused follow-up question when a complex task has material ambiguity, depends on a preference, or encounters an unexpected situation that changes the correct next step. title must be a concise heading. question contains the full prompt. options is an optional list shown as multi-select choices; it may be omitted for open questions. The UI always provides an additional free-text field and requires a second confirmation before submission. After 10 minutes without any interaction the question is withdrawn and the tool returns timed_out so you can continue with your best judgment.",
+                "Pause and ask the user one focused follow-up question when a complex task has material ambiguity, depends on a preference, or encounters an unexpected situation that changes the correct next step. title must be a concise heading. question contains the full prompt. options is an optional list shown as multi-select choices; it may be omitted for open questions. recommended_options may list exact option texts to display with a Recommended label, without selecting them. The UI always provides an additional free-text field and requires a second confirmation before submission. Users may minimize the dialog to review earlier output; this preserves their draft and pauses the idle timeout. Reopening starts a new 10-minute idle period. After 10 minutes without interaction while open, the question is withdrawn and the tool returns timed_out so you can continue with your best judgment.",
                 required = listOf("title" to "string", "question" to "string"),
-                optional = listOf("options" to "array:string"),
+                optional = listOf("options" to "array:string", "recommended_options" to "array:string"),
                 propertyDescriptions = mapOf(
                     "title" to "A concise heading that tells the user what decision or information is needed.",
                     "question" to "One clear, self-contained question.",
                     "options" to "Optional suggested answers. The user may select multiple options and can always add a different or supplementary free-text answer.",
+                    "recommended_options" to "Optional exact option texts from options that you recommend. These choices show a Recommended label and are not automatically selected. Explain why in question or preceding assistant text when helpful.",
                 ),
                 disallowAdditionalProperties = true,
             ),

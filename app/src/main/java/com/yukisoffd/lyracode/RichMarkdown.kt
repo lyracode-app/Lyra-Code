@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import com.yukisoffd.lyracode.charts.isChartLanguage
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -448,11 +449,14 @@ private fun RichListItem(node: ASTNode, content: String, marker: String, level: 
 @Composable
 private fun RichCodeFence(node: ASTNode, content: String) {
     val raw = node.getTextInNode(content)
-    val firstLine = raw.lineSequence().firstOrNull().orEmpty()
-    val language = firstLine.removePrefix("```").trim().substringBefore(' ').ifBlank { "text" }
+    val firstLine = raw.lineSequence().firstOrNull().orEmpty().trimStart()
+    val marker = firstLine.takeWhile { it == '`' || it == '~' }
+    val language = firstLine.removePrefix(marker).trim().substringBefore(' ').ifBlank { "text" }
     val start = node.children.firstOrNull { it.type == MarkdownTokenTypes.CODE_FENCE_CONTENT }?.startOffset ?: return
     val end = node.children.lastOrNull { it.type == MarkdownTokenTypes.CODE_FENCE_CONTENT }?.endOffset ?: start
-    RichCodeBlock(content.substring(start, end).trimEnd(), language)
+    val code = content.substring(start, end).trimEnd()
+    val closed = raw.lineSequence().lastOrNull()?.trim()?.let { it.length >= marker.length && it.all { char -> char == marker.firstOrNull() } } == true
+    if (isChartLanguage(language) && closed) ChartBlock(language, code) else RichCodeBlock(code, language)
 }
 
 @Composable
@@ -581,7 +585,7 @@ private fun RichTableCell(text: String, header: Boolean) {
     }
 }
 
-private fun Modifier.blockNavigationRevealOnTouch(guard: NavigationSwipeGuard?): Modifier {
+internal fun Modifier.blockNavigationRevealOnTouch(guard: NavigationSwipeGuard?): Modifier {
     if (guard == null) return this
     return pointerInput(guard) {
         awaitPointerEventScope {

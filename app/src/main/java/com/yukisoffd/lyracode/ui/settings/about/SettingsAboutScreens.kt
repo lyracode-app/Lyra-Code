@@ -130,6 +130,12 @@ internal fun OpenSourceLicensesScreen() {
                 LicenseTexts.EPL_2_0,
             ),
             LicenseNotice("JetBrains Markdown / RikkaHub Markdown fork", "Apache License 2.0", uiText(R.string.ui_markdown_gfm_ast_parsing_with_tables_lists_and_math), LicenseTexts.APACHE_2_0),
+            LicenseNotice("Mermaid 11.17.2", "MIT", uiText(R.string.tool_create_chart_desc),
+                context.assets.open("charts/MERMAID-LICENSE").bufferedReader().use { it.readText() }),
+            LicenseNotice("Apache ECharts 6.1.0", "Apache License 2.0 / BSD", uiText(R.string.tool_create_chart_desc),
+                listOf("ECHARTS-LICENSE", "ECHARTS-NOTICE", "ECHARTS-D3-LICENSE").joinToString("\n\n") { name ->
+                    context.assets.open("charts/$name").bufferedReader().use { it.readText() }
+                }),
             LicenseNotice(
                 "Sora Editor / language-textmate",
                 "GNU LGPL 2.1 or later",

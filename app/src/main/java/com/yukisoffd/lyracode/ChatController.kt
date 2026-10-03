@@ -62,6 +62,7 @@ data class PendingToolApproval(
 data class PendingUserQuestion(
     val id: Long,
     val request: UserQuestionRequest,
+    val isMinimized: Boolean = false,
 )
 
 data class EditorFileMutation(
@@ -141,7 +142,16 @@ class ChatController(
     private val approvalWaiters = mutableMapOf<Long, CompletableDeferred<ToolApprovalDecision>>()
     private var userQuestionId = 0L
     private val userQuestionWaiters = mutableMapOf<Long, CompletableDeferred<UserQuestionAnswer>>()
-    private var userQuestionTimeoutJob: Job? = null
+    private val userQuestionIdleTimeout = UserQuestionIdleTimeout(scope) { id ->
+        val pending = pendingUserQuestion.value
+        if (pending?.id == id && !pending.isMinimized) {
+            userQuestionWaiters.remove(id)?.complete(
+                UserQuestionAnswer(status = UserQuestionAnswer.STATUS_TIMED_OUT),
+            )
+            pendingUserQuestion.value = null
+            status.value = appContext.getString(R.string.status_user_question_timed_out)
+        }
+    }
     private val editorMutationWaiters = mutableMapOf<Long, CompletableDeferred<AgentFileEditResult>>()
     private val autoApprovedConversations = mutableSetOf<Long>()
     private var transientWorkspaceUri = ""
@@ -879,8 +889,7 @@ class ChatController(
                 UserQuestionAnswer(status = UserQuestionAnswer.STATUS_INTERRUPTED),
             )
             pendingUserQuestion.value = null
-            userQuestionTimeoutJob?.cancel()
-            userQuestionTimeoutJob = null
+            userQuestionIdleTimeout.cancel()
         }
         reloadConversations()
         reloadMessages()
@@ -1049,7 +1058,6 @@ class ChatController(
     }
 
     private companion object {
-        const val USER_QUESTION_IDLE_TIMEOUT_MS = 10L * 60L * 1000L
         const val ATTACHMENT_MARKER_START = "<lyra_attachment_v1>"
         const val ATTACHMENT_MARKER_END = "</lyra_attachment_v1>"
         const val WORKSPACE_REFERENCE_MARKER_START = "<lyra_workspace_refs_v1>"
@@ -1323,7 +1331,22 @@ class ChatController(
     }
 
     fun markUserQuestionInteraction(id: Long) {
-        if (pendingUserQuestion.value?.id == id) resetUserQuestionTimeout(id)
+        val pending = pendingUserQuestion.value
+        if (pending?.id == id && !pending.isMinimized) userQuestionIdleTimeout.reset(id)
+    }
+
+    fun minimizeUserQuestion(id: Long) {
+        val pending = pendingUserQuestion.value ?: return
+        if (pending.id != id || pending.isMinimized) return
+        pendingUserQuestion.value = pending.copy(isMinimized = true)
+        userQuestionIdleTimeout.pause()
+    }
+
+    fun restoreUserQuestion(id: Long) {
+        val pending = pendingUserQuestion.value ?: return
+        if (pending.id != id || !pending.isMinimized) return
+        pendingUserQuestion.value = pending.copy(isMinimized = false)
+        userQuestionIdleTimeout.resume(id)
     }
 
     fun answerUserQuestion(selectedOptions: List<String>, freeText: String) {
@@ -1339,8 +1362,7 @@ class ChatController(
             ),
         )
         pendingUserQuestion.value = null
-        userQuestionTimeoutJob?.cancel()
-        userQuestionTimeoutJob = null
+        userQuestionIdleTimeout.cancel()
         status.value = appContext.getString(R.string.status_user_answer_submitted)
     }
 
@@ -1405,7 +1427,7 @@ class ChatController(
                 userQuestionWaiters[id] = waiter
                 pendingUserQuestion.value = PendingUserQuestion(id, request)
                 status.value = appContext.getString(R.string.status_waiting_user_answer)
-                resetUserQuestionTimeout(id)
+                userQuestionIdleTimeout.reset(id)
                 id to waiter
             }
         } ?: return UserQuestionAnswer(status = UserQuestionAnswer.STATUS_UNAVAILABLE)
@@ -1416,24 +1438,9 @@ class ChatController(
                 userQuestionWaiters.remove(registration.first)
                 if (pendingUserQuestion.value?.id == registration.first) {
                     pendingUserQuestion.value = null
-                    userQuestionTimeoutJob?.cancel()
-                    userQuestionTimeoutJob = null
+                    userQuestionIdleTimeout.cancel()
                 }
             }
-        }
-    }
-
-    private fun resetUserQuestionTimeout(id: Long) {
-        userQuestionTimeoutJob?.cancel()
-        userQuestionTimeoutJob = scope.launch {
-            delay(USER_QUESTION_IDLE_TIMEOUT_MS)
-            if (pendingUserQuestion.value?.id != id) return@launch
-            userQuestionWaiters.remove(id)?.complete(
-                UserQuestionAnswer(status = UserQuestionAnswer.STATUS_TIMED_OUT),
-            )
-            pendingUserQuestion.value = null
-            userQuestionTimeoutJob = null
-            status.value = appContext.getString(R.string.status_user_question_timed_out)
         }
     }
 

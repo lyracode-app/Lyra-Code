@@ -2174,6 +2174,7 @@ class OpenAiAgent(
                 "web_search" -> ToolExecution(webAgent.search(args.getString("query"), args.optInt("limit", 6)))
                 "read_web_page" -> ToolExecution(webAgent.readPage(args.getString("url")))
                 "mark_web_sources" -> ToolExecution(webSourceMarkResult(args))
+                "create_chart" -> ToolExecution(com.yukisoffd.lyracode.charts.chartToolResult(args))
                 "manage_app_config" -> ToolExecution(configTools.manageAppConfig(args))
                 "run_sub_agents" -> ToolExecution(runSubAgents(conversationId, args, onStatus))
                 "ask_user" -> ToolExecution(
@@ -3001,88 +3002,95 @@ class OpenAiAgent(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                if (call.name == "edit_file") "精确修改文件: ${args.optString("path")}" else "写入或覆盖文件: ${args.optString("path")}",
-                "会修改工作区文件内容。",
+                uiText(
+                    if (call.name == "edit_file") R.string.approval_edit_file else R.string.approval_write_file,
+                    args.optString("path"),
+                ),
+                uiText(R.string.approval_workspace_file_risk),
             )
             "append_file" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "追加文件: ${args.optString("path")}",
-                "会修改工作区文件内容。",
+                uiText(R.string.approval_append_file, args.optString("path")),
+                uiText(R.string.approval_workspace_file_risk),
             )
             "create_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "创建目录: ${args.optString("path")}",
-                "会改变工作区目录结构。",
+                uiText(R.string.approval_create_folder, args.optString("path")),
+                uiText(R.string.approval_workspace_folder_risk),
             )
             "delete_file_or_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "删除文件或目录: ${args.optString("path")}",
-                "会删除工作区内容，可能无法恢复。",
+                uiText(R.string.approval_delete_file_or_folder, args.optString("path")),
+                uiText(R.string.approval_workspace_delete_risk),
             )
             "rename_move" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "重命名或移动: ${args.optString("from")} -> ${args.optString("to")}",
-                "会改变工作区文件路径。",
+                uiText(R.string.approval_rename_move, args.optString("from"), args.optString("to")),
+                uiText(R.string.approval_workspace_move_risk),
             )
             "global_write_file", "global_edit_file" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                if (call.name == "global_edit_file") "精确修改共享存储文件: ${args.optString("path")}" else "写入共享存储文件: ${args.optString("path")}",
-                "会修改工作区外的 Android 共享存储文件。",
+                uiText(
+                    if (call.name == "global_edit_file") R.string.approval_global_edit_file else R.string.approval_global_write_file,
+                    args.optString("path"),
+                ),
+                uiText(R.string.approval_global_file_risk),
             )
             "global_append_file" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "追加共享存储文件: ${args.optString("path")}",
-                "会修改工作区外的 Android 共享存储文件。",
+                uiText(R.string.approval_global_append_file, args.optString("path")),
+                uiText(R.string.approval_global_file_risk),
             )
             "global_create_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "创建共享存储目录: ${args.optString("path")}",
-                "会改变工作区外的 Android 共享存储目录结构。",
+                uiText(R.string.approval_global_create_folder, args.optString("path")),
+                uiText(R.string.approval_global_folder_risk),
             )
             "global_delete_file_or_folder" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "删除共享存储文件或目录: ${args.optString("path")}",
-                "会删除工作区外的 Android 共享存储内容，可能无法恢复。",
+                uiText(R.string.approval_global_delete_file_or_folder, args.optString("path")),
+                uiText(R.string.approval_global_delete_risk),
             )
             "global_rename_move" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "移动共享存储文件: ${args.optString("from")} -> ${args.optString("to")}",
-                "会改变工作区外的 Android 共享存储文件路径。",
+                uiText(R.string.approval_global_rename_move, args.optString("from"), args.optString("to")),
+                uiText(R.string.approval_global_move_risk),
             )
             "download_file" -> {
                 val destination = args.optString("destination", "workspace")
                 val target = when {
-                    destination.equals("global", true) -> "Android 共享存储"
-                    !nativeFileManager.hasWorkspaceRoot() -> "Android 共享存储 Download/LyraCode（未选择工作区）"
-                    else -> "当前工作区"
+                    destination.equals("global", true) -> uiText(R.string.approval_download_target_global)
+                    !nativeFileManager.hasWorkspaceRoot() -> uiText(R.string.approval_download_target_no_workspace)
+                    else -> uiText(R.string.approval_download_target_workspace)
                 }
                 ToolApprovalRequest(
                     conversationId,
                     call.name,
                     call.rawArguments,
-                    "下载文件到$target: ${args.optString("path")}",
+                    uiText(R.string.approval_download_file, target, args.optString("path")),
                     buildString {
-                        append("将从 ${args.optString("url")} 联网下载并写入文件，可能覆盖同名内容。")
+                        append(uiText(R.string.approval_download_file_risk, args.optString("url")))
                         if (args.optString("url").startsWith("http://", true)) {
-                            append(" 当前使用明文 HTTP，内容可能被监听或篡改。")
+                            append(' ')
+                            append(uiText(R.string.approval_download_http_risk))
                         }
                     },
                 )
@@ -3180,29 +3188,29 @@ class OpenAiAgent(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "从 WebDAV 下载到工作区: ${args.optString("remote_path")} -> ${args.optString("local_path")}",
-                "会把远程文件写入当前工作区，可能覆盖同名文件。",
+                uiText(R.string.approval_webdav_download, args.optString("remote_path"), args.optString("local_path")),
+                uiText(R.string.approval_webdav_download_risk),
             )
             "webdav_upload_from_workspace" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "上传工作区文件到 WebDAV: ${args.optString("local_path")} -> ${args.optString("remote_path")}",
-                "会把本机工作区文件发送到远程 WebDAV 服务器。",
+                uiText(R.string.approval_webdav_upload, args.optString("local_path"), args.optString("remote_path")),
+                uiText(R.string.approval_webdav_upload_risk),
             )
             "file_transfer_download_to_workspace" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "从文件传输服务器下载到工作区: ${args.optString("remote_path")} -> ${args.optString("local_path")}",
-                "会把 FTP/FTPS/SFTP 远程文件写入当前工作区，可能覆盖同名文件。",
+                uiText(R.string.approval_file_transfer_download, args.optString("remote_path"), args.optString("local_path")),
+                uiText(R.string.approval_file_transfer_download_risk),
             )
             "file_transfer_upload_from_workspace" -> ToolApprovalRequest(
                 conversationId,
                 call.name,
                 call.rawArguments,
-                "上传工作区文件到文件传输服务器: ${args.optString("local_path")} -> ${args.optString("remote_path")}",
-                "会把本机工作区文件发送到远程 FTP/FTPS/SFTP 服务器。",
+                uiText(R.string.approval_file_transfer_upload, args.optString("local_path"), args.optString("remote_path")),
+                uiText(R.string.approval_file_transfer_upload_risk),
             )
             "export_backup" -> ToolApprovalRequest(
                 conversationId,
@@ -3679,7 +3687,7 @@ class OpenAiAgent(
             Skip TODOs for ordinary conversation, a direct answer, a read-only lookup, one focused edit, or one finite command whose next step is obvious. Do not create a ceremonial one-item plan. Mark work completed only after its outcome is verified; mark it blocked only when no safe in-scope path remains, with the concrete cause and attempted alternatives.
 
             # Follow-up questions
-            When ask_user is available, use it during a complex task only if a material ambiguity, user preference, or unexpected situation would meaningfully change the result. Give every question a concise title and one focused, self-contained question. Suggested options may be empty and are never exhaustive because the UI always includes a free-text field; users may select multiple options and add extra details.
+            When ask_user is available, use it during a complex task only if a material ambiguity, user preference, or unexpected situation would meaningfully change the result. Give every question a concise title and one focused, self-contained question. Suggested options may be empty and are never exhaustive because the UI always includes a free-text field; users may select multiple options and add extra details. Use recommended_options with exact texts from options to label choices you recommend; labels do not select answers for the user. Explain your recommendation in the question or preceding assistant text when useful. Users may minimize the question to review prior output; the idle timeout is paused while minimized and restarts for 10 minutes when reopened.
             Do not call ask_user for information already provided, a simple question you can answer directly, or facts you can safely discover with available read-only tools. If ask_user returns timed_out, do not ask the same question again unchanged; make a reasonable low-risk choice from the available context and continue. If it returns answered, honor both selected_options and free_text.
             The required confirmation that Termux is running before run_command is a specific exception to the general ask-only-when-ambiguous rule.
 
@@ -3732,6 +3740,7 @@ class OpenAiAgent(
             Submit independent subtasks together with precise scope, relevant paths, constraints, and expected evidence. Lyra currently executes the batch as orchestrated sub-agent tasks; do not assume concurrency or delegate solely for speed. Sub-agents have a restricted tool set and cannot delegate, run commands, mutate shared storage, or perform unscoped writes. Treat results as unverified input: inspect important evidence, resolve conflicts, and integrate the final answer yourself.
 
             # Attachments, media, and history
+            For charts and diagrams, use create_chart and embed its returned markdown verbatim in the answer at the relevant place. Lyra renders chart, mermaid, and echarts fenced blocks inline with fullscreen and export controls. Choose Mermaid for flowcharts, sequence, Gantt, mind maps, architecture and ER diagrams; choose ECharts JSON options for line, bar, pie, scatter, tree and relationship graphs. Do not use image generation for data charts. Pass only data and diagram syntax, never executable JavaScript. Use clear labels and a short title. Do not invent data; distinguish illustrative values from user-provided facts.
             User attachments may arrive as multimodal content parts or extracted text. If the current model cannot consume a media type, state the limitation and offer a practical alternative.
             LYRA_WITHHELD_IMAGE_V1 means Lyra intentionally withheld that image from this model. When its contents matter, call the available analyze_image for a faithful visual report or extract_image_text for exact visible text before answering. Never claim to have inspected a withheld image without a successful tool result.
             When returning generated media, use a directly accessible Markdown media link, data URL, or complete local path. Avoid repeating large base64 payloads.
@@ -3949,6 +3958,7 @@ class OpenAiAgent(
             "import_backup",
         )
         private val CONFIGURABLE_AGENT_TOOLS = listOf(
+            "create_chart",
             "list_directory",
             "read_file",
             "read_file_lines",
@@ -4067,6 +4077,6 @@ internal val DEVICE_WORKSPACE_TOOLS = setOf(
     "create_folder", "delete_file_or_folder", "rename_move", "search_files", "get_file_info",
     "global_list_directory", "global_read_file", "global_read_file_lines", "global_write_file", "global_edit_file",
     "global_append_file", "global_create_folder", "global_delete_file_or_folder", "global_rename_move", "global_search_files",
-    "web_search", "read_web_page", "mark_web_sources", "get_current_time", "get_current_location",
+    "web_search", "read_web_page", "mark_web_sources", "create_chart", "get_current_time", "get_current_location",
     "get_device_hardware_info", "list_installed_apps", "set_todo_list", "update_todo_item", "list_skill_files", "read_skill_file"
 )

@@ -150,7 +150,9 @@ internal object DeviceTaskCoordinator {
                 )
                 val agent = DeviceAgentFactory.create(app, settings, store, floatingWorkspace ?: settings.workspaceUri)
                 agent.scopedTools = provider
-                agent.userQuestionHandler = DeviceQuestionBroker::ask
+                agent.userQuestionHandler = { request ->
+                    DeviceQuestionBroker.ask(request, app.getString(com.yukisoffd.lyracode.R.string.ask_user_recommended))
+                }
                 agent.approvalHandler = { request ->
                     val approved = DeviceApprovalBroker.request(request.summary,
                         "${request.risk}\n${request.arguments}".take(16000),

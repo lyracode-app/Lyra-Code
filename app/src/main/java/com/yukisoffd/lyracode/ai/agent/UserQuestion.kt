@@ -8,6 +8,7 @@ data class UserQuestionRequest(
     val title: String,
     val question: String,
     val options: List<String>,
+    val recommendedOptions: List<String> = emptyList(),
 )
 
 data class UserQuestionAnswer(
@@ -62,11 +63,22 @@ internal fun parseUserQuestionRequest(conversationId: Long, args: JSONObject): U
     require(options.all { it.length <= MAX_USER_QUESTION_OPTION_CHARS }) {
         "each option must be no longer than $MAX_USER_QUESTION_OPTION_CHARS characters."
     }
+    val recommendedOptions = buildList {
+        val rawRecommendations = args.optJSONArray("recommended_options") ?: JSONArray()
+        for (index in 0 until rawRecommendations.length()) {
+            val option = rawRecommendations.optString(index).trim()
+            if (option.isNotBlank() && option !in this) add(option)
+        }
+    }
+    require(recommendedOptions.all { it in options }) {
+        "recommended_options must contain only exact option texts from options."
+    }
     return UserQuestionRequest(
         conversationId = conversationId,
         title = title,
         question = question,
         options = options,
+        recommendedOptions = recommendedOptions,
     )
 }
 

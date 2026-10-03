@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.0.5-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.0.6-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" />
   <img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" />
@@ -54,6 +54,7 @@ Lyra Code 将 Android 设备变成 AI 辅助的全栈开发环境。它的核心
 - 集成 Sora Editor，支持 TextMate 高亮、行号、搜索跳转、换行、`.bak` 备份和 AI 编辑侧栏；另有双栏 Android 文件管理器。
 - MCP 客户端/服务端、SSH、SMTP/IMAP、WebDAV、FTP/FTPS/SFTP、原生 HTTP/HTTPS 下载及自然语言配置管理。
 - Skills 导入、图片输入与标注、Markdown/LaTeX/媒体渲染、设备诊断、用量统计及本地/WebDAV 备份。
+- AI 图表工具与正文内离线渲染：流程图、时序图、甘特图、折线图、柱状图、饼图、思维导图、架构图和关系图，支持全屏浏览及 PNG/SVG/源码另存。详见[图表说明](docs/CHARTS.md)。
 - 可选 Shizuku 和 Root 工具，均可独立开关。
 
 ## 快速开始
