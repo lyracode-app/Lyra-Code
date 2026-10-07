@@ -88,6 +88,8 @@ import com.yukisoffd.lyracode.termux.TermuxExecutor
 import com.yukisoffd.lyracode.webdav.WebDavClient
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -196,6 +198,8 @@ internal fun LyraCodeApp(
     var startupUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
     var startupUpdateProgress by remember { mutableStateOf<UpdateDownloadProgress?>(null) }
     var startupUpdateDownloading by remember { mutableStateOf(false) }
+    var startupAccelerationUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    var startupAccelerationReturnPage by rememberSaveable { mutableIntStateOf(PAGE_CHAT) }
     var startupPendingApk by remember { mutableStateOf(updateManager.pendingDownloadedApk()) }
     val appSettingsRevision = controller.settingsRevision.intValue
     val skills = remember(skillsRevision, appSettingsRevision) { settings.installedSkills() }
@@ -246,7 +250,10 @@ internal fun LyraCodeApp(
         }
     }
     LaunchedEffect(safeSelectedPage) {
-        if (safeSelectedPage != PAGE_SETTINGS) settingsDetailTitle = null
+        if (safeSelectedPage != PAGE_SETTINGS) {
+            settingsDetailTitle = null
+            startupAccelerationUrl = null
+        }
         skipNextPageTransition = false
     }
     LaunchedEffect(safeSelectedPage, activeConversationId) {
@@ -327,11 +334,16 @@ internal fun LyraCodeApp(
         }
     }
 
-    startupUpdateInfo?.let { info ->
+    startupUpdateInfo?.takeIf { startupAccelerationUrl == null }?.let { info ->
         UpdateDialog(
             info = info,
             progress = startupUpdateProgress,
             downloading = startupUpdateDownloading,
+            onOpenGitHubAcceleration = { url ->
+                startupAccelerationReturnPage = safeSelectedPage
+                startupAccelerationUrl = url
+                selectedPage = PAGE_SETTINGS
+            },
             onDismiss = {
                 if (!startupUpdateDownloading) {
                     startupUpdateInfo = null
@@ -348,7 +360,11 @@ internal fun LyraCodeApp(
                 startupUpdateProgress = UpdateDownloadProgress(status = context.getString(R.string.notice_preparing_download))
                 scope.launch {
                     val result = withContext(Dispatchers.IO) {
-                        updateManager.downloadApk(info) { progress -> startupUpdateProgress = progress }
+                        val downloadContext = currentCoroutineContext()
+                        updateManager.downloadApk(info) { progress ->
+                            downloadContext.ensureActive()
+                            startupUpdateProgress = progress
+                        }
                     }
                     startupUpdateDownloading = false
                     result.fold(
@@ -646,6 +662,11 @@ internal fun LyraCodeApp(
                             updateAvailable = aboutUpdateAvailable,
                             onUpdateAvailabilityChange = { aboutUpdateAvailable = it },
                             settingsBackRequest = settingsBackRequest,
+                            externalGitHubAccelerationUrl = startupAccelerationUrl,
+                            onExternalGitHubAccelerationClosed = {
+                                selectedPage = startupAccelerationReturnPage
+                                startupAccelerationUrl = null
+                            },
                             onDetailTitleChange = { settingsDetailTitle = it },
                             onOpenDrawer = { scope.launch { drawerState.open() } },
                             onToggleSkill = { id, enabled ->

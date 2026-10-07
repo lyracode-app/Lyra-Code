@@ -7,6 +7,29 @@ import org.junit.Test
 
 class UpdateManagerReleaseTest {
     @Test
+    fun preservesGithubAssetDigestForAcceleratedDownloadVerification() {
+        val digest = "sha256:" + "a".repeat(64)
+        val info = parseReleaseUpdateInfo(
+            JSONObject().put("tag_name", "v4.0.7").put("assets", org.json.JSONArray().put(
+                JSONObject().put("name", "lyra.apk").put("browser_download_url", "https://github.com/test/lyra.apk").put("digest", digest),
+            )),
+            fallbackWebUrl = "https://github.com/test/releases",
+        )
+        assertEquals(digest, info.apkSha256)
+    }
+
+    @Test
+    fun acceptsOlderReleaseAssetsWithNullDigest() {
+        val info = parseReleaseUpdateInfo(
+            JSONObject().put("tag_name", "v4.0.7").put("assets", org.json.JSONArray().put(
+                JSONObject().put("name", "lyra.apk").put("browser_download_url", "https://github.com/test/lyra.apk").put("digest", JSONObject.NULL),
+            )),
+            fallbackWebUrl = "https://github.com/test/releases",
+        )
+        assertEquals("", info.apkSha256)
+    }
+
+    @Test
     fun parsesGithubReleaseBodyAndApkDownloadUrl() {
         val info = parseReleaseUpdateInfo(
             JSONObject(

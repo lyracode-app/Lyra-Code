@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.data.AppSettings
+import com.yukisoffd.lyracode.data.AppUpdateInfo
+import com.yukisoffd.lyracode.data.GITHUB_CONNECTIVITY_TEST_URL
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.MediaGenerationKind
 import com.yukisoffd.lyracode.data.SkillPack
@@ -115,6 +117,8 @@ internal fun SettingsScreen(
     updateAvailable: Boolean,
     onUpdateAvailabilityChange: (Boolean) -> Unit,
     settingsBackRequest: Int,
+    externalGitHubAccelerationUrl: String?,
+    onExternalGitHubAccelerationClosed: () -> Unit,
     onDetailTitleChange: (String?) -> Unit,
     onOpenDrawer: () -> Unit,
     onToggleSkill: (String, Boolean) -> Unit,
@@ -122,6 +126,9 @@ internal fun SettingsScreen(
 ) {
     var showUnsupportedDevice by rememberSaveable { mutableStateOf(false) }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    var gitHubAccelerationTestUrl by rememberSaveable { mutableStateOf(GITHUB_CONNECTIVITY_TEST_URL) }
+    var gitHubAccelerationReturnDetail by rememberSaveable { mutableStateOf<String?>(null) }
+    val aboutUpdateInfoState = remember { mutableStateOf<AppUpdateInfo?>(null) }
     var modelNestedPageActive by rememberSaveable { mutableStateOf(false) }
     var modelNestedTitle by rememberSaveable { mutableStateOf("") }
     var modelBackRequest by rememberSaveable { mutableIntStateOf(0) }
@@ -140,6 +147,7 @@ internal fun SettingsScreen(
         )
     }
     fun previousDetail(current: String?): String? = when (current) {
+        "github_acceleration" -> if (externalGitHubAccelerationUrl != null) gitHubAccelerationReturnDetail else "about"
         "device" -> "about"
         CompliancePageIds.INDEX -> "about"
         CompliancePageIds.USER_AGREEMENT,
@@ -167,7 +175,16 @@ internal fun SettingsScreen(
             modelBackRequest++
             return
         }
+        val closingExternalAcceleration = detail == "github_acceleration" && externalGitHubAccelerationUrl != null
         detail = previousDetail(detail)
+        if (closingExternalAcceleration) onExternalGitHubAccelerationClosed()
+    }
+    LaunchedEffect(externalGitHubAccelerationUrl) {
+        if (externalGitHubAccelerationUrl != null && detail != "github_acceleration") {
+            gitHubAccelerationReturnDetail = detail
+            gitHubAccelerationTestUrl = externalGitHubAccelerationUrl
+            detail = "github_acceleration"
+        }
     }
     val predictiveBackState = rememberPredictiveBackGestureState(
         enabled = predictiveBackEnabled && detail != null,
@@ -245,7 +262,7 @@ internal fun SettingsScreen(
             if (target != null) {
                 SettingsDetailPage(
                     inset = target != "model",
-                    scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "device", "font", "font_library"),
+                    scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "device", "font", "font_library", "github_acceleration"),
                 ) {
                     when (target) {
                     "profile" -> ProfileSettingsSummary(settings)
@@ -382,7 +399,14 @@ internal fun SettingsScreen(
                         onUpdateAvailabilityChange = onUpdateAvailabilityChange,
                         onOpenDeviceInfo = { detail = "device" },
                         onOpenServiceAgreements = { detail = CompliancePageIds.INDEX },
+                        onOpenGitHubAcceleration = { url ->
+                            gitHubAccelerationTestUrl = url
+                            detail = "github_acceleration"
+                        },
+                        updateInfoState = aboutUpdateInfoState,
+                        showUpdateDialog = detail == "about",
                     )
+                    "github_acceleration" -> GitHubAccelerationSettingsScreen(initialTestUrl = gitHubAccelerationTestUrl)
                     "device" -> DeviceInfoScreen()
                     CompliancePageIds.INDEX -> ServiceAgreementScreen(onOpenDocument = { detail = it })
                     CompliancePageIds.USER_AGREEMENT,
@@ -532,6 +556,7 @@ internal fun SettingsScreen(
                         EnterTransition.None togetherWith ExitTransition.None
                     } else {
                         val forward = when {
+                            initialState == "github_acceleration" -> false
                             initialState == "device" && targetState == "about" -> false
                             initialState == "about" && targetState == "device" -> true
                             initialState == CompliancePageIds.INDEX && targetState == "about" -> false
@@ -640,6 +665,7 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "skills" -> context.getString(R.string.detail_skills)
     "licenses" -> context.getString(R.string.detail_licenses)
     "about" -> context.getString(R.string.detail_about)
+    "github_acceleration" -> context.getString(R.string.github_acceleration_title)
     "device" -> context.getString(R.string.detail_device)
     CompliancePageIds.INDEX -> context.getString(R.string.compliance_service_agreements)
     CompliancePageIds.USER_AGREEMENT -> context.getString(R.string.compliance_user_agreement)

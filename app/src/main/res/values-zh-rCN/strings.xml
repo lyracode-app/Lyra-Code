@@ -2359,6 +2359,28 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="chart_saved">图表已保存</string>
     <string name="chart_save_failed">图表保存失败</string>
     <string name="chart_render_failed">图表渲染失败：%1$s</string>
+    <string name="github_acceleration_title">GitHub 加速链接</string>
+    <string name="github_acceleration_entry_desc">管理下载备用链接，测试 GitHub 连通性</string>
+    <string name="github_acceleration_enable">自动切换加速链接</string>
+    <string name="github_acceleration_description">先使用原地址下载。失败、超时或无法连接时，按下方顺序尝试已启用的加速链接。设置自动保存，关闭自动切换后仍可手动测试。</string>
+    <string name="github_acceleration_test_url">待测试的 GitHub 下载地址</string>
+    <string name="github_acceleration_test_hint">使用同一个下载地址测试，最多读取 4 KB。APK/ZIP 地址还会检查文件头。</string>
+    <string name="github_acceleration_invalid_test_url">请输入有效的 GitHub 下载地址。</string>
+    <string name="github_acceleration_direct">GitHub 直连</string>
+    <string name="github_acceleration_add">添加加速链接</string>
+    <string name="github_acceleration_edit">修改加速链接</string>
+    <string name="github_acceleration_empty">没有加速链接，下载时仅使用原地址。</string>
+    <string name="github_acceleration_name">名称</string>
+    <string name="github_acceleration_prefix">HTTPS 加速前缀</string>
+    <string name="github_acceleration_prefix_hint">例如 https://gh-proxy.org/，会自动拼接原始 GitHub 地址。</string>
+    <string name="github_acceleration_invalid_prefix">请输入不含账号、查询参数或片段的有效 HTTPS 前缀。</string>
+    <string name="github_acceleration_duplicate">该加速链接已存在。</string>
+    <string name="github_acceleration_testing">正在测试连通性…</string>
+    <string name="github_acceleration_test_success">连接成功 · %1$d 毫秒 · HTTP %2$d</string>
+    <string name="github_acceleration_test_failed">连接失败 · %1$d 毫秒 · %2$s</string>
+    <string name="github_acceleration_download_direct">正在从原地址下载</string>
+    <string name="github_acceleration_download_via">正在通过 %1$s 重试下载</string>
+    <string name="github_acceleration_download_complete">下载完成</string>
 </resources>
 
 
