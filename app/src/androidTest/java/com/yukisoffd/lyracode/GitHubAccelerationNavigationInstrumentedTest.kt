@@ -2,6 +2,7 @@ package com.yukisoffd.lyracode
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.activity.BackEventCompat
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -35,7 +36,7 @@ class GitHubAccelerationNavigationInstrumentedTest {
             context.getSharedPreferences("android_compatibility", Context.MODE_PRIVATE).edit()
                 .putBoolean("android_17_local_network_rationale_seen", true).commit()
             AppSettings(context).apply {
-                languageMode = AppSettings.LANGUAGE_EN
+                languageMode = if (description.methodName.startsWith("aboutEntry")) AppSettings.LANGUAGE_ZH_CN else AppSettings.LANGUAGE_EN
                 fontScaleMode = AppSettings.FONT_SCALE_NORMAL
                 predictiveBackEnabled = true
                 dynamicColorEnabled = false
@@ -80,8 +81,8 @@ class GitHubAccelerationNavigationInstrumentedTest {
     }
 
     private fun assertSubpage() {
-        compose.onNodeWithText("Automatic fallback").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Back").assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.github_acceleration_enable)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.cd_back)).assertIsDisplayed()
         if (compose.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty()) {
             fail(compose.onNode(isDialog()).printToString())
         }
@@ -97,23 +98,37 @@ class GitHubAccelerationNavigationInstrumentedTest {
         compose.waitForIdle()
     }
 
-    @Test fun aboutEntryUsesSettingsSubpageAndBothBackActionsReturnToAbout() {
-        compose.onNodeWithContentDescription("Menu").performClick()
-        compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("About").performScrollTo().performClick()
-        compose.onNodeWithText("GitHub acceleration links").performScrollTo().performClick()
-        assertSubpage()
+    private fun screenshot(name: String) {
         compose.waitForIdle()
+        // Allow the completed Compose transition to reach the emulator's display surface.
+        SystemClock.sleep(500)
         InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
-            File(context.getExternalFilesDir(null), "github-acceleration-subpage.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            File(context.getExternalFilesDir(null), name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
         }
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithText("About").assertIsDisplayed()
-        compose.onNodeWithText("GitHub acceleration links").performScrollTo().performClick()
+    }
+
+    @Test fun aboutEntryUsesSettingsSubpageAndBothBackActionsReturnToAbout() {
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.cd_menu)).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.title_settings)).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).performScrollTo().performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.github_acceleration_title)).performScrollTo().performClick()
+        assertSubpage()
+        screenshot("github-acceleration-subpage.png")
+        val accelerationList = hasScrollToIndexAction() and hasAnyDescendant(hasText(compose.activity.getString(R.string.github_acceleration_test_url)))
+        compose.onNode(accelerationList).performScrollToNode(hasText("GH-Proxy"))
+        screenshot("github-acceleration-routes.png")
+        compose.onNode(hasScrollToIndexAction() and hasAnyDescendant(hasText("GH-Proxy"))).performScrollToIndex(0)
+        AppSettings(context).themeMode = "dark"
+        compose.activityRule.scenario.recreate()
+        assertSubpage()
+        screenshot("github-acceleration-subpage-dark.png")
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.cd_back)).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.github_acceleration_title)).performScrollTo().performClick()
         assertSubpage()
         systemBack()
-        compose.onNodeWithText("About").assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).assertIsDisplayed()
     }
 
     @Test fun startupUpdateEntryReturnsToOriginalPromptAndRetainsSettings() {
@@ -121,9 +136,9 @@ class GitHubAccelerationNavigationInstrumentedTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("GitHub acceleration links").performClick()
         assertSubpage()
-        val accelerationList = hasScrollToIndexAction() and hasAnyDescendant(hasText("Automatic fallback") or hasText("GitHub download URL to test"))
-        compose.onNode(accelerationList).performScrollToNode(hasText("GitHub download URL to test"))
-        compose.onNode(hasSetTextAction() and hasText(sourceUrl)).assertExists()
+        val accelerationList = hasScrollToIndexAction() and hasAnyDescendant(hasText("Automatic fallback") or hasText("GitHub download URL"))
+        compose.onNode(accelerationList).performScrollToNode(hasText("GitHub download URL"))
+        compose.onNodeWithText(sourceUrl).assertExists()
         compose.onNode(accelerationList).performScrollToNode(hasText("Automatic fallback"))
         compose.onNodeWithContentDescription("Automatic fallback").performClick()
         assertFalse(GitHubAccelerationSettings(context).load().enabled)

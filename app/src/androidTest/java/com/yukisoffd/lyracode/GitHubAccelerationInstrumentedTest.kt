@@ -2,6 +2,7 @@ package com.yukisoffd.lyracode
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inspector.WindowInspector
@@ -54,6 +55,11 @@ class GitHubAccelerationInstrumentedTest {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
     }
 
+    private fun addLink() {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasContentDescription("Add acceleration link"))
+        compose.onNodeWithContentDescription("Add acceleration link").performClick()
+    }
+
     private fun swipeToEnd() {
         val list = compose.onNode(hasScrollToIndexAction())
         repeat(40) {
@@ -66,6 +72,8 @@ class GitHubAccelerationInstrumentedTest {
     }
 
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        SystemClock.sleep(500)
         InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
             File(context.getExternalFilesDir(null), name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
@@ -73,8 +81,8 @@ class GitHubAccelerationInstrumentedTest {
     }
 
     @SdkSuppress(minSdkVersion = 30)
-    private fun assertButtonAboveSystemUi(text: String) {
-        val button = compose.onNodeWithText(text).fetchSemanticsNode()
+    private fun assertButtonAboveSystemUi(description: String) {
+        val button = compose.onNodeWithContentDescription(description).fetchSemanticsNode()
         val buttonBottom = button.positionOnScreen.y + button.size.height
         val metrics = context.getSystemService(WindowManager::class.java).currentWindowMetrics
         val navigationBottom = metrics.windowInsets.getInsets(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout()).bottom
@@ -82,7 +90,7 @@ class GitHubAccelerationInstrumentedTest {
             .maxOfOrNull { it.rootWindowInsets?.getInsets(WindowInsets.Type.ime())?.bottom ?: 0 } ?: 0
         val safeBottom = metrics.bounds.bottom - max(navigationBottom, keyboardBottom)
         val minimumGap = 12 * context.resources.displayMetrics.density
-        assertTrue("$text ends at $buttonBottom, safe bottom is $safeBottom", buttonBottom <= safeBottom - minimumGap)
+        assertTrue("$description ends at $buttonBottom, safe bottom is $safeBottom", buttonBottom <= safeBottom - minimumGap)
     }
 
     @Test
@@ -104,20 +112,29 @@ class GitHubAccelerationInstrumentedTest {
             }
         }
         swipeToEnd()
-        compose.onNodeWithText("Add acceleration link").assertIsDisplayed()
-        assertButtonAboveSystemUi("Add acceleration link")
+        compose.onNodeWithContentDescription("More actions · Acceleration 12").assertIsDisplayed()
+        assertButtonAboveSystemUi("More actions · Acceleration 12")
+        assertButtonAboveSystemUi("Test Connection · Acceleration 12")
         screenshot("github-acceleration-safe-bottom.png")
 
-        scrollTo("GitHub download URL to test")
-        compose.onNode(hasSetTextAction() and hasText("GitHub download URL to test")).performTouchInput { click() }
+        scrollTo("GitHub download URL")
+        compose.onNodeWithContentDescription("Edit test download URL").performClick()
+        compose.onNode(hasSetTextAction() and hasText("GitHub download URL")).performScrollTo().performTouchInput { click() }
+        compose.onNode(hasSetTextAction() and hasText("GitHub download URL")).assertIsFocused()
         compose.waitUntil(5_000) {
             WindowInspector.getGlobalWindowViews().any { it.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
         }
         swipeToEnd()
-        compose.onNodeWithText("Add acceleration link").assertIsDisplayed()
-        assertButtonAboveSystemUi("Add acceleration link")
+        compose.onNodeWithContentDescription("More actions · Acceleration 12").assertIsDisplayed()
+        assertButtonAboveSystemUi("More actions · Acceleration 12")
+        assertButtonAboveSystemUi("Test Connection · Acceleration 12")
         screenshot("github-acceleration-safe-keyboard.png")
-        compose.onNodeWithText("Add acceleration link").performTouchInput { click() }
+        compose.onNodeWithContentDescription("More actions · Acceleration 12").performTouchInput { click() }
+        compose.onNodeWithText("Edit acceleration link").performClick()
+        compose.onNode(hasSetTextAction() and hasText("Name")).performTextReplacement("Edited with keyboard")
+        compose.onNodeWithText("Save").assertIsDisplayed().performTouchInput { click() }
+        compose.waitUntil { store.load().links.last().name == "Edited with keyboard" }
+        addLink()
         compose.onNode(hasSetTextAction() and hasText("Name")).performTextInput("Added with keyboard")
         compose.onNode(hasSetTextAction() and hasText("HTTPS acceleration prefix")).performTextInput("https://added.example/")
         compose.onNodeWithText("Save").assertIsDisplayed().performTouchInput { click() }
@@ -141,8 +158,7 @@ class GitHubAccelerationInstrumentedTest {
                 }
             }
         }
-        scrollTo("Add acceleration link")
-        compose.onNodeWithText("Add acceleration link").performClick()
+        addLink()
         compose.onNode(hasSetTextAction() and hasText("Name")).performTextInput("First")
         compose.onNode(hasSetTextAction() and hasText("HTTPS acceleration prefix")).performTextInput("https://first.example")
         compose.onNodeWithText("Save").performClick()
@@ -153,9 +169,11 @@ class GitHubAccelerationInstrumentedTest {
         compose.onNodeWithContentDescription("Automatic fallback").performClick()
         assertTrue(store.load().enabled)
         scrollTo("First")
-        compose.onNodeWithContentDescription("First").performClick()
+        compose.onNodeWithContentDescription("More actions · First").performClick()
+        compose.onNodeWithText("Disable").performClick()
         assertFalse(store.load().links.single().enabled)
-        compose.onNodeWithContentDescription("Edit acceleration link").performClick()
+        compose.onNodeWithContentDescription("More actions · First").performClick()
+        compose.onNodeWithText("Edit acceleration link").performClick()
         compose.onNode(hasSetTextAction() and hasText("Name")).performTextReplacement("Edited")
         compose.onNode(hasSetTextAction() and hasText("HTTPS acceleration prefix")).performTextReplacement("https://edited.example/")
         compose.onNodeWithText("Save").performClick()
@@ -166,7 +184,12 @@ class GitHubAccelerationInstrumentedTest {
         compose.onNodeWithText("Open").performClick()
         scrollTo("Edited")
         compose.onNodeWithText("Edited").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Delete").performClick()
+        compose.onNodeWithText("Disabled").assertIsDisplayed()
+        compose.onNodeWithContentDescription("More actions · Edited").performClick()
+        compose.onNodeWithText("Enable").performClick()
+        assertTrue(store.load().links.single().enabled)
+        compose.onNodeWithContentDescription("More actions · Edited").performClick()
+        compose.onNodeWithText("Delete").performClick()
         compose.waitUntil { store.load().links.isEmpty() }
         assertTrue(store.load().enabled)
     }
@@ -185,14 +208,29 @@ class GitHubAccelerationInstrumentedTest {
             }
         }
         scrollTo("Direct GitHub connection")
-        compose.onAllNodesWithText("Test Connection").onFirst().performClick()
+        compose.onNodeWithContentDescription("Test Connection · Direct GitHub connection").performClick()
         compose.waitUntil { requests.size == 1 }
         scrollTo("First")
-        compose.onAllNodesWithText("Test Connection").onLast().performClick()
+        compose.onNodeWithContentDescription("Test Connection · First").performClick()
         compose.waitUntil { requests.size == 2 }
         assertEquals(listOf(sourceUrl, "https://first.example/$sourceUrl"), requests.toList())
         assertFalse(store.load().enabled)
         assertFalse(store.load().links.single().enabled)
+
+        scrollTo("GitHub download URL")
+        compose.onNodeWithContentDescription("Edit test download URL").performClick()
+        compose.onNode(hasSetTextAction() and hasText("GitHub download URL")).performTextReplacement("https://example.com/app.apk")
+        scrollTo("First")
+        compose.onNodeWithContentDescription("Test Connection · First").assertIsNotEnabled()
+        scrollTo("GitHub download URL")
+        val changedUrl = "https://github.com/test/app/releases/download/v2/app.apk"
+        compose.onNode(hasSetTextAction() and hasText("GitHub download URL")).performTextReplacement(changedUrl)
+        compose.onNodeWithContentDescription("Edit test download URL").performClick()
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        scrollTo("First")
+        compose.onNodeWithContentDescription("Test Connection · First").performClick()
+        compose.waitUntil { requests.size == 3 }
+        assertEquals("https://first.example/$changedUrl", requests.last())
     }
 
     @Test fun aboutUpdatePromptSurvivesOpeningAndReturningFromSubpage() {

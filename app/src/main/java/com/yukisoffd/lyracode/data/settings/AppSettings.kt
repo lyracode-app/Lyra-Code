@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.yukisoffd.lyracode.R
+import com.yukisoffd.lyracode.mcp.McpJsonConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -1185,7 +1186,12 @@ class AppSettings(context: Context) {
                                     )
                                 }
                             }.filter { it.name.isNotBlank() },
-                        ),
+                        ).let { server ->
+                            runCatching {
+                                val json = McpJsonConfig(server.rawJson)
+                                if (json.url.isBlank()) server else json.project(server)
+                            }.getOrDefault(server)
+                        },
                     )
                 }
             }

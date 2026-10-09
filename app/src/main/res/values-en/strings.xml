@@ -2279,9 +2279,14 @@ Revocation stops new access through that permission but does not automatically e
     <string name="github_acceleration_title">GitHub acceleration links</string>
     <string name="github_acceleration_entry_desc">Manage fallback links and test GitHub connectivity</string>
     <string name="github_acceleration_enable">Automatic fallback</string>
-    <string name="github_acceleration_description">Try the original download first. If it fails, times out, or cannot connect, retry enabled links in the order below. Settings are saved automatically. Manual tests work even when fallback is off.</string>
-    <string name="github_acceleration_test_url">GitHub download URL to test</string>
-    <string name="github_acceleration_test_hint">Tests read up to 4 KB from the same download URL. For APK/ZIP links, the file header is also checked.</string>
+    <string name="github_acceleration_description">Download from GitHub first. On failure or timeout, retry enabled routes in order.</string>
+    <string name="github_acceleration_test_url">GitHub download URL</string>
+    <string name="github_acceleration_test_hint">Read up to 4 KB to test download access and check APK/ZIP headers.</string>
+    <string name="github_acceleration_automatic_section">Automatic selection</string>
+    <string name="github_acceleration_test_section">Test download</string>
+    <string name="github_acceleration_routes_section">Acceleration routes</string>
+    <string name="github_acceleration_default_section">Default route</string>
+    <string name="github_acceleration_edit_test_url">Edit test download URL</string>
     <string name="github_acceleration_invalid_test_url">Enter a valid GitHub download URL.</string>
     <string name="github_acceleration_direct">Direct GitHub connection</string>
     <string name="github_acceleration_add">Add acceleration link</string>
@@ -2298,4 +2303,17 @@ Revocation stops new access through that permission but does not automatically e
     <string name="github_acceleration_download_direct">Downloading from original URL</string>
     <string name="github_acceleration_download_via">Retrying download via %1$s</string>
     <string name="github_acceleration_download_complete">Download complete</string>
+    <string name="mcp_tools_open_hint">View full tool names, descriptions, and parameter definitions</string>
+    <string name="mcp_tools_page_title">MCP tools</string>
+    <string name="mcp_tool_details">Tool details</string>
+    <string name="mcp_tool_parameters">Parameters (JSON Schema)</string>
+    <string name="mcp_tool_parameters_hint">Complete definitions including types, required fields, defaults, nested structures, and field descriptions. Long press to copy.</string>
+    <string name="mcp_tools_unavailable">Tools were removed or have not been fetched. Return to the server page and fetch them again.</string>
+    <string name="mcp_edit_raw_json">Edit raw JSON</string>
+    <string name="mcp_raw_json_hint">This JSON controls the connection. Custom fields and headers are preserved; Authorization receives no automatic Bearer prefix. Save to return to configuration.</string>
+    <string name="mcp_auth_verbatim_hint">Authorization is sent exactly as entered. Include Bearer only when the server requires it. Edit raw JSON for custom authentication.</string>
+    <string name="mcp_protocol_version">MCP protocol version</string>
+    <string name="mcp_protocol_auto">Auto detect (legacy and modern)</string>
+    <string name="mcp_protocol_stateless">2026-07-28 (stateless)</string>
+    <string name="mcp_local_protocol_hint">The local server supports both versions. Select the external client protocol to generate its connection configuration.</string>
 </resources>

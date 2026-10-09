@@ -126,6 +126,8 @@ internal fun SettingsScreen(
 ) {
     var showUnsupportedDevice by rememberSaveable { mutableStateOf(false) }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    var mcpToolServerId by rememberSaveable { mutableStateOf("") }
+    var mcpToolName by rememberSaveable { mutableStateOf("") }
     var gitHubAccelerationTestUrl by rememberSaveable { mutableStateOf(GITHUB_CONNECTIVITY_TEST_URL) }
     var gitHubAccelerationReturnDetail by rememberSaveable { mutableStateOf<String?>(null) }
     val aboutUpdateInfoState = remember { mutableStateOf<AppUpdateInfo?>(null) }
@@ -147,6 +149,8 @@ internal fun SettingsScreen(
         )
     }
     fun previousDetail(current: String?): String? = when (current) {
+        "mcp_tools" -> "mcp"
+        "mcp_tool_detail" -> "mcp_tools"
         "github_acceleration" -> if (externalGitHubAccelerationUrl != null) gitHubAccelerationReturnDetail else "about"
         "device" -> "about"
         CompliancePageIds.INDEX -> "about"
@@ -354,7 +358,15 @@ internal fun SettingsScreen(
                     "tools" -> AgentToolSettings(settings, termuxExecutor, controller.settingsRevision.intValue)
                     "termux" -> TermuxSettings(settings, termuxExecutor, workspaceManager)
                     "debian" -> ProotLinuxSettings()
-                    "mcp" -> McpSettings(settings, mcpClientManager, controller.settingsRevision.intValue)
+                    "mcp" -> McpSettings(settings, mcpClientManager, controller.settingsRevision.intValue, onOpenTools = { serverId ->
+                        mcpToolServerId = serverId
+                        detail = "mcp_tools"
+                    })
+                    "mcp_tools" -> McpToolsPage(settings, mcpToolServerId, controller.settingsRevision.intValue, onOpenTool = { name ->
+                        mcpToolName = name
+                        detail = "mcp_tool_detail"
+                    })
+                    "mcp_tool_detail" -> McpToolDetailPage(settings, mcpToolServerId, mcpToolName, controller.settingsRevision.intValue)
                     "local_mcp" -> LocalMcpServerSettings(settings, localMcpServerManager, controller.settingsRevision.intValue)
                     "ssh" -> SshSettings(settings, sshExecutor, controller.settingsRevision.intValue)
                     "email" -> EmailSettings(settings, controller.settingsRevision.intValue)
@@ -652,6 +664,8 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "termux" -> context.getString(R.string.detail_termux)
     "debian" -> context.getString(R.string.menu_debian)
     "mcp" -> context.getString(R.string.detail_mcp)
+    "mcp_tools" -> context.getString(R.string.mcp_tools_page_title)
+    "mcp_tool_detail" -> context.getString(R.string.mcp_tool_details)
     "local_mcp" -> context.getString(R.string.detail_local_mcp)
     "ssh" -> context.getString(R.string.detail_ssh)
     "email" -> context.getString(R.string.detail_email)

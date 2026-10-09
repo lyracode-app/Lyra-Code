@@ -1,8 +1,15 @@
 package com.yukisoffd.lyracode
 
-import android.content.Context
-import android.provider.Settings
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.Scaffold
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -27,8 +34,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,10 +45,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -56,11 +63,11 @@ import com.yukisoffd.lyracode.data.McpServerConfig
 import com.yukisoffd.lyracode.data.McpToolDefinition
 import com.yukisoffd.lyracode.mcp.LocalMcpServerManager
 import com.yukisoffd.lyracode.mcp.McpClientManager
+import com.yukisoffd.lyracode.mcp.McpJsonConfig
+import com.yukisoffd.lyracode.mcp.McpProtocol
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URL
-import kotlin.math.max
 
 
 
@@ -69,6 +76,7 @@ internal fun McpSettings(
     settings: AppSettings,
     mcpClientManager: McpClientManager,
     externalRevision: Int = 0,
+    onOpenTools: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -77,7 +85,6 @@ internal fun McpSettings(
     var editing by remember { mutableStateOf<McpServerConfig?>(null) }
     var deleteTarget by remember { mutableStateOf<McpServerConfig?>(null) }
     var status by remember { mutableStateOf("") }
-    var expandedToolServerIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
 
     editing?.let { server ->
         McpServerDialog(
@@ -85,6 +92,7 @@ internal fun McpSettings(
             onDismiss = { editing = null },
             onSave = {
                 settings.upsertMcpServer(it)
+                mcpClientManager.invalidate(it.id)
                 editing = null
                 status = uiText(R.string.notice_mcp_saved)
                 revision++
@@ -99,6 +107,7 @@ internal fun McpSettings(
             onDismiss = { deleteTarget = null },
             onConfirm = {
                 settings.deleteMcpServer(server.id)
+                mcpClientManager.invalidate(server.id)
                 status = uiText(R.string.notice_deleted_service, server.name)
                 revision++
             },
@@ -140,6 +149,7 @@ internal fun McpSettings(
                     checked = server.enabled,
                     onCheckedChange = {
                         settings.setMcpServerEnabled(server.id, it)
+                        if (!it) mcpClientManager.invalidate(server.id)
                         revision++
                     },
                 )
@@ -168,19 +178,12 @@ internal fun McpSettings(
                 }
             }
             if (server.tools.isNotEmpty()) {
-                val toolsExpanded = server.id in expandedToolServerIds
                 KimiDivider()
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .clickable {
-                            expandedToolServerIds = if (toolsExpanded) {
-                                expandedToolServerIds - server.id
-                            } else {
-                                expandedToolServerIds + server.id
-                            }
-                        }
+                        .clickable { onOpenTools(server.id) }
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,24 +192,16 @@ internal fun McpSettings(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(context.getString(R.string.label_fetched_tools, server.tools.size), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            if (toolsExpanded) uiText(R.string.action_collapse_tools) else uiText(R.string.action_expand_tools),
+                            uiText(R.string.mcp_tools_open_hint),
                             color = KimiMuted,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     Icon(
-                        if (toolsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        Icons.Default.ChevronRight,
                         contentDescription = null,
                         tint = KimiMuted,
                     )
-                }
-                AnimatedVisibility(visible = toolsExpanded) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        server.tools.forEachIndexed { index, tool ->
-                            McpToolSummaryRow(tool)
-                            if (index != server.tools.lastIndex) KimiDivider()
-                        }
-                    }
                 }
             }
         }
@@ -225,13 +220,14 @@ internal fun LocalMcpServerSettings(
     var editing by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
+    var exportProtocolVersion by rememberSaveable { mutableStateOf(McpProtocol.LEGACY) }
 
     LaunchedEffect(Unit) {
         localMcpServerManager.syncWithSettings()
         revision++
     }
-    val externalConnectionJson = remember(localConfig, localStatus.url, localStatus.lanUrls) {
-        buildLocalMcpExternalConnectionJson(localConfig, localStatus.url, localStatus.lanUrls)
+    val externalConnectionJson = remember(localConfig, localStatus.url, localStatus.lanUrls, exportProtocolVersion) {
+        buildLocalMcpExternalConnectionJson(localConfig, localStatus.url, localStatus.lanUrls, exportProtocolVersion)
     }
 
     if (editing) {
@@ -340,6 +336,11 @@ internal fun LocalMcpServerSettings(
             style = MaterialTheme.typography.bodySmall,
         )
         Text(uiText(R.string.ui_external_connection_raw_json), style = MaterialTheme.typography.titleSmall)
+        Text(uiText(R.string.mcp_local_protocol_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            MaterialChoiceButton(McpProtocol.LEGACY, exportProtocolVersion == McpProtocol.LEGACY) { exportProtocolVersion = McpProtocol.LEGACY }
+            MaterialChoiceButton(uiText(R.string.mcp_protocol_stateless), exportProtocolVersion == McpProtocol.MODERN) { exportProtocolVersion = McpProtocol.MODERN }
+        }
         CommandCopyCard(
             command = externalConnectionJson,
             buttonText = uiText(R.string.ui_copy_external_connection_json),
@@ -357,10 +358,11 @@ internal fun buildLocalMcpExternalConnectionJson(
     config: LocalMcpServerConfig,
     url: String,
     lanUrls: List<String>,
+    protocolVersion: String = McpProtocol.LEGACY,
 ): String {
     val key = config.authKey.trim()
     val headers = JSONObject()
-        .put("Mcp-Protocol-Version", "2025-06-18")
+        .put("Mcp-Protocol-Version", protocolVersion)
     if (key.isNotBlank()) {
         headers.put("Authorization", if (key.startsWith("Bearer ", ignoreCase = true)) key else "Bearer $key")
     }
@@ -372,7 +374,7 @@ internal fun buildLocalMcpExternalConnectionJson(
         .put("baseUrl", url)
         .put("headers", headers)
     val root = JSONObject()
-        .put("protocolVersion", "2025-06-18")
+        .put("protocolVersion", protocolVersion)
         .put("mcpServers", JSONObject().put("lyra_code", server))
         .put(
             "direct",
@@ -386,19 +388,52 @@ internal fun buildLocalMcpExternalConnectionJson(
 }
 
 @Composable
-internal fun McpToolSummaryRow(tool: McpToolDefinition) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(tool.name, style = MaterialTheme.typography.titleSmall)
-        Text(
-            tool.description.ifBlank { uiText(R.string.label_no_description) },
-            color = KimiMuted,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
+internal fun McpToolsPage(settings: AppSettings, serverId: String, externalRevision: Int, onOpenTool: (String) -> Unit) {
+    val server = remember(serverId, externalRevision) { settings.mcpServers().firstOrNull { it.id == serverId } }
+    if (server == null || server.tools.isEmpty()) {
+        KimiCardBox { Text(uiText(R.string.mcp_tools_unavailable)) }
+        return
+    }
+    KimiCardBox {
+        Text(server.name, style = MaterialTheme.typography.titleMedium)
+        Text(uiText(R.string.mcp_tools_open_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+    }
+    server.tools.forEach { tool ->
+        KimiCardBox {
+            Row(Modifier.fillMaxWidth().clickable { onOpenTool(tool.name) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(tool.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                Icon(Icons.Default.ChevronRight, contentDescription = uiText(R.string.mcp_tool_details), tint = KimiMuted)
+            }
+        }
     }
 }
 
+@Composable
+internal fun McpToolDetailPage(settings: AppSettings, serverId: String, toolName: String, externalRevision: Int) {
+    val tool = remember(serverId, toolName, externalRevision) {
+        settings.mcpServers().firstOrNull { it.id == serverId }?.tools?.firstOrNull { it.name == toolName }
+    }
+    if (tool == null) {
+        KimiCardBox { Text(uiText(R.string.mcp_tools_unavailable)) }
+        return
+    }
+    SelectionContainer {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            KimiCardBox {
+                Text(tool.name, style = MaterialTheme.typography.titleMedium)
+                Text(tool.description.ifBlank { uiText(R.string.label_no_description) }, style = MaterialTheme.typography.bodyMedium)
+            }
+            KimiCardBox {
+                Text(uiText(R.string.mcp_tool_parameters), style = MaterialTheme.typography.titleMedium)
+                Text(uiText(R.string.mcp_tool_parameters_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    runCatching { JSONObject(tool.inputSchema).toString(2) }.getOrDefault(tool.inputSchema),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+            }
+        }
+    }
+}
 @Composable
 internal fun LocalMcpServerDialog(
     initial: LocalMcpServerConfig,
@@ -480,177 +515,120 @@ internal fun McpServerDialog(
     onDismiss: () -> Unit,
     onSave: (McpServerConfig) -> Unit,
 ) {
-    var name by rememberSaveable(initial.id) { mutableStateOf(initial.name) }
-    var url by rememberSaveable(initial.id) { mutableStateOf(initial.url) }
-    var authKey by rememberSaveable(initial.id) { mutableStateOf(initial.authKey) }
-    var transport by rememberSaveable(initial.id) { mutableStateOf(initial.transport.ifBlank { AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP }) }
+    var rawJson by rememberSaveable(initial.id) { mutableStateOf(runCatching { McpJsonConfig.draft(initial) }.getOrDefault(initial.rawJson)) }
+    val parsed = remember(rawJson) { runCatching { McpJsonConfig(rawJson).also { it.url; it.headers; it.transport; it.protocolVersion } }.getOrNull() }
     var timeout by rememberSaveable(initial.id) { mutableStateOf(initial.timeoutSeconds.toString()) }
-    var rawJson by rememberSaveable(initial.id) { mutableStateOf(initial.rawJson.ifBlank { "{}" }) }
     var enabled by rememberSaveable(initial.id) { mutableStateOf(initial.enabled) }
+    var editingJson by rememberSaveable(initial.id) { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    fun patch(field: String, value: String) {
+        runCatching { McpJsonConfig(rawJson).patch(field, value) }.fold(
+            onSuccess = { rawJson = it; error = "" }, onFailure = { error = it.message.orEmpty() },
+        )
+    }
+    if (editingJson) {
+        McpRawJsonEditor(rawJson, onDismiss = { editingJson = false }, onApply = { rawJson = it; error = ""; editingJson = false })
+        return
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(uiText(R.string.detail_mcp)) },
         text = {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {
-                        name = it
-                        rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(uiText(R.string.label_webdav_service_name)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = {
-                        url = it
-                        rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("URL") },
-                    singleLine = true,
-                )
-                if (url.startsWith("http://", ignoreCase = true)) {
-                    Text(uiText(R.string.label_http_insecure), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-                OutlinedTextField(
-                    value = authKey,
-                    onValueChange = {
-                        authKey = it
-                        rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(uiText(R.string.label_auth_key_optional)) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                )
+            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(parsed?.name.orEmpty(), { patch("name", it) }, Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_webdav_service_name)) }, singleLine = true)
+                OutlinedTextField(runCatching { parsed?.url.orEmpty() }.getOrDefault(""), { patch("url", it) }, Modifier.fillMaxWidth(), label = { Text("URL") }, singleLine = true)
+                OutlinedTextField(parsed?.authKey.orEmpty(), { patch("authKey", it) }, Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_auth_key_optional)) }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                Text(uiText(R.string.mcp_auth_verbatim_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MaterialChoiceButton("Streamable HTTP", transport == AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP) {
-                        transport = AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP
-                        rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport)
-                    }
-                    MaterialChoiceButton("SSE", transport == AppSettings.MCP_TRANSPORT_SSE) {
-                        transport = AppSettings.MCP_TRANSPORT_SSE
-                        rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport)
-                    }
+                    MaterialChoiceButton("Streamable HTTP", parsed?.transport == AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP) { patch("transport", AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP) }
+                    MaterialChoiceButton("SSE", parsed?.transport == AppSettings.MCP_TRANSPORT_SSE) { patch("transport", AppSettings.MCP_TRANSPORT_SSE) }
                 }
-                OutlinedTextField(value = timeout, onValueChange = { timeout = it.filter(Char::isDigit) }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_timeout_seconds)) }, singleLine = true)
+                Text(uiText(R.string.mcp_protocol_version), style = MaterialTheme.typography.titleSmall)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val version = runCatching { parsed?.protocolVersion.orEmpty() }.getOrDefault("")
+                    MaterialChoiceButton(uiText(R.string.mcp_protocol_auto), version.isBlank()) { patch("protocolVersion", "") }
+                    MaterialChoiceButton(McpProtocol.LEGACY, version == McpProtocol.LEGACY) { patch("protocolVersion", McpProtocol.LEGACY) }
+                    MaterialChoiceButton(uiText(R.string.mcp_protocol_stateless), version == McpProtocol.MODERN) { patch("protocolVersion", McpProtocol.MODERN) }
+                }
+                OutlinedTextField(timeout, { timeout = it.filter(Char::isDigit) }, Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_timeout_seconds)) }, singleLine = true)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(uiText(R.string.label_enabled), modifier = Modifier.weight(1f))
-                    Switch(checked = enabled, onCheckedChange = { enabled = it })
+                    Text(uiText(R.string.label_enabled), Modifier.weight(1f))
+                    Switch(enabled, { enabled = it })
                 }
-                OutlinedTextField(
-                    value = rawJson,
-                    onValueChange = {
-                        rawJson = it
-                        parseMcpRawJson(it)?.let { parsed ->
-                            name = parsed.name.ifBlank { name }
-                            url = parsed.url.ifBlank { url }
-                            authKey = parsed.authKey.ifBlank { authKey }
-                            transport = parsed.transport.ifBlank { transport }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 5,
-                    label = { Text(uiText(R.string.label_raw_json)) },
-                )
+                OutlinedButton(onClick = { editingJson = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Code, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(uiText(R.string.mcp_edit_raw_json))
+                }
+                Text(rawJson, maxLines = 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        initial.copy(
-                            name = name.ifBlank { "MCP Server" },
-                            url = url.trim(),
-                            authKey = authKey.trim(),
-                            transport = transport,
-                            timeoutSeconds = timeout.toIntOrNull()?.coerceIn(5, 300) ?: 30,
-                            enabled = enabled,
-                            rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport),
-                        ),
-                    )
-                },
-            ) { Text(uiText(R.string.file_editor_save)) }
+            Button(onClick = {
+                runCatching {
+                    val json = McpJsonConfig(rawJson)
+                    json.validateEndpoint()
+                    json.project(initial).copy(rawJson = rawJson, enabled = enabled, timeoutSeconds = timeout.toIntOrNull()?.coerceIn(5, 300) ?: 30,
+                        tools = if (rawJson == initial.rawJson) initial.tools else emptyList())
+                }.fold(onSuccess = onSave, onFailure = { error = it.message.orEmpty() })
+            }) { Text(uiText(R.string.file_editor_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(uiText(R.string.action_cancel)) } },
     )
 }
 
-internal data class ParsedMcpRawConfig(
-    val name: String,
-    val url: String,
-    val authKey: String,
-    val transport: String,
-    val serverKey: String,
-)
-
-internal fun parseMcpRawJson(rawJson: String): ParsedMcpRawConfig? = runCatching {
-    val root = JSONObject(rawJson)
-    val servers = root.optJSONObject("mcpServers")
-    val serverKey = servers?.keys()?.asSequence()?.firstOrNull().orEmpty()
-    val node = if (serverKey.isNotBlank()) servers?.optJSONObject(serverKey) else root
-    node ?: return@runCatching null
-    val headers = node.optJSONObject("headers") ?: root.optJSONObject("headers")
-    val auth = headers?.optString("Authorization").orEmpty().removePrefix("Bearer ").trim()
-    val rawType = node.optString("type").ifBlank { node.optString("transport") }
-    ParsedMcpRawConfig(
-        name = node.optString("name").ifBlank { serverKey.ifBlank { root.optString("name") } },
-        url = node.optString("baseUrl").ifBlank { node.optString("url").ifBlank { root.optString("baseUrl").ifBlank { root.optString("url") } } },
-        authKey = auth,
-        transport = when {
-            rawType.equals("sse", ignoreCase = true) -> AppSettings.MCP_TRANSPORT_SSE
-            else -> AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP
-        },
-        serverKey = serverKey.ifBlank { node.optString("id").ifBlank { "mcp_server" } },
-    )
-}.getOrNull()
-
-internal fun buildMcpRawJson(rawJson: String, name: String, url: String, authKey: String, transport: String): String {
-    val parsed = parseMcpRawJson(rawJson)
-    val serverKey = parsed?.serverKey?.ifBlank { null } ?: name.ifBlank { "mcp_server" }
-    val root = runCatching { JSONObject(rawJson.ifBlank { "{}" }) }.getOrDefault(JSONObject())
-    val servers = root.optJSONObject("mcpServers") ?: JSONObject()
-    val node = servers.optJSONObject(serverKey) ?: JSONObject()
-    node.put("type", if (transport == AppSettings.MCP_TRANSPORT_SSE) "sse" else "streamableHttp")
-    node.put("name", name.ifBlank { parsed?.name ?: "MCP Server" })
-    node.put("baseUrl", url)
-    val headers = node.optJSONObject("headers") ?: JSONObject()
-    if (authKey.isNotBlank()) {
-        headers.put("Authorization", if (authKey.startsWith("Bearer ", ignoreCase = true)) authKey else "Bearer $authKey")
+@Composable
+internal fun McpRawJsonEditor(initialJson: String, onDismiss: () -> Unit, onApply: (String) -> Unit) {
+    var json by rememberSaveable { mutableStateOf(initialJson) }
+    var error by remember { mutableStateOf("") }
+    // Compose 1.7's non-default dialog measures against screenHeight even when the IME shrinks
+    // its window. Keep platform measurement and explicitly make this editor window full screen.
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = true, decorFitsSystemWindows = false)) {
+        val view = LocalView.current
+        val window = (view.parent as DialogWindowProvider).window
+        DisposableEffect(window) {
+            val previousMode = window.attributes.softInputMode
+            window.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT)
+            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            onDispose { window.setSoftInputMode(previousMode) }
+        }
+        // Native visible-frame/compat insets also cover keyboards that Compose's dialog insets miss.
+        val keyboardOffset = with(LocalDensity.current) { rememberKeyboardAvoidanceOffsetPx().toDp() }
+        Scaffold(
+            Modifier.fillMaxSize().systemBarsPadding().padding(bottom = keyboardOffset),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.ArrowBack, contentDescription = uiText(R.string.cd_back)) }
+                    Text(uiText(R.string.label_raw_json), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = {
+                        runCatching { McpJsonConfig(json).validateEndpoint() }.fold(
+                            onSuccess = { onApply(json) }, onFailure = { error = it.message.orEmpty() },
+                        )
+                    }) { Text(uiText(R.string.file_editor_save)) }
+                }
+                Text(uiText(R.string.mcp_raw_json_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = json, onValueChange = { json = it; error = "" },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    label = { Text(uiText(R.string.label_raw_json)) },
+                    isError = error.isNotBlank(),
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                )
+            }
+        }
     }
-    node.put("headers", headers)
-    servers.put(serverKey, node)
-    root.put("mcpServers", servers)
-    if (!root.has("protocolVersion")) root.put("protocolVersion", "2025-06-18")
-    return root.toString(2)
 }
 
 internal fun defaultMcpServer(): McpServerConfig = McpServerConfig(
-    id = AppSettings.newId(),
-    name = "MCP Server",
-    url = "",
-    authKey = "",
-    transport = AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP,
-    timeoutSeconds = 30,
-    enabled = true,
-    rawJson = """
-        {
-          "protocolVersion": "2025-06-18",
-          "headers": {}
-        }
-    """.trimIndent(),
-    tools = emptyList(),
+    id = AppSettings.newId(), name = "MCP Server", url = "", authKey = "",
+    transport = AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP, timeoutSeconds = 30,
+    enabled = true, rawJson = "{}", tools = emptyList(),
 )
-
 internal fun transportLabel(transport: String): String = when (transport) {
     AppSettings.MCP_TRANSPORT_SSE -> "SSE"
     else -> "Streamable HTTP"

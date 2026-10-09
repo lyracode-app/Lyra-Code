@@ -2362,9 +2362,14 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="github_acceleration_title">GitHub 加速链接</string>
     <string name="github_acceleration_entry_desc">管理下载备用链接，测试 GitHub 连通性</string>
     <string name="github_acceleration_enable">自动切换加速链接</string>
-    <string name="github_acceleration_description">先使用原地址下载。失败、超时或无法连接时，按下方顺序尝试已启用的加速链接。设置自动保存，关闭自动切换后仍可手动测试。</string>
-    <string name="github_acceleration_test_url">待测试的 GitHub 下载地址</string>
-    <string name="github_acceleration_test_hint">使用同一个下载地址测试，最多读取 4 KB。APK/ZIP 地址还会检查文件头。</string>
+    <string name="github_acceleration_description">优先从 GitHub 下载，失败或超时后依次尝试已启用的线路。</string>
+    <string name="github_acceleration_test_url">GitHub 下载地址</string>
+    <string name="github_acceleration_test_hint">最多读取 4 KB，测试下载连通性并检查 APK/ZIP 文件头。</string>
+    <string name="github_acceleration_automatic_section">自动选择</string>
+    <string name="github_acceleration_test_section">测试下载</string>
+    <string name="github_acceleration_routes_section">加速线路</string>
+    <string name="github_acceleration_default_section">默认线路</string>
+    <string name="github_acceleration_edit_test_url">修改测试下载地址</string>
     <string name="github_acceleration_invalid_test_url">请输入有效的 GitHub 下载地址。</string>
     <string name="github_acceleration_direct">GitHub 直连</string>
     <string name="github_acceleration_add">添加加速链接</string>
@@ -2381,6 +2386,19 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="github_acceleration_download_direct">正在从原地址下载</string>
     <string name="github_acceleration_download_via">正在通过 %1$s 重试下载</string>
     <string name="github_acceleration_download_complete">下载完成</string>
+    <string name="mcp_tools_open_hint">查看工具完整名称、详细简介和参数说明</string>
+    <string name="mcp_tools_page_title">MCP 工具</string>
+    <string name="mcp_tool_details">工具详情</string>
+    <string name="mcp_tool_parameters">参数说明（JSON Schema）</string>
+    <string name="mcp_tool_parameters_hint">完整参数定义，包含类型、必填项、默认值、嵌套结构和各字段说明，可长按复制。</string>
+    <string name="mcp_tools_unavailable">工具已移除或尚未拉取，请返回服务器页面重新拉取。</string>
+    <string name="mcp_edit_raw_json">编辑原始 JSON</string>
+    <string name="mcp_raw_json_hint">连接严格使用此 JSON。自定义字段与请求头原样保留，Authorization 不会自动添加 Bearer 前缀。保存后返回配置页面。</string>
+    <string name="mcp_auth_verbatim_hint">Authorization 按输入原值发送。仅在服务器要求时填写 Bearer 前缀；自定义认证请编辑原始 JSON。</string>
+    <string name="mcp_protocol_version">MCP 协议版本</string>
+    <string name="mcp_protocol_auto">自动探测（兼容新旧版本）</string>
+    <string name="mcp_protocol_stateless">2026-07-28（无状态）</string>
+    <string name="mcp_local_protocol_hint">本机服务同时支持新旧版本。选择外部客户端使用的协议版本以生成连接配置。</string>
 </resources>
 
 
