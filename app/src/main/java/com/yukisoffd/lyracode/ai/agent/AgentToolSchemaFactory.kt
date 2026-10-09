@@ -262,7 +262,7 @@ internal class AgentToolSchemaFactory(
         .put(
             functionWithOptional(
                 "manage_app_config",
-                "Manage MCP, SSH, email (IMAP/SMTP), WebDAV, FTP/FTPS/SFTP, Skill, and Agent-tool configuration when the user asks to add, update, enable, disable, or delete it. If the target is ambiguous, call target=all action=list and inspect disabled_summary. Ask for missing account credentials; never invent them. Agent tools can only be enabled or disabled, and manage_app_config itself cannot be disabled.",
+                "Manage MCP, SSH, email (IMAP/SMTP), WebDAV, FTP/FTPS/SFTP, Skill, and Agent-tool configuration when the user asks to add, update, enable, disable, or delete it. For MCP, list returns raw_json: edit that complete JSON and submit raw_json (string) or config_json (object) with the existing id. This replaces the connection JSON exactly, preserving custom fields and headers; it takes precedence over url/auth_key/transport. Authorization values are used verbatim: include Bearer only when required by that server. Removing a header removes authentication; no old key is inherited. protocolVersion supports 2025-11-25 (initialize), 2026-07-28 (stateless Streamable HTTP), and older legacy revisions; omit it for automatic detection. Without raw_json/config_json, only supplied basic fields are patched. If the target is ambiguous, call target=all action=list and inspect disabled_summary. Ask for missing account credentials; never invent them. Agent tools can only be enabled or disabled, and manage_app_config itself cannot be disabled.",
                 required = listOf("target" to "string", "action" to "string"),
                 optional = listOf(
                     "id" to "string",
@@ -270,6 +270,8 @@ internal class AgentToolSchemaFactory(
                     "description" to "string",
                     "url" to "string",
                     "raw_json" to "string",
+                    "config_json" to "object",
+                    "protocol_version" to "string",
                     "auth_key" to "string",
                     "transport" to "string",
                     "timeout_seconds" to "integer",

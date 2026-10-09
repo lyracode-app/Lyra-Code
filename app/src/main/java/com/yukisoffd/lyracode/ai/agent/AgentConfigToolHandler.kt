@@ -8,6 +8,7 @@ import com.yukisoffd.lyracode.data.SkillPack
 import com.yukisoffd.lyracode.data.SshServerConfig
 import com.yukisoffd.lyracode.data.WebDavServerConfig
 import com.yukisoffd.lyracode.filetransfer.FileTransferClient
+import com.yukisoffd.lyracode.mcp.mcpConfigurationUpdate
 import com.yukisoffd.lyracode.mcp.McpClientManager
 import com.yukisoffd.lyracode.webdav.WebDavClient
 import okhttp3.OkHttpClient
@@ -58,53 +59,23 @@ internal class AgentConfigToolHandler(
             "delete", "remove" -> {
                 val target = existing ?: error("MCP server to delete was not found. List configured servers and use an exact id or name.")
                 settings.deleteMcpServer(target.id)
+                mcpClientManager.invalidate(target.id)
                 return configResult("mcp_server_deleted", JSONObject().put("id", target.id).put("name", target.name)).toString()
             }
             "enable", "disable" -> {
                 val target = existing ?: error("MCP server to $action was not found. List configured servers and use an exact id or name.")
                 settings.setMcpServerEnabled(target.id, action == "enable")
+                if (action == "disable") mcpClientManager.invalidate(target.id)
                 return configResult("mcp_server_${action}d", mcpServerJson(target.copy(enabled = action == "enable"))).toString()
             }
         }
     
-                require(action in setOf("add", "create", "update", "modify", "upsert")) { "MCP does not support action=$action." }
-        val rawJson = args.optString("raw_json").ifBlank { existing?.rawJson.orEmpty() }
-        val parsed = parseMcpRawJson(rawJson)
-        val url = args.optString("url")
-            .ifBlank { args.optString("base_url") }
-            .ifBlank { parsed?.url.orEmpty() }
-            .ifBlank { existing?.url.orEmpty() }
-            .trim()
-                require(url.isNotBlank()) { "MCP url is required. If authentication data is missing, ask the user for the key or complete raw_json." }
-        val name = args.optString("name")
-            .ifBlank { parsed?.name.orEmpty() }
-            .ifBlank { existing?.name.orEmpty() }
-            .ifBlank { "MCP Server" }
-        val authKey = args.optString("auth_key")
-            .ifBlank { args.optString("api_key") }
-            .ifBlank { args.optString("key") }
-            .ifBlank { parsed?.authKey.orEmpty() }
-            .ifBlank { existing?.authKey.orEmpty() }
-        val transport = normalizeMcpTransport(
-            args.optString("transport")
-                .ifBlank { parsed?.transport.orEmpty() }
-                .ifBlank { existing?.transport.orEmpty() },
-        )
-        val timeout = args.optInt("timeout_seconds", existing?.timeoutSeconds ?: 30).coerceIn(5, 300)
-        val enabled = if (args.has("enabled")) args.optBoolean("enabled") else existing?.enabled ?: true
-        val server = McpServerConfig(
-            id = existing?.id ?: args.optString("id").ifBlank { AppSettings.newId() },
-            name = name,
-            url = url,
-            authKey = authKey,
-            transport = transport,
-            timeoutSeconds = timeout,
-            enabled = enabled,
-            rawJson = buildMcpRawJson(rawJson, name, url, authKey, transport),
-            tools = existing?.tools.orEmpty(),
-        )
+        require(action in setOf("add", "create", "update", "modify", "upsert")) { "MCP does not support action=$action." }
+        if (action in setOf("update", "modify")) require(existing != null) { "MCP server to update was not found. List configured servers and use its exact id." }
+        val server = mcpConfigurationUpdate(existing, args)
+        mcpClientManager.invalidate(server.id)
         settings.upsertMcpServer(server)
-        val refresh = if (enabled) {
+        val refresh = if (server.enabled) {
             runCatching { mcpClientManager.testAndRefreshTools(server).getOrThrow() }
         } else {
             Result.success(server.tools)
@@ -116,7 +87,9 @@ internal class AgentConfigToolHandler(
                 .put("server", mcpServerJson(saved))
                 .put("tools_count", saved.tools.size)
                 .put("refresh_ok", refresh.isSuccess)
-                    .put("message", refresh.exceptionOrNull()?.message.orEmpty().ifBlank { "MCP server saved and tools refreshed." }),
+                .put("message", refresh.exceptionOrNull()?.message.orEmpty().ifBlank {
+                    if (server.enabled) "MCP server saved and tools refreshed." else "MCP server saved (disabled)."
+                }),
         ).toString()
     }
     
@@ -455,60 +428,6 @@ internal class AgentConfigToolHandler(
             })
     }
     
-    private data class ParsedMcpRawConfig(
-        val name: String,
-        val url: String,
-        val authKey: String,
-        val transport: String,
-        val serverKey: String,
-    )
-    
-    private fun parseMcpRawJson(rawJson: String): ParsedMcpRawConfig? = runCatching {
-        if (rawJson.isBlank()) return@runCatching null
-        val root = JSONObject(rawJson)
-        val servers = root.optJSONObject("mcpServers")
-        val serverKey = servers?.keys()?.asSequence()?.firstOrNull().orEmpty()
-        val node = if (serverKey.isNotBlank()) servers?.optJSONObject(serverKey) else root
-        node ?: return@runCatching null
-        val headers = node.optJSONObject("headers") ?: root.optJSONObject("headers")
-        val auth = headers?.optString("Authorization").orEmpty().removePrefix("Bearer ").trim()
-        val rawType = node.optString("type").ifBlank { node.optString("transport") }
-        ParsedMcpRawConfig(
-            name = node.optString("name").ifBlank { serverKey.ifBlank { root.optString("name") } },
-            url = node.optString("baseUrl").ifBlank { node.optString("url").ifBlank { root.optString("baseUrl").ifBlank { root.optString("url") } } },
-            authKey = auth,
-            transport = normalizeMcpTransport(rawType),
-            serverKey = serverKey.ifBlank { node.optString("id").ifBlank { "mcp_server" } },
-        )
-    }.getOrNull()
-    
-    fun buildMcpRawJson(rawJson: String, name: String, url: String, authKey: String, transport: String): String {
-        val parsed = parseMcpRawJson(rawJson)
-        val serverKey = parsed?.serverKey?.takeIf { it.isNotBlank() } ?: configKeyPart(name).ifBlank { "mcp_server" }
-        val root = runCatching { JSONObject(rawJson.ifBlank { "{}" }) }.getOrDefault(JSONObject())
-        val servers = root.optJSONObject("mcpServers") ?: JSONObject()
-        val node = servers.optJSONObject(serverKey) ?: JSONObject()
-        node.put("type", if (transport == AppSettings.MCP_TRANSPORT_SSE) "sse" else "streamableHttp")
-        node.put("name", name)
-        node.put("baseUrl", url)
-        val headers = node.optJSONObject("headers") ?: JSONObject()
-        if (authKey.isNotBlank()) {
-            headers.put("Authorization", if (authKey.startsWith("Bearer ", ignoreCase = true)) authKey else "Bearer $authKey")
-        }
-        node.put("headers", headers)
-        servers.put(serverKey, node)
-        root.put("mcpServers", servers)
-        if (!root.has("protocolVersion")) root.put("protocolVersion", "2025-06-18")
-        return root.toString()
-    }
-    
-    fun normalizeMcpTransport(raw: String): String {
-        return when (raw.trim().lowercase(Locale.US)) {
-            "sse" -> AppSettings.MCP_TRANSPORT_SSE
-            else -> AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP
-        }
-    }
-    
     fun configKeyPart(value: String): String {
         return value.lowercase(Locale.US)
             .replace(Regex("[^a-z0-9_]+"), "_")
@@ -570,6 +489,7 @@ internal class AgentConfigToolHandler(
         .put("transport", server.transport)
         .put("timeout_seconds", server.timeoutSeconds)
         .put("enabled", server.enabled)
+        .put("raw_json", server.rawJson)
         .put("tools", JSONArray().also { tools ->
             val disabled = settings.disabledTools()
             server.tools.forEach { tool ->
@@ -577,6 +497,7 @@ internal class AgentConfigToolHandler(
                 tools.put(
                     JSONObject()
                         .put("name", tool.name)
+                        .put("inputSchema", JSONObject(tool.inputSchema))
                         .put("function_name", functionName)
                         .put("description", tool.description)
                         .put("enabled", server.enabled && functionName !in disabled)

@@ -47,6 +47,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -79,6 +80,8 @@ import com.yukisoffd.lyracode.data.AppUpdateInfo
 import com.yukisoffd.lyracode.data.UpdateDownloadProgress
 import com.yukisoffd.lyracode.data.UpdateManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -243,6 +246,9 @@ internal fun AboutSoftwareScreen(
     onUpdateAvailabilityChange: (Boolean) -> Unit,
     onOpenDeviceInfo: () -> Unit,
     onOpenServiceAgreements: () -> Unit,
+    onOpenGitHubAcceleration: (String) -> Unit,
+    updateInfoState: MutableState<AppUpdateInfo?> = remember { mutableStateOf(null) },
+    showUpdateDialog: Boolean = true,
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -267,7 +273,7 @@ internal fun AboutSoftwareScreen(
     } ?: uiText(R.string.device_battery_unknown)
     var notice by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }
-    var updateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var updateInfo by updateInfoState
     var downloadProgress by remember { mutableStateOf<UpdateDownloadProgress?>(null) }
     var downloading by remember { mutableStateOf(false) }
     var pendingApk by remember { mutableStateOf(updateManager.pendingDownloadedApk()) }
@@ -363,11 +369,12 @@ internal fun AboutSoftwareScreen(
         }
     }
 
-    updateInfo?.let { info ->
+    updateInfo?.takeIf { showUpdateDialog }?.let { info ->
         UpdateDialog(
             info = info,
             progress = downloadProgress,
             downloading = downloading,
+            onOpenGitHubAcceleration = onOpenGitHubAcceleration,
             onDismiss = {
                 if (!downloading) {
                     updateInfo = null
@@ -384,7 +391,11 @@ internal fun AboutSoftwareScreen(
                 downloadProgress = UpdateDownloadProgress(status = uiText(R.string.notice_preparing_download))
                 scope.launch {
                     val result = withContext(Dispatchers.IO) {
-                        updateManager.downloadApk(info) { progress -> downloadProgress = progress }
+                        val downloadContext = currentCoroutineContext()
+                        updateManager.downloadApk(info) { progress ->
+                            downloadContext.ensureActive()
+                            downloadProgress = progress
+                        }
                     }
                     downloading = false
                     result.fold(
@@ -497,6 +508,18 @@ internal fun AboutSoftwareScreen(
                     value = if (checking) context.getString(R.string.action_checking_update) else if (updateAvailable) context.getString(R.string.notice_new_version_found) else context.getString(R.string.action_check_update),
                     updateAvailable = updateAvailable,
                     onClick = ::checkUpdate,
+                )
+                KimiDivider()
+                KimiMenuRow(
+                    Icons.Default.Speed,
+                    uiText(R.string.github_acceleration_title),
+                    uiText(R.string.github_acceleration_entry_desc),
+                    onClick = {
+                        onOpenGitHubAcceleration(
+                            updateManager.latestAvailableUpdate()?.apkUrl
+                                ?: com.yukisoffd.lyracode.data.GITHUB_CONNECTIVITY_TEST_URL,
+                        )
+                    },
                 )
                 pendingApk?.let { apk ->
                     KimiDivider()
@@ -841,6 +864,7 @@ internal fun UpdateDialog(
     onDismiss: () -> Unit,
     onOpenWeb: () -> Unit,
     onDownload: () -> Unit,
+    onOpenGitHubAcceleration: (String) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -854,6 +878,11 @@ internal fun UpdateDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                TextButton(onClick = { onOpenGitHubAcceleration(info.apkUrl) }, enabled = !downloading) {
+                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(uiText(R.string.github_acceleration_title))
+                }
                 if (info.mandatory) {
                     Text(uiText(R.string.notice_mandatory_update), color = MaterialTheme.colorScheme.error)
                 }

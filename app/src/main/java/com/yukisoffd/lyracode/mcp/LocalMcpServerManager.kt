@@ -11,15 +11,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class LocalMcpServerStatus(
@@ -128,71 +125,26 @@ class LocalMcpServerManager(private val settings: AppSettings) {
 
     private fun handleClient(socket: Socket, config: LocalMcpServerConfig) {
         socket.use { client ->
-            val reader = BufferedReader(InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8))
-            val requestLine = reader.readLine().orEmpty()
-            if (requestLine.isBlank()) return
-            val parts = requestLine.split(" ")
-            val method = parts.getOrNull(0).orEmpty().uppercase(Locale.US)
-            val path = parts.getOrNull(1).orEmpty()
-            val headers = readHeaders(reader)
+            client.soTimeout = 30_000
+            val request = runCatching { readMcpHttpRequest(client.getInputStream().buffered()) }.getOrElse {
+                writeJson(client.getOutputStream(), rpcError(null, -32600, it.message ?: "Invalid HTTP request"), 400)
+                return
+            }
+            val output = client.getOutputStream()
             when {
-                method == "OPTIONS" -> writeResponse(client.getOutputStream(), 204, "")
-                method == "GET" -> writeJson(client.getOutputStream(), statusJson())
-                method == "POST" && path.substringBefore("?") == "/mcp" -> {
-                    if (!authorized(config, headers)) {
-                        writeJson(client.getOutputStream(), rpcError(null, -32001, "未授权"), 401)
-                        return
-                    }
-                    val length = headers["content-length"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-                    val body = readBody(reader, length)
-                    val response = handleRpc(body)
-                    if (response == null) {
-                        writeResponse(client.getOutputStream(), 202, "")
-                    } else {
-                        writeJson(client.getOutputStream(), response)
-                    }
+                request.method == "OPTIONS" -> writeResponse(output, 204, "")
+                !authorized(config, request.headers) -> writeJson(output, rpcError(null, -32001, "未授权"), 401)
+                request.method == "GET" && request.path in setOf("/", "/status") -> writeJson(output, statusJson())
+                request.path == "/mcp" && request.method != "POST" -> writeJson(output, rpcError(null, -32600, "Only POST /mcp is supported"), 405)
+                request.method == "POST" && request.path == "/mcp" -> {
+                    val reply = McpServerProtocol(::toolsForMcp, ::callTool).handle(request.body, request.headers)
+                    if (reply.body == null) writeResponse(output, reply.status, "")
+                    else writeJson(output, reply.body, reply.status)
                 }
-                else -> writeJson(client.getOutputStream(), rpcError(null, -32600, "只支持 POST /mcp"), 404)
+                else -> writeJson(output, rpcError(null, -32600, "Only POST /mcp is supported"), 404)
             }
         }
     }
-
-    private fun readBody(reader: BufferedReader, length: Int): String {
-        if (length <= 0) return ""
-        val buffer = CharArray(length)
-        var offset = 0
-        while (offset < length) {
-            val read = reader.read(buffer, offset, length - offset)
-            if (read <= 0) break
-            offset += read
-        }
-        return buffer.concatToString(0, offset)
-    }
-
-    private fun handleRpc(body: String): JSONObject? {
-        val payload = runCatching { JSONObject(body) }.getOrNull()
-            ?: return rpcError(null, -32700, "JSON 解析失败")
-        val hasId = payload.has("id")
-        val id = if (hasId) payload.opt("id") else null
-        val method = payload.optString("method")
-        val params = payload.optJSONObject("params") ?: JSONObject()
-        val result = when (method) {
-            "initialize" -> JSONObject()
-                .put("protocolVersion", "2025-06-18")
-                .put("capabilities", JSONObject().put("tools", JSONObject().put("listChanged", true)))
-                .put("serverInfo", JSONObject().put("name", "Lyra Code").put("version", "1"))
-            "notifications/initialized" -> return null
-            "tools/list" -> JSONObject().put("tools", toolsForMcp())
-            "tools/call" -> callTool(params)
-            else -> return if (hasId) rpcError(id, -32601, "未知 MCP 方法: $method") else null
-        }
-        if (!hasId) return null
-        return JSONObject()
-            .put("jsonrpc", "2.0")
-            .put("id", id)
-            .put("result", result)
-    }
-
     private fun toolsForMcp(): JSONArray {
         val definitions = agent?.localMcpToolDefinitions() ?: JSONArray()
         val tools = JSONArray()
@@ -227,26 +179,7 @@ class LocalMcpServerManager(private val settings: AppSettings) {
             .put("isError", isError)
     }
 
-    private fun rpcError(id: Any?, code: Int, message: String): JSONObject {
-        return JSONObject()
-            .put("jsonrpc", "2.0")
-            .put("id", id)
-            .put("error", JSONObject().put("code", code).put("message", message))
-    }
-
-    private fun readHeaders(reader: BufferedReader): Map<String, String> {
-        val headers = mutableMapOf<String, String>()
-        while (true) {
-            val line = reader.readLine() ?: break
-            if (line.isBlank()) break
-            val separator = line.indexOf(':')
-            if (separator > 0) {
-                headers[line.substring(0, separator).trim().lowercase(Locale.US)] = line.substring(separator + 1).trim()
-            }
-        }
-        return headers
-    }
-
+    private fun rpcError(id: Any?, code: Int, message: String): JSONObject = McpProtocol.error(id, code, message)
     private fun authorized(config: LocalMcpServerConfig, headers: Map<String, String>): Boolean {
         val key = config.authKey.trim()
         if (key.isBlank()) return true
@@ -274,6 +207,8 @@ class LocalMcpServerManager(private val settings: AppSettings) {
             200 -> "OK"
             202 -> "Accepted"
             204 -> "No Content"
+            400 -> "Bad Request"
+            405 -> "Method Not Allowed"
             401 -> "Unauthorized"
             404 -> "Not Found"
             else -> "OK"
@@ -283,8 +218,9 @@ class LocalMcpServerManager(private val settings: AppSettings) {
                 append("HTTP/1.1 $status $reason\r\n")
                 append("Content-Type: application/json; charset=utf-8\r\n")
                 append("Access-Control-Allow-Origin: *\r\n")
-                append("Access-Control-Allow-Headers: Content-Type, Authorization, X-Lyra-MCP-Key, X-API-Key, Api-Key, Mcp-Protocol-Version\r\n")
+                append("Access-Control-Allow-Headers: Content-Type, Authorization, X-Lyra-MCP-Key, X-API-Key, Api-Key, Mcp-Protocol-Version, Mcp-Method, Mcp-Name\r\n")
                 append("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n")
+                if (status == 405) append("Allow: POST, OPTIONS\r\n")
                 append("Content-Length: ${bytes.size}\r\n")
                 append("Connection: close\r\n\r\n")
             }.toByteArray(StandardCharsets.UTF_8),

@@ -6,12 +6,11 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.yukisoffd.lyracode.R
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 data class AppUpdateInfo(
@@ -50,6 +49,11 @@ class UpdateManager(private val context: Context) {
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
+    private val accelerationSettings = GitHubAccelerationSettings(appContext)
+    private val apkDownloader = UpdateApkDownloader(
+        client.newBuilder().readTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(false).build(),
+        "LyraCode/${currentVersionCode()} AndroidUpdateClient",
+    )
 
     fun manifestUrl(): String = com.yukisoffd.lyracode.BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim()
 
@@ -188,68 +192,22 @@ class UpdateManager(private val context: Context) {
         onProgress: (UpdateDownloadProgress) -> Unit,
     ): Result<File> = runCatching {
         require(info.apkUrl.startsWith("https://") || info.apkUrl.startsWith("http://")) { "安装包下载地址无效" }
-        val request = Request.Builder()
-            .url(info.apkUrl)
-            .header("Accept", "application/vnd.android.package-archive, application/octet-stream, */*")
-            .header("Accept-Encoding", "identity")
-            .header("User-Agent", "LyraCode/${currentVersionCode()} AndroidUpdateClient")
-            .get()
-            .build()
-        client.newCall(request).execute().use { response ->
-            require(response.isSuccessful) { "下载安装包失败：HTTP ${response.code}" }
-            val body = response.body ?: error("下载安装包失败：响应为空")
-            val total = body.contentLength()
-            val contentType = body.contentType()?.toString().orEmpty()
-            val outputDir = updateDownloadDir().also { it.mkdirs() }
-            val output = File(outputDir, "LyraCode-${info.versionName.ifBlank { info.versionCode.toString() }}.apk")
-            val partial = File(outputDir, "${output.name}.part")
-            if (partial.exists()) partial.delete()
-            body.byteStream().use { input ->
-                partial.outputStream().use { outputStream ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var downloaded = 0L
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        outputStream.write(buffer, 0, read)
-                        downloaded += read
-                        onProgress(UpdateDownloadProgress(downloaded, total, "正在下载"))
-                    }
-                }
-            }
-            require(partial.length() > 0L) {
-                partial.delete()
-                "下载安装包失败：文件为空"
-            }
-            require(isZipApk(partial)) {
-                val head = firstBytesHex(partial)
-                val length = partial.length()
-                partial.delete()
-                "下载到的不是 APK 文件。contentType=${contentType.ifBlank { "unknown" }}，size=$length，head=$head"
-            }
-            if (info.apkSha256.isNotBlank()) {
-                val actual = sha256(partial)
-                val expected = normalizeSha256(info.apkSha256)
-                require(expected != null) {
-                    partial.delete()
-                    "更新清单中的 apkSha256 格式无效"
-                }
-                require(actual.equals(expected, ignoreCase = true)) {
-                    val size = partial.length()
-                    partial.delete()
-                    "安装包校验失败：SHA-256 不一致\n期望：$expected\n实际：$actual\nsize=$size，contentType=${contentType.ifBlank { "unknown" }}"
-                }
-            }
-            if (output.exists()) output.delete()
-            require(partial.renameTo(output)) {
-                partial.delete()
-                "保存安装包失败"
-            }
-            pruneCachedUpdateArtifacts(keepFile = output)
-            savePendingApk(output, info)
-            onProgress(UpdateDownloadProgress(total.coerceAtLeast(output.length()), total, "下载完成"))
-            output
+        val version = info.versionName.ifBlank { info.versionCode.toString() }.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val output = File(updateDownloadDir(), "LyraCode-$version.apk")
+        val file = apkDownloader.download(
+            targets = githubDownloadTargets(info.apkUrl, accelerationSettings.load()),
+            output = output,
+            expectedSha256 = info.apkSha256,
+        ) { target, downloaded, total ->
+            val status = target.acceleratorName?.let {
+                context.getString(R.string.github_acceleration_download_via, it)
+            } ?: context.getString(R.string.github_acceleration_download_direct)
+            onProgress(UpdateDownloadProgress(downloaded, total, status))
         }
+        pruneCachedUpdateArtifacts(keepFile = file)
+        savePendingApk(file, info)
+        onProgress(UpdateDownloadProgress(file.length(), file.length(), context.getString(R.string.github_acceleration_download_complete)))
+        file
     }
 
     fun pendingDownloadedApk(): File? {
@@ -278,7 +236,7 @@ class UpdateManager(private val context: Context) {
         }
         val expected = prefs.getString(KEY_PENDING_APK_SHA256, "").orEmpty()
         if (expected.isNotBlank()) {
-            val valid = runCatching { sha256(file).equals(expected, ignoreCase = true) }.getOrDefault(false)
+            val valid = runCatching { apkSha256(file).equals(expected, ignoreCase = true) }.getOrDefault(false)
             if (!valid) {
                 clearPendingApk()
                 pruneCachedUpdateArtifacts()
@@ -379,49 +337,10 @@ class UpdateManager(private val context: Context) {
         }
     }
 
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun normalizeSha256(value: String): String? {
-        val trimmed = value.trim().removePrefix("sha256:").removePrefix("SHA256:")
-        val hex = trimmed.replace(Regex("[^0-9a-fA-F]"), "")
-        if (hex.length == 64) return hex.lowercase()
-        return runCatching {
-            val decoded = Base64.getDecoder().decode(trimmed)
-            if (decoded.size == 32) decoded.joinToString("") { "%02x".format(it) } else null
-        }.getOrNull()
-    }
-
-    private fun isZipApk(file: File): Boolean {
-        val header = ByteArray(4)
-        val read = file.inputStream().use { it.read(header) }
-        if (read < 4) return false
-        return header[0] == 0x50.toByte() &&
-            header[1] == 0x4B.toByte() &&
-            header[2] in listOf(0x03.toByte(), 0x05.toByte(), 0x07.toByte()) &&
-            header[3] in listOf(0x04.toByte(), 0x06.toByte(), 0x08.toByte())
-    }
-
-    private fun firstBytesHex(file: File, count: Int = 16): String {
-        val bytes = ByteArray(count)
-        val read = file.inputStream().use { it.read(bytes) }.coerceAtLeast(0)
-        return bytes.take(read).joinToString(" ") { "%02x".format(it) }
-    }
-
     private fun savePendingApk(file: File, info: AppUpdateInfo) {
         prefs.edit()
             .putString(KEY_PENDING_APK_PATH, file.absolutePath)
-            .putString(KEY_PENDING_APK_SHA256, normalizeSha256(info.apkSha256).orEmpty())
+            .putString(KEY_PENDING_APK_SHA256, normalizeApkSha256(info.apkSha256).orEmpty())
             .putString(KEY_PENDING_VERSION_NAME, info.versionName)
             .putLong(KEY_PENDING_VERSION_CODE, info.versionCode)
             .apply()
@@ -465,12 +384,11 @@ internal fun parseReleaseUpdateInfo(json: JSONObject, fallbackWebUrl: String): A
     val tagName = json.optString("tag_name").trim()
     require(versionComponents(tagName) != null) { "Release 缺少可识别的版本号" }
     val assets = json.optJSONArray("assets") ?: error("Release 缺少安装包")
-    val apkUrl = (0 until assets.length())
+    val apkAsset = (0 until assets.length())
         .asSequence()
         .mapNotNull { assets.optJSONObject(it) }
         .firstOrNull { asset -> asset.optString("name").endsWith(".apk", ignoreCase = true) }
-        ?.optString("browser_download_url")
-        .orEmpty()
+    val apkUrl = apkAsset?.optString("browser_download_url").orEmpty()
     require(apkUrl.startsWith("https://") || apkUrl.startsWith("http://")) {
         "Release 缺少 APK 的 browser_download_url"
     }
@@ -480,7 +398,7 @@ internal fun parseReleaseUpdateInfo(json: JSONObject, fallbackWebUrl: String): A
         versionName = versionName,
         versionCode = 0L,
         apkUrl = apkUrl,
-        apkSha256 = "",
+        apkSha256 = apkAsset?.takeUnless { it.isNull("digest") }?.optString("digest").orEmpty(),
         releaseNotes = json.optString("body").ifBlank { "发现新版本，暂无更新说明。" },
         releaseNotesUrl = webUrl,
         webUrl = webUrl,
