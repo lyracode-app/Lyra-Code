@@ -64,6 +64,28 @@ import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 
+/**
+ * Parent conversations that currently have a run_sub_agents call in flight.
+ *
+ * Steering stays available while a sub-agent batch runs, but the steer can only be drained
+ * after the batch returns to the parent agent loop. Kept separate from the agent's tool
+ * registry so the state transition is unit-testable without Android dependencies.
+ */
+internal class SubAgentRunRegistry {
+    private val running = ConcurrentHashMap.newKeySet<Long>()
+
+    fun begin(conversationId: Long) {
+        running += conversationId
+    }
+
+    fun end(conversationId: Long) {
+        running -= conversationId
+    }
+
+    fun isRunning(conversationId: Long): Boolean = conversationId in running
+}
+
+
 class OpenAiAgent(
     private val context: Context,
     private val settings: AppSettings,
@@ -87,8 +109,14 @@ class OpenAiAgent(
     private val prootCommandExecutor = ProotCommandExecutor(context)
 
     internal var scopedTools: ScopedAgentTools? = null
+    internal var steerSource: SteerSource = NoOpSteerSource
     internal fun cancelScopedRequests() { if (scopedTools != null) client.dispatcher.cancelAll() }
     private fun scopedToolsFor(conversationId: Long) = scopedTools?.takeIf { it.conversationId == conversationId }
+    private val subAgentRuns = SubAgentRunRegistry()
+    /** Notified when a sub-agent batch starts or ends so the composer can refresh its note. */
+    internal var subAgentRunStateChanged: (() -> Unit)? = null
+    /** True while [runSubAgents] is executing for this parent conversation. */
+    internal fun isSubAgentRunning(conversationId: Long): Boolean = subAgentRuns.isRunning(conversationId)
 
     var approvalHandler: suspend (ToolApprovalRequest) -> ToolApprovalDecision = { ToolApprovalDecision.Approved }
     var todoSetHandler: suspend (Long, List<TodoItem>) -> String = { _, _ -> "TODO list recorded." }
@@ -561,6 +589,10 @@ class OpenAiAgent(
                     }
                     it.checkRound()
                 }
+                // Steer boundary A: only at the top of a round, after the previous round's tool
+                // results were appended and before the next assistant turn. Never inject a user
+                // message between an assistant tool_call and its tool results.
+                drainSteering(conversationId, profile, model, onUpdate)
                 if (!isMediaGenerationModel(model)) {
                     ensureRuntimeContextSnapshot(conversationId, profile, model)
                 }
@@ -622,7 +654,16 @@ class OpenAiAgent(
                         deepSeekCacheHitRate = result.deepSeekCacheHitRate,
                     ),
                 )
-                if (result.toolCalls.isEmpty()) {
+                // Steer boundary B: a steer can arrive while the final response streams. Drain
+                // only when this turn produced no tool calls, after every tool result of this run
+                // was appended, then let the shared decision end the run or continue the loop.
+                // With the default no-op source this is exactly the previous exit.
+                val steered = if (result.toolCalls.isEmpty()) {
+                    drainSteering(conversationId, profile, model, onUpdate)
+                } else {
+                    false
+                }
+                if (runBoundaryAfterTurn(result.toolCalls.isNotEmpty(), steered) == RunBoundary.Return) {
                     conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_IDLE, profileId = profile.id, model = model)
                     return
                 }
@@ -696,6 +737,31 @@ class OpenAiAgent(
             onUpdate(ChatUpdate(finalError, "", finalError, errorMessageId))
             if (propagateErrors) throw error
         }
+    }
+
+    /**
+     * Persists queued steer texts as ordinary user turns and reports whether anything was drained.
+     *
+     * Scoped (foreground/sub-agent) runs own their conversation, so steering is refused there.
+     * With the default [NoOpSteerSource] this performs no store write, no update and no status change.
+     */
+    private suspend fun drainSteering(
+        conversationId: Long,
+        profile: ApiProfile,
+        model: String,
+        onUpdate: suspend (ChatUpdate) -> Unit,
+    ): Boolean {
+        if (!steeringAvailable(hasScopedTools = scopedToolsFor(conversationId) != null)) return false
+        var drained = false
+        for (text in steerSource.drain(conversationId)) {
+            if (text.isBlank()) continue
+            conversationStore.addMessage(conversationId, "user", text, profileId = profile.id, model = model)
+            // A zero message id makes the controller reload history, which inserts the steered
+            // user bubble as a normal turn; the next provider request is built from the store.
+            onUpdate(ChatUpdate("", "", uiText(R.string.status_message_steered), forceReload = true))
+            drained = true
+        }
+        return drained
     }
 
     private fun runningToolStatus(call: ToolCall): String {
@@ -1383,11 +1449,30 @@ class OpenAiAgent(
         val messages = JSONArray()
         if (mediaGeneration) {
             mediaGenerationHistory(conversationId, excludeMessageId).forEach {
-                messages.put(it.toPromptJson(routeVisualAttachments = false))
+                messages.put(
+                    it.toPromptJson(
+                        routeVisualAttachments = false,
+                        renderAttachments = { content, messageId, routeVisualAttachments ->
+                            userPromptWithAttachments(content, messageId, routeVisualAttachments)
+                        },
+                    ),
+                )
             }
         } else {
             systemMessagesFor(conversationId).forEach(messages::put)
-            val history = openAiHistoryGroups(conversationId, excludeMessageId, profile)
+            val history = openAiHistoryGroups(
+                source = contextHistory(conversationId, excludeMessageId),
+                toPromptJson = { message ->
+                    message.toPromptJson(
+                        routeVisualAttachments = settings.isVisionSupplementRoutingEnabled(),
+                        renderAttachments = { content, messageId, routeVisualAttachments ->
+                            userPromptWithAttachments(content, messageId, routeVisualAttachments)
+                        },
+                    )
+                },
+                toToolPromptJson = { it.toToolPromptJson() },
+                adapt = { message, json -> chatGptHistoryForService(json, message.profileId, profile) },
+            )
             history.forEach { group ->
                 group.forEach { messages.put(it) }
             }
@@ -1578,36 +1663,17 @@ class OpenAiAgent(
 
     private fun contextHistory(conversationId: Long, excludeMessageId: Long): List<ChatMessage> {
         val conversation = conversationStore.conversation(conversationId)
-        val source = conversationStore.messages(conversationId)
-            .filter {
-                    it.id != excludeMessageId &&
-                    (!settings.purePromptMode || it.role != RUNTIME_CONTEXT_ROLE) &&
-                    it.id > (conversation?.compressedThroughMessageId ?: 0L) &&
-                    it.role != MEDIA_MESSAGE_ROLE &&
-                    !it.isLocalRequestErrorMessage() &&
-                    !it.isEmptyAssistantPlaceholder()
-            }
-        val summary = conversation?.compressedContext.orEmpty().trim()
-        if (summary.isBlank()) return source
-        val compressedContextMarker = if (summary.startsWith("LYRA_STRUCTURED_CONTEXT_V2")) {
-            "LYRA_COMPRESSED_CONVERSATION_CONTEXT_V2"
-        } else {
-            "LYRA_COMPRESSED_CONVERSATION_CONTEXT_V1"
-        }
-        return listOf(
-            ChatMessage(
-                id = conversation?.compressedThroughMessageId ?: 0L,
-                conversationId = conversationId,
-                role = "user",
-                content = "$compressedContextMarker\n$summary\n\nThe content above is a compressed summary of earlier conversation history. Treat it as prior conversation facts and continue the current task.",
-                thinking = "",
-                profileId = conversation?.profileId.orEmpty(),
-                model = conversation?.model.orEmpty(),
-                toolCallId = null,
-                rawJson = null,
-                createdAt = conversation?.updatedAt ?: System.currentTimeMillis(),
-            ),
-        ) + source
+        return selectContextHistory(
+            messages = conversationStore.messages(conversationId),
+            excludeMessageId = excludeMessageId,
+            compressedThroughMessageId = conversation?.compressedThroughMessageId ?: 0L,
+            compressedContext = conversation?.compressedContext.orEmpty(),
+            purePromptMode = settings.purePromptMode,
+            summaryConversationId = conversationId,
+            summaryProfileId = conversation?.profileId.orEmpty(),
+            summaryModel = conversation?.model.orEmpty(),
+            summaryCreatedAt = conversation?.updatedAt ?: System.currentTimeMillis(),
+        )
     }
 
     private fun anthropicMessages(
@@ -1617,51 +1683,16 @@ class OpenAiAgent(
         model: String,
         mediaGeneration: Boolean = false,
     ): JSONArray {
-        val output = JSONArray()
-        val source = providerHistory(conversationId, excludeMessageId, mediaGeneration)
-        var index = 0
-        while (index < source.size) {
-            val message = source[index]
-            when (message.role) {
-                "user", RUNTIME_CONTEXT_ROLE -> output.put(
-                    JSONObject().put("role", "user").put(
-                        "content",
-                        anthropicUserContent(
-                            message.content,
-                            message.id,
-                            routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
-                        ),
-                    ),
+        val output = buildAnthropicMessages(
+            source = providerHistory(conversationId, excludeMessageId, mediaGeneration),
+            userContent = { message ->
+                anthropicUserContent(
+                    message.content,
+                    message.id,
+                    routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
                 )
-                "assistant" -> {
-                    val toolUseIds = message.anthropicToolUseIds()
-                    if (toolUseIds.isEmpty()) {
-                        output.put(JSONObject().put("role", "assistant").put("content", anthropicAssistantContent(message)))
-                    } else {
-                        val toolResults = JSONArray()
-                        val returned = mutableSetOf<String>()
-                        var next = index + 1
-                        while (next < source.size && source[next].role == "tool") {
-                            val tool = source[next]
-                            val id = tool.toolCallId.orEmpty()
-                            if (id in toolUseIds) {
-                                toolResults.put(anthropicToolResult(tool))
-                                returned += id
-                            }
-                            next++
-                        }
-                        if (returned.containsAll(toolUseIds)) {
-                            output.put(JSONObject().put("role", "assistant").put("content", anthropicAssistantContent(message)))
-                            output.put(JSONObject().put("role", "user").put("content", toolResults))
-                        }
-                        index = next
-                        continue
-                    }
-                }
-                "tool" -> Unit
-            }
-            index++
-        }
+            },
+        )
         if (supportsDeepSeekFilesApi(profile, model)) deepSeekFilesApi.replaceAnthropicInlineImages(output, profile)
         return output
     }
@@ -1703,68 +1734,22 @@ class OpenAiAgent(
         }
     }
 
-    private fun anthropicAssistantContent(message: ChatMessage): JSONArray {
-        val raw = message.rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
-        return JSONArray().also { output ->
-            val text = cleanGeneratedText(message.content)
-            if (text.isNotBlank()) output.put(JSONObject().put("type", "text").put("text", text))
-            val calls = raw?.optJSONArray("tool_calls") ?: JSONArray()
-            for (index in 0 until calls.length()) {
-                val call = calls.optJSONObject(index) ?: continue
-                val function = call.optJSONObject("function") ?: JSONObject()
-                val args = runCatching { JSONObject(function.optString("arguments").ifBlank { "{}" }) }.getOrElse { JSONObject() }
-                output.put(
-                    JSONObject()
-                        .put("type", "tool_use")
-                        .put("id", call.optString("id").ifBlank { "tool_$index" })
-                        .put("name", function.optString("name"))
-                        .put("input", args),
-                )
-            }
-            if (output.length() == 0) output.put(JSONObject().put("type", "text").put("text", " "))
-        }
-    }
-
-    private fun anthropicToolResult(message: ChatMessage): JSONObject {
-        return JSONObject()
-            .put("type", "tool_result")
-            .put("tool_use_id", message.toolCallId.orEmpty())
-            .put("content", message.content)
-    }
-
-    private fun ChatMessage.anthropicToolUseIds(): Set<String> {
-        val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return emptySet()
-        val calls = raw.optJSONArray("tool_calls") ?: return emptySet()
-        return buildSet {
-            for (index in 0 until calls.length()) {
-                calls.optJSONObject(index)?.optString("id").orEmpty().takeIf { it.isNotBlank() }?.let { add(it) }
-            }
-        }
-    }
-
     private fun geminiContents(
         conversationId: Long,
         excludeMessageId: Long,
         mediaGeneration: Boolean = false,
     ): JSONArray {
-        val output = JSONArray()
-        providerHistory(conversationId, excludeMessageId, mediaGeneration).forEach { message ->
-            when (message.role) {
-                "user", RUNTIME_CONTEXT_ROLE -> output.put(
-                    JSONObject().put("role", "user").put(
-                        "parts",
-                        geminiUserParts(
-                            message.content,
-                            message.id,
-                            routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
-                        ),
-                    ),
+        return buildGeminiContents(
+            source = providerHistory(conversationId, excludeMessageId, mediaGeneration),
+            userParts = { message ->
+                geminiUserParts(
+                    message.content,
+                    message.id,
+                    routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
                 )
-                "assistant" -> output.put(JSONObject().put("role", "model").put("parts", geminiAssistantParts(cleanGeneratedText(message.content), message.rawJson)))
-                "tool" -> output.put(JSONObject().put("role", "user").put("parts", JSONArray().put(geminiFunctionResponse(message))))
-            }
-        }
-        return output
+            },
+            toolNameForToolResult = { message -> toolNameForToolResult(message) },
+        )
     }
 
     private fun geminiUserParts(
@@ -1801,16 +1786,6 @@ class OpenAiAgent(
         }
     }
 
-    private fun geminiFunctionResponse(message: ChatMessage): JSONObject {
-        return JSONObject()
-            .put(
-                "functionResponse",
-                JSONObject()
-                    .put("name", toolNameForToolResult(message))
-                    .put("response", JSONObject().put("content", message.content)),
-            )
-    }
-
     private fun toolNameForToolResult(message: ChatMessage): String {
         val previous = conversationStore.messages(message.conversationId)
             .takeWhile { it.id < message.id }
@@ -1830,88 +1805,6 @@ class OpenAiAgent(
     private fun parseDataUrlForProvider(dataUrl: String): Pair<String, String>? {
         val match = Regex("""^data:([^;,]+);base64,(.+)$""", RegexOption.IGNORE_CASE).matchEntire(dataUrl.trim()) ?: return null
         return match.groupValues[1] to match.groupValues[2]
-    }
-
-    private fun sanitizePromptMessageSequence(messages: JSONArray): JSONArray {
-        val output = mutableListOf<JSONObject>()
-        val pendingToolIds = linkedSetOf<String>()
-        var pendingAssistantIndex = -1
-
-        fun dropPendingAssistant() {
-            if (pendingAssistantIndex >= 0 && pendingAssistantIndex < output.size) {
-                while (output.size > pendingAssistantIndex) output.removeAt(output.lastIndex)
-            }
-            pendingAssistantIndex = -1
-            pendingToolIds.clear()
-        }
-
-        for (index in 0 until messages.length()) {
-            val message = messages.getJSONObject(index)
-            when (message.optString("role")) {
-                "tool" -> {
-                    val id = message.optString("tool_call_id")
-                    if (id.isNotBlank() && id in pendingToolIds) {
-                        output += message
-                        pendingToolIds -= id
-                    }
-                }
-                "assistant" -> {
-                    if (pendingToolIds.isNotEmpty()) dropPendingAssistant()
-                    output += message
-                    if (message.hasToolCalls()) {
-                        pendingAssistantIndex = output.lastIndex
-                        pendingToolIds += message.toolCallIds()
-                    } else {
-                        pendingAssistantIndex = -1
-                        pendingToolIds.clear()
-                    }
-                }
-                else -> {
-                    if (pendingToolIds.isNotEmpty()) dropPendingAssistant()
-                    output += message
-                    pendingAssistantIndex = -1
-                    pendingToolIds.clear()
-                }
-            }
-        }
-        if (pendingToolIds.isNotEmpty()) dropPendingAssistant()
-        return JSONArray().also { array -> output.forEach { array.put(it) } }
-    }
-
-    private fun openAiHistoryGroups(conversationId: Long, excludeMessageId: Long, profile: ApiProfile): List<List<JSONObject>> {
-        val source = contextHistory(conversationId, excludeMessageId)
-        val groups = mutableListOf<List<JSONObject>>()
-        var index = 0
-        while (index < source.size) {
-            val message = source[index]
-            if (message.role == "tool") {
-                index++
-                continue
-            }
-            val json = chatGptHistoryForService(message.toPromptJson(), message.profileId, profile)
-            if (json.hasToolCalls()) {
-                val requiredToolIds = json.toolCallIds()
-                val toolMessages = mutableListOf<JSONObject>()
-                var next = index + 1
-                while (next < source.size && source[next].role == "tool") {
-                    val tool = source[next]
-                    val toolCallId = tool.toolCallId.orEmpty()
-                    if (toolCallId in requiredToolIds) {
-                        toolMessages.add(tool.toToolPromptJson())
-                    }
-                    next++
-                }
-                val returnedToolIds = toolMessages.map { it.optString("tool_call_id") }.toSet()
-                if (requiredToolIds.isNotEmpty() && returnedToolIds.containsAll(requiredToolIds)) {
-                    groups.add(listOf(json) + toolMessages)
-                }
-                index = next
-            } else {
-                groups.add(listOf(json))
-                index++
-            }
-        }
-        return groups
     }
 
     private fun applyProviderCacheHints(requestJson: JSONObject, profile: ApiProfile, model: String, conversationId: Long) {
@@ -2647,6 +2540,9 @@ class OpenAiAgent(
             }
         }
         val owners = tasks.indices.associateWith { index -> SubAgentWriteOwner(parentConversationId, index) }
+        subAgentRuns.begin(parentConversationId)
+        subAgentRunStateChanged?.invoke()
+        try {
         val batchReservation = subAgentWriteCoordinator.reserveBatch(
             owners.entries.associate { (index, owner) -> owner to tasks[index].writePaths },
         )
@@ -2738,6 +2634,11 @@ class OpenAiAgent(
             )
         } finally {
             batchReservation.close()
+        }
+        } finally {
+            // Cancellation and tool failures must both clear the wait state.
+            subAgentRuns.end(parentConversationId)
+            subAgentRunStateChanged?.invoke()
         }
     }
 
@@ -3300,33 +3201,6 @@ class OpenAiAgent(
         return userInput.lineSequence().firstOrNull().orEmpty().take(36).ifBlank { "新对话" }
     }
 
-    private fun ChatMessage.toPromptJson(
-        routeVisualAttachments: Boolean = settings.isVisionSupplementRoutingEnabled(),
-    ): JSONObject {
-        val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
-            ?.also {
-                sanitizeAssistantRaw(it)
-                it.remove(GEMINI_REPLAY_PARTS_KEY)
-            }
-        if (raw == null && role == "user" && hasUploadedAttachments(content)) {
-            return userPromptWithAttachments(content, id, routeVisualAttachments)
-        }
-        return raw ?: JSONObject()
-            .put("role", if (role == RUNTIME_CONTEXT_ROLE) "user" else role)
-            .put("content", if (role == "assistant") cleanGeneratedText(content) else content)
-            .apply {
-                if (role == "assistant" && thinking.isNotBlank()) {
-                    put("reasoning_content", cleanGeneratedText(thinking))
-                }
-            }
-    }
-
-    private fun hasUploadedAttachments(content: String): Boolean {
-        return content.contains("<lyra_attachment_v1>") ||
-            content.contains("用户上传媒体：") ||
-            content.contains("用户上传文件：")
-    }
-
     private fun userPromptWithAttachments(
         rawContent: String,
         messageId: Long = 0L,
@@ -3514,34 +3388,6 @@ class OpenAiAgent(
             "aac" in lower || "m4a" in lower -> "mp3"
             "ogg" in lower -> "mp3"
             else -> "mp3"
-        }
-    }
-
-    private fun ChatMessage.toToolPromptJson(): JSONObject = JSONObject()
-        .put("role", "tool")
-        .put("tool_call_id", toolCallId)
-        .put("content", content)
-
-    private fun JSONObject.hasToolCalls(): Boolean {
-        return optString("role") == "assistant" && (optJSONArray("tool_calls")?.length() ?: 0) > 0
-    }
-
-    private fun JSONObject.toolCallIds(): Set<String> {
-        val calls = optJSONArray("tool_calls") ?: return emptySet()
-        return buildSet {
-            for (index in 0 until calls.length()) {
-                calls.optJSONObject(index)?.optString("id").orEmpty().takeIf { it.isNotBlank() }?.let { add(it) }
-            }
-        }
-    }
-
-    private fun sanitizeAssistantRaw(raw: JSONObject) {
-        if (raw.optString("role") != "assistant") return
-        if (raw.has("content") && !raw.isNull("content")) {
-            raw.put("content", cleanGeneratedText(raw.optString("content")))
-        }
-        if (raw.has("reasoning_content") && !raw.isNull("reasoning_content")) {
-            raw.put("reasoning_content", cleanGeneratedText(raw.optString("reasoning_content")))
         }
     }
 
@@ -4075,10 +3921,6 @@ internal fun ChatMessage.isLocalRequestErrorMessage(): Boolean {
 
 internal fun ChatMessage.isEmptyAssistantPlaceholder(): Boolean {
     return role == "assistant" && content.isBlank() && thinking.isBlank() && rawJson.isNullOrBlank()
-}
-
-private fun cleanGeneratedText(text: String): String {
-    return text.replace(Regex("(?:null){4,}", RegexOption.IGNORE_CASE), "").trim()
 }
 
 fun ChatMessage.toRecord(): ChatRecord = ChatRecord(

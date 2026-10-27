@@ -1,5 +1,6 @@
 package com.yukisoffd.lyracode
 
+import com.yukisoffd.lyracode.data.ConversationStore
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -64,5 +65,38 @@ class ConversationRunLifecycleTest {
         try {
             assertEquals("other finished", withTimeout(1_000) { gate.run(2) { "other finished" } })
         } finally { old.cancelAndJoin() }
+    }
+
+    @Test fun cancellationOutcomeWinsOverInterruptedStoreStatus() {
+        assertEquals(
+            ConversationRunOutcome.Cancelled,
+            classifyRunOutcome(CancellationException("stopped"), ConversationStore.STATUS_INTERRUPTED),
+        )
+    }
+
+    @Test fun cancellationOutcomeIsReportedWithoutStoreStatus() {
+        assertEquals(
+            ConversationRunOutcome.Cancelled,
+            classifyRunOutcome(CancellationException("stopped"), null),
+        )
+    }
+
+    @Test fun nonCancellationFailureIsReportedWithItsError() {
+        val failure = IllegalStateException("boom")
+
+        assertEquals(ConversationRunOutcome.Failed(failure), classifyRunOutcome(failure, null))
+    }
+
+    @Test fun cleanReturnWithInterruptedStoreStatusIsReportedAsFailedWithoutError() {
+        assertEquals(
+            ConversationRunOutcome.Failed(null),
+            classifyRunOutcome(null, ConversationStore.STATUS_INTERRUPTED),
+        )
+    }
+
+    @Test fun cleanReturnWithOtherStoreStatusesIsReportedAsCompleted() {
+        assertEquals(ConversationRunOutcome.Completed, classifyRunOutcome(null, ConversationStore.STATUS_RUNNING))
+        assertEquals(ConversationRunOutcome.Completed, classifyRunOutcome(null, ConversationStore.STATUS_IDLE))
+        assertEquals(ConversationRunOutcome.Completed, classifyRunOutcome(null, null))
     }
 }

@@ -1436,6 +1436,47 @@
     <string name="action_fullscreen_input">全屏輸入</string>
     <string name="action_exit_fullscreen_input">退出全屏輸入</string>
     <string name="title_fullscreen_input">全屏輸入</string>
+    <!-- Chat composer queue and steer -->
+    <string name="composer_queue_dock_description">佇列訊息：%1$d</string>
+    <string name="composer_queue_dock_title">%1$d 則佇列訊息</string>
+    <string name="composer_queue_dock_expand">展開佇列訊息</string>
+    <string name="composer_queue_dock_collapse">收合佇列訊息</string>
+    <string name="composer_queue_state_queued">佇列中</string>
+    <string name="composer_queue_state_parked">已暫停</string>
+    <string name="composer_queue_attachment_count">附件：%1$d</string>
+    <string name="composer_queue_remove_description">移除佇列訊息：%1$s</string>
+    <string name="composer_queue_send_now_description">立即傳送：%1$s</string>
+    <string name="composer_queue_steer_description">立即引導佇列訊息：%1$s</string>
+    <string name="composer_queue_missing_attachment">附件缺失：%1$d</string>
+    <string name="status_message_queued">已排隊，等待傳送：%1$d 則</string>
+    <string name="status_message_delivered">正在傳送排隊訊息</string>
+    <string name="status_message_parked">已暫存排隊訊息：%1$d 則</string>
+    <string name="status_message_refused">智慧體執行中，排隊傳送已關閉</string>
+    <string name="status_message_send_now_busy">智慧體執行中，無法立即傳送</string>
+    <string name="status_message_run_busy">請等待目前任務結束後再試。</string>
+    <string name="status_message_profile_unavailable">排隊訊息未傳送：服務商不可用</string>
+    <string name="cd_queue">排隊訊息</string>
+    <string name="composer_steer_unavailable_default">目前無法使用引導功能</string>
+    <string name="composer_steer_unavailable_feature_disabled">引導已關閉。請在設定中啟用執行中傳送。</string>
+    <string name="composer_steer_unavailable_no_run">引導需要正在生成的回覆。</string>
+    <string name="composer_steer_unavailable_compressing">壓縮歷史期間不能引導。請等待壓縮結束後重試。</string>
+    <string name="composer_steer_unavailable_scoped_device">裝置控制任務執行期間不能引導。請等待任務結束後重試。</string>
+    <string name="composer_steer_unavailable_media_generation">媒體生成模型不接受引導。請改用一般對話模型。</string>
+    <string name="composer_steer_unavailable_sub_agent_target">子代理會話不接受引導。請在父會話中繼續。</string>
+    <string name="composer_steer_wait_approval">已接受。回答審批提示後生效。</string>
+    <string name="composer_steer_wait_question">已接受。回答提問後生效。</string>
+    <string name="composer_steer_wait_sub_agent">已接受。子代理呼叫結束後生效。</string>
+    <string name="status_message_steered">已引導</string>
+    <string name="status_message_steer_queued">引導已排隊，將在下一步生效。</string>
+    <string name="status_message_steer_carried">回覆已結束，引導已移入佇列。</string>
+    <string name="status_message_steer_attachments">這則佇列訊息帶有附件，無法引導。請在本次執行結束後傳送。</string>
+    <!-- Composer delivery settings -->
+    <string name="detail_composer">輸入框</string>
+    <string name="menu_composer">輸入框</string>
+    <string name="menu_composer_desc">排隊後續訊息，並引導單則佇列訊息。</string>
+    <string name="composer_delivery_enabled_title">排隊後續訊息與引導</string>
+    <string name="composer_delivery_enabled_desc">智慧型代理執行時仍可繼續輸入。執行中傳送會進入佇列；可在佇列面板中引導任何佇列訊息。</string>
+    <string name="composer_delivery_disabled_hint">開啟排隊後續訊息與引導後，才能在智慧型代理執行時排隊訊息。</string>
     <!-- File manager and editor -->
     <string name="nav_tab_files">檔案</string>
     <string name="file_permission_title">共享儲存存取</string>

@@ -6,8 +6,10 @@ import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import com.yukisoffd.lyracode.ChatController
 import com.yukisoffd.lyracode.R
+import com.yukisoffd.lyracode.SendOutcome
 import com.yukisoffd.lyracode.agentToolCatalog
 import com.yukisoffd.lyracode.ai.ChatRecord
+import com.yukisoffd.lyracode.chat.pending.PendingInputSnapshot
 import com.yukisoffd.lyracode.localizedContext
 import com.yukisoffd.lyracode.data.*
 import com.yukisoffd.lyracode.debian.ProotLinuxManager
@@ -52,11 +54,13 @@ internal class WebAccessBridge(
         val before=previous.associateBy { it.id }
         media.update(messages,controller.pendingUploads.toList())
         val usage=controller.contextWindowUsage.value
+        val queue=controller.pendingInputSnapshotFor(controller.activeConversationId.value)
         val result=JSONObject().put("partial",true).put("instanceId",instanceId).put("version",++snapshotVersion)
             .put("conversationId",controller.activeConversationId.value).put("projectId",controller.activeProjectId()).put("sessionRevision",controller.sessionRevision.intValue)
-            .put("running",controller.isActiveConversationRunning()).put("generating",controller.isActiveConversationGenerating())
+            .put("running",controller.isActiveConversationBusy()).put("generating",controller.isActiveConversationGenerating())
             .put("loading",controller.messagesLoading.value).put("compressing",controller.isActiveHistoryCompressionRunning()).put("status",controller.status.value)
             .put("canContinue",controller.canContinueActive()).put("media",media.catalog())
+            .put("composerDelivery",composerDeliveryJson(queue))
             .put("messages",array(messages.filter { before[it.id]!=it }, ::messageJson))
             .put("uploads",array(controller.pendingUploads) { f -> JSONObject().put("uri",f.uri).put("name",f.name).put("size",f.size).put("kind",f.mediaKind) })
             .put("context",JSONObject().put("tokens",usage.estimatedTokens).put("messages",usage.contextMessageCount).put("turns",usage.turnsSinceCompression)
@@ -69,6 +73,10 @@ internal class WebAccessBridge(
         return result
     }
     private fun <T> array(items: Iterable<T>, transform: (T) -> JSONObject): JSONArray = JSONArray().also { a -> items.forEach { a.put(transform(it)) } }
+    private fun composerDeliveryJson(queue: PendingInputSnapshot): JSONObject = JSONObject()
+        .put("enabled", settings.composerDeliveryEnabled)
+        .put("queued", queue.queuedCount)
+        .put("parked", queue.parkedCount)
     private fun messageJson(message: ChatRecord): JSONObject = JSONObject()
         .put("id", message.id).put("role", message.role).put("content", message.content)
         .put("thinking", message.thinking).put("toolName", message.toolName).put("toolInput", message.toolInput).put("model", message.model)
@@ -93,6 +101,7 @@ internal class WebAccessBridge(
     fun snapshot(): JSONObject {
         val compression = controller.autoCompressionConfig()
         val usage = controller.contextWindowUsage.value
+        val queue = controller.pendingInputSnapshotFor(controller.activeConversationId.value)
         val disabled = settings.disabledTools()
         controller.settingsRevision.intValue // Also observe changes to preference-backed settings.
         media.update(controller.messages.value, controller.pendingUploads.toList())
@@ -105,11 +114,12 @@ internal class WebAccessBridge(
             .put("motionEnabled", android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f)
             .put("streamingAnimationMode", settings.streamingAnimationMode)
             .put("canContinue", controller.canContinueActive())
+            .put("composerDelivery", composerDeliveryJson(queue))
             .put("locale", locale())
             .put("sessionRevision", controller.sessionRevision.intValue)
             .put("conversationId", controller.activeConversationId.value).put("projectId", controller.activeProjectId())
             .put("title", controller.activeConversation()?.title ?: context.getString(com.yukisoffd.lyracode.R.string.title_new_chat))
-            .put("running", controller.isActiveConversationRunning()).put("loading", controller.messagesLoading.value)
+            .put("running", controller.isActiveConversationBusy()).put("loading", controller.messagesLoading.value)
             .put("generating",controller.isActiveConversationGenerating())
             .put("compressing", controller.isActiveHistoryCompressionRunning()).put("status", controller.status.value)
             .put("profileId", controller.activeProfileId.value).put("model", controller.activeModel.value)
@@ -153,13 +163,35 @@ internal class WebAccessBridge(
             args.getLong("projectId") != controller.activeProjectId()) throw WebHttpError(409, "手机端已切换会话，请刷新后重试")
     }
 
+    /** A run-owned refusal is a conflict, not a malformed request. */
+    private fun requireNotBusy(message: String) {
+        if (controller.isActiveConversationBusy()) throw WebHttpError(409, message)
+    }
+
     suspend fun action(args: JSONObject): JSONObject = withContext(Dispatchers.Main) {
         val action = args.getString("action")
         if (action in setOf("send", "stop", "continue", "workspace", "autoApproval", "compression", "compress", "removeUpload", "model", "refreshContext", "branch", "editMessage")) requireSession(args)
         when (action) {
-            "send" -> { require(!controller.isActiveConversationRunning()) { "会话正在运行" }; val text = args.getString("text"); require(text.isNotBlank() || controller.pendingUploads.isNotEmpty()) { "请输入消息或上传文件" }; controller.send(text) }
+            "send" -> {
+                val text = args.getString("text")
+                require(text.isNotBlank() || controller.pendingUploads.isNotEmpty()) { "请输入消息或上传文件" }
+                // The web composer has no per-message queue controls, so a mid-run send
+                // always queues. Steering stays a queue-row action on the phone.
+                when (controller.send(text)) {
+                    SendOutcome.SENT -> return@withContext JSONObject().put("ok", true).put("delivery", "sent")
+                    SendOutcome.QUEUED -> {
+                        val queue = controller.pendingInputSnapshotFor()
+                        return@withContext JSONObject().put("ok", true).put("delivery", "queued")
+                            .put("position", queue.queuedCount)
+                    }
+                    SendOutcome.BLOCKED -> throw WebHttpError(409, context.getString(R.string.status_message_refused))
+                }
+            }
             "stop" -> controller.stopActive()
-            "continue" -> controller.continueActive()
+            "continue" -> {
+                requireNotBusy("会话正在运行，请重试")
+                controller.continueActive()
+            }
             "new" -> controller.newConversation()
             "select" -> { require(controller.usageStore().conversation(args.getLong("id")) != null) { "会话不存在" }; controller.selectConversation(args.getLong("id")) }
             "newProjectChat" -> controller.startProjectConversation(args.getLong("id"))
@@ -235,7 +267,8 @@ internal class WebAccessBridge(
                 controller.setAutoCompressionForActiveSession(mode, args.getInt("turns"), args.getLong("tokens"))
             }
             "compress" -> {
-                require(!controller.isActiveConversationRunning() && controller.activeConversationId.value > 0) { "当前会话不能压缩" }
+                requireNotBusy("会话正在运行，请重试")
+                require(controller.activeConversationId.value > 0) { "当前会话不能压缩" }
                 controller.compressActiveHistory(args.optString("instruction")) { result -> result.onFailure { controller.status.value = it.message.orEmpty() } }
             }
             "rename" -> { require(args.getString("title").isNotBlank()); controller.renameConversation(args.getLong("id"), args.getString("title")) }
@@ -247,7 +280,10 @@ internal class WebAccessBridge(
             "projectArchive" -> controller.archiveProject(args.getLong("id"))
             "projectRestore" -> controller.restoreArchivedProject(args.getLong("id"))
             "branch" -> controller.createConversationBranch(args.getLong("id"))
-            "editMessage" -> controller.editAndRegenerateUserMessage(args.getLong("id"), args.getString("text"))
+            "editMessage" -> {
+                requireNotBusy("会话正在运行，请重试")
+                controller.editAndRegenerateUserMessage(args.getLong("id"), args.getString("text"))
+            }
             else -> throw WebHttpError(400, "Unknown action")
         }
         controller.settingsRevision.intValue++
@@ -257,11 +293,19 @@ internal class WebAccessBridge(
     suspend fun upload(headers: Map<String, String>, bytes: ByteArray): JSONObject {
         val expected = JSONObject().put("conversationId", headers["x-conversation-id"]?.toLongOrNull()).put("projectId", headers["x-project-id"]?.toLongOrNull())
             .put("sessionRevision", headers["x-session-revision"]?.toIntOrNull())
-        withContext(Dispatchers.Main) { requireSession(expected); require(!controller.isActiveConversationRunning()) { "请等待当前回复结束" } }
+        // A queued follow-up needs its attachment captured while the run is active.
+        withContext(Dispatchers.Main) {
+            requireSession(expected)
+            if (!settings.composerDeliveryEnabled) requireNotBusy("请等待当前回复结束")
+        }
         val name = URLDecoder.decode(headers["x-file-name"].orEmpty(), "UTF-8")
         val file = withContext(Dispatchers.IO) { uploads.saveWebUpload(name, headers["content-type"].orEmpty(), bytes).getOrThrow() }
         try {
-            withContext(Dispatchers.Main) { requireSession(expected); require(!controller.isActiveConversationRunning()) { "会话正在运行，请重试" }; controller.pendingUploads += file }
+            withContext(Dispatchers.Main) {
+                requireSession(expected)
+                if (!settings.composerDeliveryEnabled) requireNotBusy("会话正在运行，请重试")
+                controller.pendingUploads += file
+            }
         } catch (error: Exception) { uploads.discardWebUpload(file); throw error }
         return JSONObject().put("ok", true).put("name", file.name)
     }

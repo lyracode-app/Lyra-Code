@@ -94,12 +94,14 @@ function render() {
   setSelect('model-select', models,modelValue);
   reasoningControl.sync(state);
   $('auto-approval').checked = state.autoApproval; $('approval-label').textContent = state.autoApproval ? t("无审批模式") : t("逐次审批");
+  const deliveryEnabled = !!state.composerDelivery?.enabled;
   $('run-state').textContent = state.compressing ? t("正在压缩…") : state.running ? t("正在运行…") : '';
+  if (deliveryEnabled && state.composerDelivery?.queued > 0) $('run-state').textContent += t(" · {count} 条排队", {count: state.composerDelivery.queued});
   $('context-label').textContent = `${t("上下文 ·")} ${state.context.tokens.toLocaleString()}`;
-  $('status').textContent = state.status; $('stop').hidden = !state.running; $('send').hidden = state.running; $('continue').hidden = !state.canContinue;
+  $('status').textContent = state.status; $('stop').hidden = !state.running; $('send').hidden = state.running && !deliveryEnabled; $('continue').hidden = !state.canContinue;
   renderPerformance();
   $('send').disabled = busy || uploading || (!state.uploads.length && !$('input').value.trim()) || !connected;
-  $('attach').disabled = uploading || state.running; $('input').disabled = busy;
+  $('attach').disabled = uploading || (state.running && !deliveryEnabled); $('input').disabled = busy;
   $('upload-list').innerHTML = state.uploads.map(f => `<span class="file-chip">▧ ${esc(f.name)} <small>${(f.size/1024).toFixed(1)} KB</small><button data-remove-upload="${esc(f.uri)}" aria-label="${esc(t("移除附件"))}">×</button></span>`).join('');
   renderHistory(); renderMessages(); renderInteraction();
   if (!$('settings').hidden) {
@@ -211,15 +213,21 @@ function chatMenu(id, project = false) {
   dialog(project ? c.name : c.title, `<div class="form"><label>${project ? t("项目名称") : t("会话标题")}<input id="rename-value" value="${esc(project ? c.name : c.title)}"></label><div class="buttons"><button data-rename="${id}" data-project="${project}">${esc(t("保存名称"))}</button><button data-pin="${id}" data-project="${project}" data-enabled="${!c.pinned}">${c.pinned ? t("取消置顶") : t("置顶")}</button><button data-archive="${id}" data-project="${project}" data-restore="${c.archived}">${c.archived ? t("恢复") : t("归档")}</button></div></div>`, () => chatMenu(id,project));
 }
 async function send() {
-  if (!state || state.running || busy || uploading || !connected) return;
+  const deliveryEnabled = !!state?.composerDelivery?.enabled;
+  if (!state || (state.running && !deliveryEnabled) || busy || uploading || !connected) return;
   const text = $('input').value; if (!text.trim() && !state.uploads.length) return;
   busy = true; render();
-  try { await action('send',{text}); $('input').value = ''; resizeInput(); }
+  try {
+    const result = await action('send',{text});
+    $('input').value = ''; resizeInput();
+    if (result?.delivery === 'queued') message(t("已排队，等待当前回复结束"));
+  }
   catch (e) { message(e.message); }
   finally { busy = false; render(); }
 }
 async function uploadFiles(files) {
-  if (uploading || !state || state.running) return;
+  const deliveryEnabled = !!state?.composerDelivery?.enabled;
+  if (uploading || !state || (state.running && !deliveryEnabled)) return;
   uploading = true; const target = session(); render();
   try {
     for (const file of files) {

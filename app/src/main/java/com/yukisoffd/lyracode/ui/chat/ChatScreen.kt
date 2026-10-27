@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -80,6 +81,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material.icons.filled.*
@@ -88,6 +90,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.ContextCompat
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.ConversationStore
+import com.yukisoffd.lyracode.chat.pending.PendingInputSnapshot
+import com.yukisoffd.lyracode.interaction.session.ManualControlController
 import com.yukisoffd.lyracode.termux.TermuxExecutor
 import com.yukisoffd.lyracode.workspace.WorkspaceFileReference
 import kotlinx.coroutines.Dispatchers
@@ -261,13 +265,57 @@ internal fun ChatScreen(
     val isRunning = controller.isActiveConversationRunning()
     val isGenerating = controller.isActiveConversationGenerating()
     val isCompressing = controller.isActiveHistoryCompressionRunning()
+    // A scoped device-control task runs its persisted conversation outside ChatController's
+    // job registry. Read its running flag so this screen recomposes when a task starts or
+    // ends, including the empty-queue case. The busy decision stays per-conversation in the
+    // controller, so an unrelated visible conversation is not blocked.
+    val deviceControlState by ManualControlController.state.collectAsState()
+    @Suppress("UNUSED_VARIABLE")
+    val deviceChatRunning = deviceControlState.chat.running
+    val runActiveForComposer = controller.isActiveConversationBusy()
     val renderItems = remember(messageSnapshot, isRunning) {
         chatRenderItems(messageSnapshot, isStreaming = isRunning)
     }
     val hasWorkspace = controller.hasWorkspace()
     var forcedSkillIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val installedSkills = settings.installedSkills()
-    val canSend = (input.isNotBlank() || pendingUploads.isNotEmpty() || selectedWorkspaceFiles.isNotEmpty()) && !isRunning
+    val featureEnabled = settings.composerDeliveryEnabled
+    val composerEditable = !runActiveForComposer || featureEnabled
+    val hasSendableContent = composerHasSendableContent(input, pendingUploads.size, selectedWorkspaceFiles.size)
+    // The queue dock uses the availability policy to decide whether a queued message can steer.
+    val steerAvailability = controller.activeSteerAvailability()
+    val steerAccepted = steerAvailability.acceptsSteer()
+    // A mid-run send always queues; steering is a per-message action in the queue dock.
+    val sendAction = composerSendAction(
+        hasSendableContent = hasSendableContent,
+        runActive = runActiveForComposer,
+        featureEnabled = featureEnabled,
+    )
+    val canSend = sendAction != ComposerSendAction.BLOCKED
+    fun submit(action: ComposerSendAction) {
+        val delivered = when (action) {
+            ComposerSendAction.QUEUE, ComposerSendAction.SEND -> controller.send(
+                input,
+                forcedSkillIds,
+                selectedWorkspaceFiles,
+            ) != SendOutcome.BLOCKED
+            ComposerSendAction.BLOCKED -> false
+        }
+        if (delivered) {
+            controller.clearInputDraft()
+            input = ""
+            forcedSkillIds = emptyList()
+            selectedWorkspaceFiles = emptyList()
+            workspaceFileMatches = emptyList()
+            attachmentMenuOpen = false
+        }
+    }
+    val queueSnapshots by controller.pendingInputSnapshots.collectAsState()
+    val activeQueueSnapshot = queueSnapshots[controller.activeConversationId.value]
+    LaunchedEffect(featureEnabled) {
+        // Turning the feature off must not leave items eligible for automatic delivery.
+        if (!featureEnabled) controller.parkAllQueuedForDisabledFeature()
+    }
     val draftKey = controller.inputDraftKey()
     var loadedDraftKey by remember { mutableStateOf("") }
     LaunchedEffect(draftKey) {
@@ -310,7 +358,7 @@ internal fun ChatScreen(
         if (navigationRevealToken == token) navigationVisible = false
     }
     val isInterrupted = controller.activeConversation()?.status == ConversationStore.STATUS_INTERRUPTED
-    val showInterruptedAction = showContinueConversation(isInterrupted, isRunning, messageSnapshot.isNotEmpty())
+    val showInterruptedAction = showContinueConversation(isInterrupted, runActiveForComposer, messageSnapshot.isNotEmpty())
     // This is the declarative index of the final anchor, independent of the
     // previous LazyColumn measurement kept in listState.layoutInfo.
     val bottomAnchorIndex = renderItems.size + if (showInterruptedAction) 1 else 0
@@ -634,11 +682,21 @@ internal fun ChatScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (featureEnabled) {
+                    ComposerQueueSection(
+                        snapshot = activeQueueSnapshot,
+                        runActive = runActiveForComposer,
+                        steerAccepted = steerAccepted,
+                        onRemove = controller::removeQueued,
+                        onSendParked = controller::sendQueuedNow,
+                        onSteerQueued = controller::steerQueued,
+                    )
+                }
                 ForcedSkillControls(
                     input = input,
                     installedSkills = installedSkills,
                     forcedSkillIds = forcedSkillIds,
-                    enabled = !isRunning,
+                    enabled = composerEditable,
                     onSkillIdsChange = { forcedSkillIds = it },
                     onInputChange = { input = it },
                 )
@@ -646,7 +704,7 @@ internal fun ChatScreen(
                     input = input,
                     matches = workspaceFileMatches,
                     selected = selectedWorkspaceFiles,
-                    enabled = !isRunning,
+                    enabled = composerEditable,
                     hasWorkspace = hasWorkspace,
                     loading = workspaceFileSearchLoading,
                     onToggle = { file ->
@@ -672,9 +730,12 @@ internal fun ChatScreen(
                     settings = settings,
                     value = input,
                     onValueChange = { input = it },
-                    enabled = !isRunning,
+                    enabled = composerEditable,
                     canSend = canSend,
                     isRunning = isRunning,
+                    stopVisible = runActiveForComposer,
+                    sendWhileRunning = featureEnabled,
+                    sendAction = sendAction,
                     onOpenMenu = {
                         attachmentMenuPage = "root"
                         attachmentMenuOpen = !attachmentMenuOpen
@@ -688,23 +749,41 @@ internal fun ChatScreen(
                         controller.refreshContextWindowUsage()
                         contextInfoOpen = true
                     },
-                    onSend = {
-                        val text = input
-                        val skills = forcedSkillIds
-                        val workspaceFiles = selectedWorkspaceFiles
-                        controller.clearInputDraft()
-                        input = ""
-                        forcedSkillIds = emptyList()
-                        selectedWorkspaceFiles = emptyList()
-                        workspaceFileMatches = emptyList()
-                        attachmentMenuOpen = false
-                        controller.send(text, skills, workspaceFiles)
-                    },
+                    onSend = { submit(sendAction) },
                 )
             }
         }
     }
 }
+}
+
+/**
+ * Wires one conversation's queue snapshot into the dock. Kept internal so the
+ * instrumentation test can mount the wired surface without the whole chat screen.
+ */
+@Composable
+internal fun ComposerQueueSection(
+    snapshot: PendingInputSnapshot?,
+    runActive: Boolean,
+    steerAccepted: Boolean,
+    onRemove: (String) -> Unit,
+    onSendParked: (String) -> Unit,
+    onSteerQueued: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val current = snapshot ?: return
+    ComposerQueueDock(
+        conversationId = current.conversationId,
+        items = remember(current) {
+            composerQueueRowUis(current)
+        },
+        runActive = runActive,
+        steerAccepted = steerAccepted,
+        onRemove = onRemove,
+        onSendParked = onSendParked,
+        onSteer = onSteerQueued,
+        modifier = modifier,
+    )
 }
 
 @Composable

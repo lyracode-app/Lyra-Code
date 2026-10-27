@@ -1353,6 +1353,47 @@
     <string name="action_fullscreen_input">Fullscreen input</string>
     <string name="action_exit_fullscreen_input">Exit fullscreen input</string>
     <string name="title_fullscreen_input">Fullscreen input</string>
+    <!-- Chat composer queue and steer -->
+    <string name="composer_queue_dock_description">Queued messages: %1$d</string>
+    <string name="composer_queue_dock_title">%1$d queued messages</string>
+    <string name="composer_queue_dock_expand">Expand queued messages</string>
+    <string name="composer_queue_dock_collapse">Collapse queued messages</string>
+    <string name="composer_queue_state_queued">Queued</string>
+    <string name="composer_queue_state_parked">Parked</string>
+    <string name="composer_queue_attachment_count">Attachments: %1$d</string>
+    <string name="composer_queue_remove_description">Remove queued message: %1$s</string>
+    <string name="composer_queue_send_now_description">Send now: %1$s</string>
+    <string name="composer_queue_steer_description">Steer queued message now: %1$s</string>
+    <string name="composer_queue_missing_attachment">Missing attachment: %1$d</string>
+    <string name="status_message_queued">Queued. %1$d waiting.</string>
+    <string name="status_message_delivered">Sending queued message</string>
+    <string name="status_message_parked">Queued messages parked: %1$d</string>
+    <string name="status_message_refused">Queued delivery is off while the agent is running</string>
+    <string name="status_message_send_now_busy">Cannot send now while the agent is running</string>
+    <string name="status_message_run_busy">Wait for the current task to finish first.</string>
+    <string name="status_message_profile_unavailable">Queued message not sent: its profile is unavailable</string>
+    <string name="cd_queue">Queue message</string>
+    <string name="composer_steer_unavailable_default">Steering is not available right now</string>
+    <string name="composer_steer_unavailable_feature_disabled">Steering is off. Turn on mid-run delivery in settings.</string>
+    <string name="composer_steer_unavailable_no_run">Steering needs an active response.</string>
+    <string name="composer_steer_unavailable_compressing">Steering is unavailable while history compression runs. Try again when it finishes.</string>
+    <string name="composer_steer_unavailable_scoped_device">Steering is unavailable during a device-control task. Try again when it finishes.</string>
+    <string name="composer_steer_unavailable_media_generation">Media-generation models do not accept steering. Switch to a normal chat model instead.</string>
+    <string name="composer_steer_unavailable_sub_agent_target">Sub-agent conversations do not accept steering. Continue in the parent conversation instead.</string>
+    <string name="composer_steer_wait_approval">Accepted. Delivered after you answer the approval prompt.</string>
+    <string name="composer_steer_wait_question">Accepted. Delivered after you answer the question.</string>
+    <string name="composer_steer_wait_sub_agent">Accepted. Delivered after the sub-agent call finishes.</string>
+    <string name="status_message_steered">Steered</string>
+    <string name="status_message_steer_queued">Steer queued. It lands at the next step.</string>
+    <string name="status_message_steer_carried">Run ended. Steer moved to the queue.</string>
+    <string name="status_message_steer_attachments">This queued message has attachments. Send it when the run ends.</string>
+    <!-- Composer delivery settings -->
+    <string name="detail_composer">Composer</string>
+    <string name="menu_composer">Composer</string>
+    <string name="menu_composer_desc">Queue follow-ups and steer individual queued messages.</string>
+    <string name="composer_delivery_enabled_title">Queued follow-ups and steering</string>
+    <string name="composer_delivery_enabled_desc">Keep typing while the agent runs. Mid-run sends queue; steer any queued message from the queue panel.</string>
+    <string name="composer_delivery_disabled_hint">Turn on queued follow-ups and steering to queue messages while the agent runs.</string>
     <!-- File manager and editor -->
     <string name="nav_tab_files">Files</string>
     <string name="file_permission_title">Shared-storage access</string>

@@ -1436,6 +1436,47 @@
     <string name="action_fullscreen_input">全屏输入</string>
     <string name="action_exit_fullscreen_input">退出全屏输入</string>
     <string name="title_fullscreen_input">全屏输入</string>
+    <!-- Chat composer queue and steer -->
+    <string name="composer_queue_dock_description">排队消息：%1$d</string>
+    <string name="composer_queue_dock_title">%1$d 条排队消息</string>
+    <string name="composer_queue_dock_expand">展开排队消息</string>
+    <string name="composer_queue_dock_collapse">收起排队消息</string>
+    <string name="composer_queue_state_queued">排队中</string>
+    <string name="composer_queue_state_parked">已暂停</string>
+    <string name="composer_queue_attachment_count">附件：%1$d</string>
+    <string name="composer_queue_remove_description">移除排队消息：%1$s</string>
+    <string name="composer_queue_send_now_description">立即发送：%1$s</string>
+    <string name="composer_queue_steer_description">立即引导排队消息：%1$s</string>
+    <string name="composer_queue_missing_attachment">附件缺失：%1$d</string>
+    <string name="status_message_queued">已排队，等待发送：%1$d 条</string>
+    <string name="status_message_delivered">正在发送排队消息</string>
+    <string name="status_message_parked">已暂存排队消息：%1$d 条</string>
+    <string name="status_message_refused">智能体运行中，排队发送已关闭</string>
+    <string name="status_message_send_now_busy">智能体运行中，无法立即发送</string>
+    <string name="status_message_run_busy">请等待当前任务结束后再试。</string>
+    <string name="status_message_profile_unavailable">排队消息未发送：服务商不可用</string>
+    <string name="cd_queue">排队消息</string>
+    <string name="composer_steer_unavailable_default">当前无法使用引导功能</string>
+    <string name="composer_steer_unavailable_feature_disabled">引导已关闭。请在设置中启用运行中发送。</string>
+    <string name="composer_steer_unavailable_no_run">引导需要正在生成的回复。</string>
+    <string name="composer_steer_unavailable_compressing">压缩历史期间不能引导。请等待压缩结束后重试。</string>
+    <string name="composer_steer_unavailable_scoped_device">设备控制任务运行期间不能引导。请等待任务结束后重试。</string>
+    <string name="composer_steer_unavailable_media_generation">媒体生成模型不接受引导。请改用普通对话模型。</string>
+    <string name="composer_steer_unavailable_sub_agent_target">子代理会话不接受引导。请在父会话中继续。</string>
+    <string name="composer_steer_wait_approval">已接受。回答审批提示后生效。</string>
+    <string name="composer_steer_wait_question">已接受。回答提问后生效。</string>
+    <string name="composer_steer_wait_sub_agent">已接受。子代理调用结束后生效。</string>
+    <string name="status_message_steered">已引导</string>
+    <string name="status_message_steer_queued">引导已排队，将在下一步生效。</string>
+    <string name="status_message_steer_carried">回复已结束，引导已移入队列。</string>
+    <string name="status_message_steer_attachments">这条排队消息带有附件，无法引导。请在本次运行结束后发送。</string>
+    <!-- Composer delivery settings -->
+    <string name="detail_composer">输入框</string>
+    <string name="menu_composer">输入框</string>
+    <string name="menu_composer_desc">排队后续消息，并引导单条排队消息。</string>
+    <string name="composer_delivery_enabled_title">排队后续消息与引导</string>
+    <string name="composer_delivery_enabled_desc">智能体运行时仍可继续输入。运行中发送会进入队列；可在队列面板中引导任意排队消息。</string>
+    <string name="composer_delivery_disabled_hint">开启排队后续消息与引导后，才能在智能体运行时排队消息。</string>
     <!-- File manager and editor -->
     <string name="nav_tab_files">文件</string>
     <string name="file_permission_title">共享存储访问</string>
