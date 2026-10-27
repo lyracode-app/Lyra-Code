@@ -49,6 +49,8 @@
     <string name="action_new_project_session">New chat in project</string>
     <string name="action_expand_project">Expand project</string>
     <string name="action_collapse_project">Collapse project</string>
+    <string name="action_expand_section">Expand %1$s</string>
+    <string name="action_collapse_section">Collapse %1$s</string>
     <string name="project_session_count">%1$d chats</string>
     <string name="notice_project_created">Created project “%1$s”</string>
     <string name="notice_already_in_new_project_chat">You are already in a new chat for this project.</string>

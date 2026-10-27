@@ -49,6 +49,8 @@
     <string name="action_new_project_session">在專案中新建對話</string>
     <string name="action_expand_project">展開專案</string>
     <string name="action_collapse_project">收起專案</string>
+    <string name="action_expand_section">展開%1$s</string>
+    <string name="action_collapse_section">收起%1$s</string>
     <string name="project_session_count">%1$d 個對話</string>
     <string name="notice_project_created">已建立專案“%1$s”</string>
     <string name="notice_already_in_new_project_chat">你已在此專案的新對話中</string>
