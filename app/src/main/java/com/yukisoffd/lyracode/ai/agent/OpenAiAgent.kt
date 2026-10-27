@@ -237,7 +237,7 @@ class OpenAiAgent(
                     .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
                 client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
+                    if (!response.isSuccessful) error(response.withGzipFailureHint("话题总结请求失败 ${response.code}: ${body.take(300)}"))
                     val blocks = JSONObject(body).optJSONArray("content") ?: JSONArray()
                     buildString { for (index in 0 until blocks.length()) blocks.optJSONObject(index)?.takeIf { it.optString("type") == "text" }?.optString("text")?.let(::append) }
                 }
@@ -251,7 +251,7 @@ class OpenAiAgent(
                     .addHeader("Content-Type", "application/json").post(payload.toString().toRequestBody("application/json".toMediaType())).build()
                 client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
+                    if (!response.isSuccessful) error(response.withGzipFailureHint("话题总结请求失败 ${response.code}: ${body.take(300)}"))
                     val parts = JSONObject(body).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
                     buildString { for (index in 0 until parts.length()) parts.optJSONObject(index)?.takeUnless { it.optBoolean("thought") }?.optString("text")?.let(::append) }
                 }
@@ -442,7 +442,7 @@ class OpenAiAgent(
                 }
                 return call.useModelResponse { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error(historyCompressionHttpError(response.code, body))
+                    if (!response.isSuccessful) error(response.withGzipFailureHint(historyCompressionHttpError(response.code, body)))
                     extractCompressionSummary(JSONObject(body), profile)
                 }
             } catch (error: CompressionOutputLimitException) {
@@ -504,7 +504,7 @@ class OpenAiAgent(
             .build()
         return client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) error(errorMessage(response.code, body))
+            if (!response.isSuccessful) error(response.withGzipFailureHint(errorMessage(response.code, body)))
             extractModelResponseText(JSONObject(body), profile.apiFormat, profile.usesResponsesApi)
         }
     }
@@ -825,7 +825,7 @@ class OpenAiAgent(
         val replayableItems = JSONArray()
         modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
-            if (!response.isSuccessful) throwModelRequestHttpError(response.code, source.string())
+            if (!response.isSuccessful) throwModelRequestHttpError(response, source.string())
             if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
                 val completed = JSONObject(source.string())
                 completed.optJSONObject("error")?.let { throw IOException(it.optString("message")) }
@@ -1014,7 +1014,7 @@ class OpenAiAgent(
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val text = source.string()
-                throwModelRequestHttpError(response.code, text)
+                throwModelRequestHttpError(response, text)
             }
             if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
                 val root = JSONObject(source.string())
@@ -1172,7 +1172,7 @@ class OpenAiAgent(
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val body = source.string()
-                throwModelRequestHttpError(response.code, body)
+                throwModelRequestHttpError(response, body)
             }
             source.byteStream().bufferedReader().consumeModelStream { line ->
                 if (!line.startsWith("data:")) {
@@ -1303,7 +1303,7 @@ class OpenAiAgent(
         modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
             val body = source.string()
-            if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
+            if (!response.isSuccessful) throwModelRequestHttpError(response, body)
             val root = runCatching { JSONObject(body) }.getOrElse { error ->
                 throw IOException("Gemini 响应不完整或不是有效 JSON", error)
             }
@@ -1336,8 +1336,8 @@ class OpenAiAgent(
         }
     }
 
-    private fun throwModelRequestHttpError(statusCode: Int, body: String): Nothing {
-        throw modelRequestHttpException(statusCode, body, uiText(R.string.ui_ai_request_failed).trim())
+    private fun throwModelRequestHttpError(response: okhttp3.Response, body: String): Nothing {
+        throw modelRequestHttpException(response.code, body, uiText(R.string.ui_ai_request_failed).trim(), response)
     }
 
     private fun assistantRawMessage(content: String, thinking: String, calls: List<ToolCall>): JSONObject {
@@ -2544,7 +2544,7 @@ class OpenAiAgent(
         }
         return client.newCall(requestBuilder.build().customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
+            if (!response.isSuccessful) throwModelRequestHttpError(response, body)
             extractModelResponseText(JSONObject(body), profile.apiFormat, profile.usesResponsesApi)
                 .trim()
                 .also { require(it.isNotBlank()) { "The visual supplement model returned no text." } }

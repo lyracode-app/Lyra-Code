@@ -95,7 +95,7 @@ class ModelHttpAuditTest {
         val client = OkHttpClient.Builder().addInterceptor(audit.application).addInterceptor(GzipRequestInterceptor())
             .addNetworkInterceptor(audit.network).build()
         try {
-            val profile = ApiProfile("test", "test", "fixture-key", "http://127.0.0.1:${server.address.port}", selectedModel = "test", savedModels = listOf("test"))
+            val profile = ApiProfile("test", "test", "fixture-key", "http://127.0.0.1:${server.address.port}", selectedModel = "test", savedModels = listOf("test"), gzipRequestBodies = true)
             val payload = JSONObject().put("model", "test").put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", "你好 ".repeat(5_000))))
             fun post(path: String) = Request.Builder().url("${profile.baseUrl}$path").header("Authorization", "Bearer fixture-key")
                 .post(payload.toString().toRequestBody("application/json".toMediaType())).build().customizedFor(profile, "test")
@@ -110,6 +110,85 @@ class ModelHttpAuditTest {
             assertEquals(listOf("gzip", null), received.drop(1).map { it.first })
             assertEquals(listOf(sent, sent), received.drop(1).map { it.second })
             assertEquals(listOf(sent, sent), sink.records.values.drop(1).map { it["request.body"] })
+        } finally { server.stop(0); client.connectionPool.evictAll(); dir.deleteRecursively() }
+    }
+
+    @Test fun redirectsAndAutomatic503RetriesRecordEveryRequestBodyWithAndWithoutGzip() {
+        for (firstCode in listOf(307, 503)) {
+            for (gzip in listOf(true, false)) {
+                val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+                val received = mutableListOf<Triple<String, String?, String>>()
+                server.createContext("/") { exchange ->
+                    val encoding = exchange.requestHeaders.getFirst("Content-Encoding")
+                    val bytes = exchange.requestBody.readBytes()
+                    val text = if (encoding == "gzip") GZIPInputStream(bytes.inputStream()).use { it.readBytes().decodeToString() } else bytes.decodeToString()
+                    received += Triple(exchange.requestMethod, encoding, text)
+                    val code = if (received.size == 1) firstCode else 200
+                    if (code == 307) exchange.responseHeaders.add("Location", "/target")
+                    if (code == 503) exchange.responseHeaders.add("Retry-After", "0")
+                    val reply = "{}".toByteArray()
+                    exchange.sendResponseHeaders(code, reply.size.toLong())
+                    exchange.responseBody.use { it.write(reply) }
+                }
+                server.start()
+                val sink = MemorySink()
+                val dir = Files.createTempDirectory("audit-followup").toFile()
+                val audit = ModelHttpAudit(sink, dir)
+                val client = OkHttpClient.Builder().callTimeout(5, TimeUnit.SECONDS).addInterceptor(audit.application)
+                    .addInterceptor(GzipRequestInterceptor()).addNetworkInterceptor(audit.network).build()
+                try {
+                    val profile = ApiProfile("test", "test", "fixture-key", "http://127.0.0.1:${server.address.port}",
+                        selectedModel = "test", savedModels = listOf("test"), gzipRequestBodies = gzip)
+                    val payload = JSONObject().put("model", "test").put("messages", JSONArray().put(JSONObject()
+                        .put("role", "user").put("content", "大请求😀".repeat(80_000))))
+                    val request = Request.Builder().url("${profile.baseUrl}/start")
+                        .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                        .build().customizedFor(profile, "test")
+                    client.newCall(request).execute().use { response ->
+                        assertEquals(200, response.code)
+                        assertEquals("{}", response.body!!.string())
+                    }
+                    assertEquals(listOf("POST", "POST"), received.map { it.first })
+                    assertEquals(listOf(if (gzip) "gzip" else null, if (gzip) "gzip" else null), received.map { it.second })
+                    assertEquals(received[0].third, received[1].third)
+                    val records = sink.records.values.toList()
+                    assertEquals(2, records.size)
+                    assertEquals(received.map { it.third }, records.map { it["request.body"] })
+                    assertEquals(listOf(firstCode, 200), records.map { JSONObject(it.getValue("response.metadata")).getInt("code") })
+                    assertEquals(if (firstCode == 307) "/target" else "/start",
+                        java.net.URI(JSONObject(records[1].getValue("request.metadata")).getString("url")).path)
+                    assertTrue(records.all { JSONObject(it.getValue("request.metadata")).getBoolean("observed_at_network") })
+                    assertEquals("{}", records.last()["response.body"])
+                    assertTrue(records.none { it.containsKey("capture.error") })
+                } finally { server.stop(0); client.connectionPool.evictAll(); dir.deleteRecursively() }
+            }
+        }
+    }
+
+    @Test fun redirectToGetDoesNotInheritPostBodyInAudit() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            exchange.requestBody.readBytes()
+            if (exchange.requestURI.path == "/start") exchange.responseHeaders.add("Location", "/target")
+            exchange.sendResponseHeaders(if (exchange.requestURI.path == "/start") 303 else 200, -1)
+            exchange.close()
+        }
+        server.start()
+        val sink = MemorySink()
+        val dir = Files.createTempDirectory("audit-get-redirect").toFile()
+        val audit = ModelHttpAudit(sink, dir)
+        val client = OkHttpClient.Builder().callTimeout(5, TimeUnit.SECONDS).addInterceptor(audit.application)
+            .addInterceptor(GzipRequestInterceptor()).addNetworkInterceptor(audit.network).build()
+        try {
+            val request = Request.Builder().url("http://127.0.0.1:${server.address.port}/start")
+                .post("x".repeat(10_000).toRequestBody("application/json".toMediaType()))
+                .tag(ModelAuditTag::class.java, ModelAuditTag("p", "m"))
+                .tag(ApiProfile::class.java, ApiProfile("p", "test", "", "http://127.0.0.1", selectedModel = "m", savedModels = listOf("m"), gzipRequestBodies = true)).build()
+            client.newCall(request).execute().close()
+            assertEquals(2, sink.records.size)
+            val redirected = sink.records.values.last()
+            assertEquals("GET", JSONObject(redirected.getValue("request.metadata")).getString("method"))
+            assertFalse(redirected.containsKey("request.body"))
         } finally { server.stop(0); client.connectionPool.evictAll(); dir.deleteRecursively() }
     }
 

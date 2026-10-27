@@ -2,6 +2,7 @@ package com.yukisoffd.lyracode.ai
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
 import javax.net.ssl.SSLHandshakeException
@@ -32,8 +33,9 @@ internal fun modelHttpErrorDetail(body: String): String {
     return detail.trim().take(2_000)
 }
 
-internal fun modelRequestHttpException(statusCode: Int, body: String, prefix: String): Exception {
-    val message = "$prefix HTTP $statusCode: ${modelHttpErrorDetail(body)}"
+internal fun modelRequestHttpException(statusCode: Int, body: String, prefix: String, response: Response? = null): Exception {
+    val detail = "$prefix HTTP $statusCode: ${modelHttpErrorDetail(body)}"
+    val message = response?.withGzipFailureHint(detail) ?: detail
     // Some compatible servers report deterministic template/input errors as 500.
     val templateError = listOf(
         "jinja exception", "system message must be at the beginning",

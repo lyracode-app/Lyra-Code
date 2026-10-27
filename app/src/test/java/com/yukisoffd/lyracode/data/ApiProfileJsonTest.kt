@@ -29,11 +29,26 @@ class ApiProfileJsonTest {
         assertEquals("legacy", restored.apiKey)
         assertTrue(restored.secondaryApiKeys.isEmpty())
         assertEquals(listOf("a"), restored.enabledModels)
-        assertTrue(restored.gzipRequestBodies)
+        assertFalse(restored.gzipRequestBodies)
     }
 
     @Test fun disabledRequestCompressionSurvivesStorageAndBackup() {
         assertFalse(decode(ApiProfileJson.encode(profile.copy(gzipRequestBodies = false), includeSecrets = false)).gzipRequestBodies)
+    }
+
+    @Test fun missingCompressionSettingDefaultsToAnthropicOnly() {
+        for (format in listOf(ApiProfile.API_FORMAT_OPENAI, ApiProfile.API_FORMAT_ANTHROPIC, ApiProfile.API_FORMAT_GEMINI)) {
+            val json = ApiProfileJson.encode(profile.copy(apiFormat = format)).apply { remove("gzipRequestBodies") }
+            assertEquals(format == ApiProfile.API_FORMAT_ANTHROPIC, decode(json).gzipRequestBodies)
+        }
+    }
+
+    @Test fun explicitCompressionChoicesSurviveStorageAndBackupForEveryFormat() {
+        for (format in listOf(ApiProfile.API_FORMAT_OPENAI, ApiProfile.API_FORMAT_ANTHROPIC, ApiProfile.API_FORMAT_GEMINI)) {
+            for (enabled in listOf(true, false)) {
+                assertEquals(enabled, decode(ApiProfileJson.encode(profile.copy(apiFormat = format, gzipRequestBodies = enabled))).gzipRequestBodies)
+            }
+        }
     }
 
     @Test fun incompleteModelSyncDoesNotInventASelectedModel() {

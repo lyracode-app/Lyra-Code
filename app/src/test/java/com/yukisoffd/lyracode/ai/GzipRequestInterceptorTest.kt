@@ -20,7 +20,7 @@ import org.junit.Test
 
 class GzipRequestInterceptorTest {
     private val profile = ApiProfile("p", "Provider", "main", "https://example.com/v1", selectedModel = "model",
-        savedModels = listOf("model"))
+        savedModels = listOf("model"), gzipRequestBodies = true)
     private val json = "application/json; charset=utf-8".toMediaType()
     private val large = """{"messages":"${"hello ".repeat(2000)}"}"""
 
@@ -117,6 +117,41 @@ class GzipRequestInterceptorTest {
                 assertEquals(error, it.body!!.string())
             }
             assertEquals(listOf("gzip"), seen.map { it.encoding })
+        }
+    }
+
+    @Test fun failedPlainFallbackPreservesServerErrorAndAddsGzipDiagnostic() {
+        val seen = mutableListOf<Seen>()
+        val error = """{"error":{"message":"unsupported request encoding"}}"""
+        val client = client(GzipRequestInterceptor(), seen) { 415 to error }
+        client.newCall(post(large)).execute().use { response ->
+            assertEquals(415, response.code)
+            assertEquals(error, response.body!!.string())
+            assertEquals("HTTP 415\nGzip may be unsupported; disable it in service settings.",
+                response.withGzipFailureHint("HTTP 415") { "Gzip may be unsupported; disable it in service settings." })
+        }
+        assertEquals(listOf("gzip", null), seen.map { it.encoding })
+        assertEquals(listOf(large, large), seen.map { it.body })
+    }
+
+    @Test fun successfulFallbackAndUncompressedErrorsDoNotBlameGzip() {
+        for (gzip in listOf(false, true)) {
+            val seen = mutableListOf<Seen>()
+            val client = client(GzipRequestInterceptor(), seen) { if (gzip && it.encoding == null) 200 to "ok" else 415 to "unsupported" }
+            client.newCall(post(large, profile = profile.copy(gzipRequestBodies = gzip))).execute().use { response ->
+                assertEquals(if (gzip) 200 else 415, response.code)
+                assertEquals("original", response.withGzipFailureHint("original") { error("No gzip diagnostic should be shown") })
+            }
+        }
+    }
+
+    @Test fun onlyAnthropicProfilesCompressByDefaultAndOtherFormatsCanOptIn() {
+        for (format in listOf(ApiProfile.API_FORMAT_OPENAI, ApiProfile.API_FORMAT_ANTHROPIC, ApiProfile.API_FORMAT_GEMINI)) {
+            val defaultProfile = ApiProfile("p", "Provider", "key", "https://example.com/v1", apiFormat = format,
+                selectedModel = "model", savedModels = listOf("model"))
+            val seen = mutableListOf<Seen>()
+            client(GzipRequestInterceptor(), seen).newCall(post(large, profile = defaultProfile)).execute().close()
+            assertEquals(if (format == ApiProfile.API_FORMAT_ANTHROPIC) "gzip" else null, seen.single().encoding)
         }
     }
 

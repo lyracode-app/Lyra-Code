@@ -13,7 +13,7 @@ data class ApiProfile(
     val savedModels: List<String>,
     val enabledModels: List<String> = savedModels,
     val useResponsesApi: Boolean = false,
-    val gzipRequestBodies: Boolean = true,
+    val gzipRequestBodies: Boolean = defaultGzipRequestBodies(apiFormat),
     val presetId: String = "",
     val presetPlanId: String = "",
     val modelRequestOverrides: Map<String, ModelRequestCustomization> = emptyMap(),
@@ -51,6 +51,8 @@ data class ApiProfile(
         const val API_FORMAT_OPENAI = "openai"
         const val API_FORMAT_ANTHROPIC = "anthropic_messages"
         const val API_FORMAT_GEMINI = "gemini_generate_content"
+
+        fun defaultGzipRequestBodies(apiFormat: String): Boolean = apiFormat == API_FORMAT_ANTHROPIC
 
         fun defaultChatPath(apiFormat: String): String = when (apiFormat) {
             API_FORMAT_ANTHROPIC -> DEFAULT_ANTHROPIC_CHAT_PATH
