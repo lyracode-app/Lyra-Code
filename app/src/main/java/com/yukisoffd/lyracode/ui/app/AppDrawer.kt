@@ -120,6 +120,8 @@ internal fun KimiDrawerContent(
     val projectSnapshot = controller.projects.toList()
     var historyQuery by rememberSaveable { mutableStateOf("") }
     var historyMode by rememberSaveable { mutableStateOf("sessions") }
+    var functionsExpanded by rememberSaveable { mutableStateOf(true) }
+    var historyExpanded by rememberSaveable { mutableStateOf(true) }
     val historyContentProgress = remember { Animatable(1f) }
     var lastAnimatedHistoryMode by remember { mutableStateOf(historyMode) }
     LaunchedEffect(historyMode) {
@@ -285,180 +287,156 @@ internal fun KimiDrawerContent(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        context.getString(R.string.label_functions),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Icon(
-                        Icons.Default.ExpandLess,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                DrawerSectionHeader(
+                    title = context.getString(R.string.label_functions),
+                    expanded = functionsExpanded,
+                    onToggle = { functionsExpanded = !functionsExpanded },
+                )
+                if (functionsExpanded) {
+                    pages.indices.forEach { index ->
+                        KimiFunctionRow(
+                            icon = functionPageIcon(index),
+                            title = pages[index],
+                            selected = selectedPage == index,
+                            onClick = { onSelectPage(index) },
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    KimiDivider()
                 }
-                pages.indices.forEach { index ->
-                    KimiFunctionRow(
-                        icon = functionPageIcon(index),
-                        title = pages[index],
-                        selected = selectedPage == index,
-                        onClick = { onSelectPage(index) },
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                KimiDivider()
             }
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        context.getString(R.string.label_history_sessions),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Icon(
-                        Icons.Default.ExpandLess,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .clip(KimiPillShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                            shape = KimiPillShape,
-                        )
-                        .padding(3.dp),
-                ) {
-                    HistoryModeButton(
-                        selected = historyMode == "sessions",
-                        icon = Icons.Default.ChatBubbleOutline,
-                        label = context.getString(R.string.history_mode_sessions),
-                        onClick = {
-                            historyMode = "sessions"
-                            selectedHistoryIds = emptySet()
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    HistoryModeButton(
-                        selected = historyMode == "projects",
-                        icon = Icons.Default.FolderOpen,
-                        label = context.getString(R.string.history_mode_projects),
-                        onClick = {
-                            historyMode = "projects"
-                            selectedHistoryIds = emptySet()
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val projectMode = historyMode == "projects"
-                    val projectButtonSlotWidth by animateDpAsState(
-                        targetValue = if (projectMode) 56.dp else 0.dp,
-                        animationSpec = tween(durationMillis = 260),
-                        label = "project-button-slot-width",
-                    )
-                    val searchWidth = (maxWidth - projectButtonSlotWidth).coerceAtLeast(0.dp)
+                DrawerSectionHeader(
+                    title = context.getString(R.string.label_history_sessions),
+                    expanded = historyExpanded,
+                    onToggle = { historyExpanded = !historyExpanded },
+                )
+                if (historyExpanded) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .height(46.dp)
+                            .clip(KimiPillShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                                shape = KimiPillShape,
+                            )
+                            .padding(3.dp),
                     ) {
-                        CapsuleTextField(
-                            value = historyQuery,
-                            onValueChange = { historyQuery = it },
-                            modifier = Modifier
-                                .width(searchWidth)
-                                .bringIntoViewRequester(searchBringIntoViewRequester)
-                                .onFocusChanged { searchFocused = it.isFocused },
-                            placeholder = context.getString(
-                                if (projectMode) R.string.search_projects_placeholder
-                                else R.string.search_history_placeholder,
-                            ),
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(19.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        HistoryModeButton(
+                            selected = historyMode == "sessions",
+                            icon = Icons.Default.ChatBubbleOutline,
+                            label = context.getString(R.string.history_mode_sessions),
+                            onClick = {
+                                historyMode = "sessions"
+                                selectedHistoryIds = emptySet()
                             },
+                            modifier = Modifier.weight(1f),
                         )
-                        Box(
+                        HistoryModeButton(
+                            selected = historyMode == "projects",
+                            icon = Icons.Default.FolderOpen,
+                            label = context.getString(R.string.history_mode_projects),
+                            onClick = {
+                                historyMode = "projects"
+                                selectedHistoryIds = emptySet()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val projectMode = historyMode == "projects"
+                        val projectButtonSlotWidth by animateDpAsState(
+                            targetValue = if (projectMode) 56.dp else 0.dp,
+                            animationSpec = tween(durationMillis = 260),
+                            label = "project-button-slot-width",
+                        )
+                        val searchWidth = (maxWidth - projectButtonSlotWidth).coerceAtLeast(0.dp)
+                        Row(
                             modifier = Modifier
-                                .width(projectButtonSlotWidth)
+                                .fillMaxWidth()
                                 .height(48.dp),
-                            contentAlignment = Alignment.CenterEnd,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = projectMode,
-                                enter = fadeIn(tween(180)) + expandHorizontally(
-                                    animationSpec = tween(260),
-                                    expandFrom = Alignment.End,
+                            CapsuleTextField(
+                                value = historyQuery,
+                                onValueChange = { historyQuery = it },
+                                modifier = Modifier
+                                    .width(searchWidth)
+                                    .bringIntoViewRequester(searchBringIntoViewRequester)
+                                    .onFocusChanged { searchFocused = it.isFocused },
+                                placeholder = context.getString(
+                                    if (projectMode) R.string.search_projects_placeholder
+                                    else R.string.search_history_placeholder,
                                 ),
-                                exit = fadeOut(tween(120)) + shrinkHorizontally(
-                                    animationSpec = tween(220),
-                                    shrinkTowards = Alignment.End,
-                                ),
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(19.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(projectButtonSlotWidth)
+                                    .height(48.dp),
+                                contentAlignment = Alignment.CenterEnd,
                             ) {
-                                NewProjectButton(onClick = onCreateProject)
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = projectMode,
+                                    enter = fadeIn(tween(180)) + expandHorizontally(
+                                        animationSpec = tween(260),
+                                        expandFrom = Alignment.End,
+                                    ),
+                                    exit = fadeOut(tween(120)) + shrinkHorizontally(
+                                        animationSpec = tween(220),
+                                        shrinkTowards = Alignment.End,
+                                    ),
+                                ) {
+                                    NewProjectButton(onClick = onCreateProject)
+                                }
                             }
                         }
                     }
-                }
-                if (historyMode == "sessions" && selectedHistoryIds.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(context.getString(R.string.label_selected_count, selectedHistoryIds.size), modifier = Modifier.weight(1f), color = KimiMuted)
-                        KimiChip(context.getString(R.string.action_pin), onClick = {
-                            controller.setConversationsPinned(selectedHistoryIds, true)
-                            selectedHistoryIds = emptySet()
-                        })
-                        KimiChip(context.getString(R.string.action_delete), onClick = {
-                            controller.deleteConversations(selectedHistoryIds)
-                            selectedHistoryIds = emptySet()
-                        })
-                        IconButton(onClick = { selectedHistoryIds = emptySet() }) {
-                            Icon(Icons.Default.Close, contentDescription = context.getString(R.string.action_cancel_select))
+                    if (historyMode == "sessions" && selectedHistoryIds.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(context.getString(R.string.label_selected_count, selectedHistoryIds.size), modifier = Modifier.weight(1f), color = KimiMuted)
+                            KimiChip(context.getString(R.string.action_pin), onClick = {
+                                controller.setConversationsPinned(selectedHistoryIds, true)
+                                selectedHistoryIds = emptySet()
+                            })
+                            KimiChip(context.getString(R.string.action_delete), onClick = {
+                                controller.deleteConversations(selectedHistoryIds)
+                                selectedHistoryIds = emptySet()
+                            })
+                            IconButton(onClick = { selectedHistoryIds = emptySet() }) {
+                                Icon(Icons.Default.Close, contentDescription = context.getString(R.string.action_cancel_select))
+                            }
                         }
                     }
-                }
-                if (historyMode == "sessions" && filteredConversations.isEmpty()) {
-                    Text(
-                        context.getString(R.string.notice_no_sessions),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else if (historyMode == "projects" && projectGroups.isEmpty()) {
-                    Text(
-                        context.getString(R.string.notice_no_projects),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (historyMode == "sessions" && filteredConversations.isEmpty()) {
+                        Text(
+                            context.getString(R.string.notice_no_sessions),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else if (historyMode == "projects" && projectGroups.isEmpty()) {
+                        Text(
+                            context.getString(R.string.notice_no_projects),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
-        if (historyMode == "sessions") {
+        if (historyExpanded && historyMode == "sessions") {
             groupedConversations.forEach { (label, conversations) ->
                 item(key = "history-group-$label") {
                     Text(
@@ -492,7 +470,7 @@ internal fun KimiDrawerContent(
                     )
                 }
             }
-        } else {
+        } else if (historyExpanded) {
             projectGroups.forEach { (project, conversations) ->
                 val projectExpanded = project.id !in collapsedProjectIds
                 item(key = "project-${project.id}") {
@@ -864,6 +842,48 @@ internal fun KimiDrawerShortcut(icon: String, label: String, onClick: () -> Unit
     ) {
         Text(icon, style = MaterialTheme.typography.titleLarge)
         Text(label, color = KimiMuted, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+internal fun DrawerSectionHeader(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val expandIconRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(220),
+        label = "drawerSectionExpandIconRotation",
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Icon(
+            Icons.Default.ExpandMore,
+            contentDescription = if (expanded) {
+                context.getString(R.string.action_collapse_section, title)
+            } else {
+                context.getString(R.string.action_expand_section, title)
+            },
+            modifier = Modifier
+                .size(20.dp)
+                .graphicsLayer { rotationZ = expandIconRotation },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

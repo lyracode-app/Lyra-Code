@@ -639,6 +639,9 @@ class AppSettings(context: Context) {
         get() = plainPrefs.getBoolean(KEY_HIDE_TERMUX_PERMISSION_HINT, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_HIDE_TERMUX_PERMISSION_HINT, value).apply()
 
+    internal var composerDeliveryEnabled: Boolean
+        get() = plainPrefs.getBoolean(KEY_COMPOSER_DELIVERY_ENABLED, true)
+        set(value) = plainPrefs.edit().putBoolean(KEY_COMPOSER_DELIVERY_ENABLED, value).apply()
 
     fun disabledTools(): Set<String> = plainPrefs.getStringSet(KEY_DISABLED_TOOLS, emptySet()).orEmpty()
 
@@ -1489,6 +1492,7 @@ class AppSettings(context: Context) {
             .put("chatBackgroundPath", chatBackgroundPath.orEmpty())
             .put("chatBackgroundMaskOpacity", chatBackgroundMaskOpacity.toDouble())
             .put("hideTermuxPermissionHint", hideTermuxPermissionHint)
+            .put("composerDeliveryEnabled", composerDeliveryEnabled)
             .put("purePromptMode", purePromptMode)
             .put("selectedSystemPromptId", selectedSystemPromptId)
             .put("customSystemPrompts", JSONObject(plainPrefs.getString(KEY_CUSTOM_SYSTEM_PROMPTS, "{}").orEmpty().ifBlank { "{}" }))
@@ -1633,6 +1637,7 @@ class AppSettings(context: Context) {
             ).toFloat()
         }
         if (root.has("hideTermuxPermissionHint")) hideTermuxPermissionHint = root.optBoolean("hideTermuxPermissionHint")
+        if (root.has("composerDeliveryEnabled")) composerDeliveryEnabled = root.optBoolean("composerDeliveryEnabled")
         if (root.has("purePromptMode")) purePromptMode = root.optBoolean("purePromptMode")
         root.optString("selectedSystemPromptId").takeIf { it.isNotBlank() }?.let { selectedSystemPromptId = it }
         root.optJSONObject("customSystemPrompts")?.let { imported ->
@@ -2377,6 +2382,7 @@ class AppSettings(context: Context) {
         private const val KEY_CHAT_BACKGROUND_MASK_OPACITY = "chat_background_mask_opacity"
         private const val DEFAULT_CHAT_BACKGROUND_MASK_OPACITY = 0.58f
         private const val KEY_HIDE_TERMUX_PERMISSION_HINT = "hide_termux_permission_hint"
+        private const val KEY_COMPOSER_DELIVERY_ENABLED = "composer_delivery_enabled"
         private const val KEY_DISABLED_TOOLS = "disabled_tools"
         private const val KEY_HIDDEN_TODO_SIGNATURE_PREFIX = "hidden_todo_signature_"
         private const val KEY_CHAT_INPUT_DRAFT_PREFIX = "chat_input_draft_"

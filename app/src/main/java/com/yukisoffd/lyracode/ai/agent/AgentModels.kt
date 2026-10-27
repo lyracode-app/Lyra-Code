@@ -25,6 +25,8 @@ data class ChatUpdate(
     val messageId: Long = 0L,
     val tokensPerSecond: Double = 0.0,
     val deepSeekCacheHitRate: Double? = null,
+    /** Asks the controller to reload history immediately, bypassing the throttle. */
+    val forceReload: Boolean = false,
 )
 
 

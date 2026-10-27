@@ -1049,6 +1049,44 @@ class ConversationStore(private val appContext: Context, inMemory: Boolean = fal
         }
     }.getOrNull()
 
+    /**
+     * Attachment URIs embedded in delivered user messages. The pending-input orphan checker must
+     * keep a backing file that a delivered message still points at, even after its queue item is
+     * gone. Only messages with an attachment marker are read.
+     */
+    fun userMessageAttachmentUris(): Set<String> {
+        val uris = mutableSetOf<String>()
+        readableDatabase.query(
+            "messages",
+            arrayOf(
+                "id",
+                "length(content)",
+                "CASE WHEN length(content) <= $MAX_CURSOR_MESSAGE_CONTENT_CHARS THEN content ELSE NULL END AS bounded_content",
+            ),
+            "role=? AND content LIKE ?",
+            arrayOf("user", "%<lyra_attachment_v1>%"),
+            null,
+            null,
+            "id ASC",
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val messageId = cursor.getLong(0)
+                val contentLength = cursor.getInt(1)
+                val content = cursor.getString(2)
+                    ?: readMessageContentInChunks(messageId, contentLength)
+                    ?: continue
+                ATTACHMENT_MARKER_REGEX.findAll(content).forEach { match ->
+                    runCatching { JSONObject(match.groupValues[1]).optString("uri") }
+                        .getOrNull()
+                        ?.trim()
+                        ?.takeIf(String::isNotEmpty)
+                        ?.let(uris::add)
+                }
+            }
+        }
+        return uris
+    }
+
     /** Count context rows without allocating another copy of every message body. */
     fun contextMessageCounts(conversationId: Long, afterMessageId: Long): Pair<Int, Int> =
         readableDatabase.rawQuery(
@@ -1474,6 +1512,7 @@ class ConversationStore(private val appContext: Context, inMemory: Boolean = fal
         private const val MAX_STORED_ATTACHMENT_BYTES = 8 * 1024 * 1024
         private const val MESSAGE_CONTENT_CHUNK_CHARS = 256 * 1024
         private const val MAX_CURSOR_MESSAGE_CONTENT_CHARS = 128 * 1024
+        private val ATTACHMENT_MARKER_REGEX = Regex("<lyra_attachment_v1>([\\s\\S]*?)</lyra_attachment_v1>")
         val AUTO_COMPRESSION_MODES = setOf(AUTO_COMPRESSION_OFF, AUTO_COMPRESSION_TURNS, AUTO_COMPRESSION_TOKENS)
         private val CONVERSATION_COLUMNS = arrayOf(
             "id", "title", "status", "profile_id", "model", "created_at", "updated_at",

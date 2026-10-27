@@ -3,6 +3,7 @@ package com.yukisoffd.lyracode
 import android.net.Uri
 import android.graphics.Bitmap
 import android.os.Environment
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -18,17 +19,33 @@ import com.yukisoffd.lyracode.ai.ModelReachabilityResult
 import com.yukisoffd.lyracode.ai.ProviderReachabilityReport
 import com.yukisoffd.lyracode.ai.ProviderReachabilityResult
 import com.yukisoffd.lyracode.ai.RUNTIME_CONTEXT_ROLE
+import com.yukisoffd.lyracode.ai.SteerSource
 import com.yukisoffd.lyracode.ai.ToolApprovalDecision
 import com.yukisoffd.lyracode.ai.ToolApprovalRequest
 import com.yukisoffd.lyracode.ai.TodoItem
 import com.yukisoffd.lyracode.ai.UserQuestionAnswer
 import com.yukisoffd.lyracode.ai.UserQuestionRequest
+import com.yukisoffd.lyracode.ai.isMediaGenerationModel
 import com.yukisoffd.lyracode.ai.toRecord
+import com.yukisoffd.lyracode.chat.pending.PendingAttachment
+import com.yukisoffd.lyracode.chat.pending.PendingInputAttachmentReaper
+import com.yukisoffd.lyracode.chat.pending.PendingInputCapture
+import com.yukisoffd.lyracode.chat.pending.PendingInputFileStore
+import com.yukisoffd.lyracode.chat.pending.PendingInputItem
+import com.yukisoffd.lyracode.chat.pending.PendingInputRestorer
+import com.yukisoffd.lyracode.chat.pending.PendingInputSnapshot
+import com.yukisoffd.lyracode.chat.pending.PendingInputState
+import com.yukisoffd.lyracode.chat.pending.PendingInputStore
+import com.yukisoffd.lyracode.chat.pending.PendingSteer
 import com.yukisoffd.lyracode.data.ApiProfile
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.withChatGptModels
 import com.yukisoffd.lyracode.data.ChatProject
 import com.yukisoffd.lyracode.data.Conversation
+import com.yukisoffd.lyracode.interaction.session.ConversationIdleOutcome
+import com.yukisoffd.lyracode.interaction.session.DeviceTaskCoordinator
+import com.yukisoffd.lyracode.interaction.session.dispatchConversationIdle
+import kotlinx.coroutines.flow.StateFlow
 import android.content.Context
 import com.yukisoffd.lyracode.data.ConversationStore
 import com.yukisoffd.lyracode.workspace.UploadedFile
@@ -50,10 +67,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 data class PendingToolApproval(
     val id: Long,
@@ -89,6 +110,272 @@ data class ContextWindowUsage(
     val updating: Boolean = false,
 )
 
+/** Result of a user-initiated send. The caller clears its draft only for SENT and QUEUED. */
+internal enum class SendOutcome { SENT, QUEUED, BLOCKED }
+
+/** Result of a user-initiated steer. The caller clears its draft only for STEERED. */
+internal enum class SteerOutcome { STEERED, REFUSED }
+
+/**
+ * Why the steer channel can or cannot accept a message right now.
+ *
+ * [AWAITING_APPROVAL], [AWAITING_QUESTION] and [SUB_AGENT_RUNNING] accept the steer, but the
+ * agent can only drain it after the blocking wait resolves, so the UI must not claim
+ * immediate delivery. Every other non-[AVAILABLE] value is a refusal.
+ */
+internal enum class SteerAvailability {
+    AVAILABLE,
+    FEATURE_DISABLED,
+    NO_ACTIVE_GENERATING_RUN,
+    COMPRESSING,
+    SCOPED_DEVICE,
+    MEDIA_GENERATION,
+    SUB_AGENT_TARGET,
+    AWAITING_APPROVAL,
+    AWAITING_QUESTION,
+    SUB_AGENT_RUNNING,
+}
+
+/**
+ * Gate for the transient steer channel.
+ *
+ * Precedence: feature-off, then the states where no steer can ever be drained (scoped
+ * device-control run, compression, media-generation models, sub-agent target), then a run
+ * that is not generating, then the waits that merely delay delivery, then available.
+ *
+ * [generating] must come from the GENERATING operation only. A conversation that is
+ * COMPRESSING inside a generating job is still refused: the agent is not at a steer
+ * boundary, and the compression owns the provider call.
+ *
+ * Media-generation models consume prompt text as generation material and have no agent
+ * loop, so there is no safe boundary to drain a steer.
+ */
+internal fun steerAvailability(
+    featureEnabled: Boolean,
+    generating: Boolean,
+    compressing: Boolean = false,
+    scopedDeviceRunning: Boolean = false,
+    mediaGeneration: Boolean = false,
+    subAgentTarget: Boolean = false,
+    pendingApprovalForConversation: Boolean = false,
+    pendingQuestionForConversation: Boolean = false,
+    subAgentRunning: Boolean = false,
+): SteerAvailability = when {
+    !featureEnabled -> SteerAvailability.FEATURE_DISABLED
+    scopedDeviceRunning -> SteerAvailability.SCOPED_DEVICE
+    compressing -> SteerAvailability.COMPRESSING
+    mediaGeneration -> SteerAvailability.MEDIA_GENERATION
+    subAgentTarget -> SteerAvailability.SUB_AGENT_TARGET
+    !generating -> SteerAvailability.NO_ACTIVE_GENERATING_RUN
+    pendingApprovalForConversation -> SteerAvailability.AWAITING_APPROVAL
+    pendingQuestionForConversation -> SteerAvailability.AWAITING_QUESTION
+    subAgentRunning -> SteerAvailability.SUB_AGENT_RUNNING
+    else -> SteerAvailability.AVAILABLE
+}
+
+/** Whether the steer channel accepts text in this state, even when delivery waits. */
+internal fun SteerAvailability.acceptsSteer(): Boolean = when (this) {
+    SteerAvailability.AVAILABLE,
+    SteerAvailability.AWAITING_APPROVAL,
+    SteerAvailability.AWAITING_QUESTION,
+    SteerAvailability.SUB_AGENT_RUNNING,
+    -> true
+    SteerAvailability.FEATURE_DISABLED,
+    SteerAvailability.NO_ACTIVE_GENERATING_RUN,
+    SteerAvailability.COMPRESSING,
+    SteerAvailability.SCOPED_DEVICE,
+    SteerAvailability.MEDIA_GENERATION,
+    SteerAvailability.SUB_AGENT_TARGET,
+    -> false
+}
+
+/**
+ * A pending approval or question only blocks its own conversation; another conversation's
+ * global prompt slot must not affect this one.
+ */
+internal fun isPendingInteractionForConversation(
+    pendingConversationId: Long?,
+    conversationId: Long,
+): Boolean = pendingConversationId != null && pendingConversationId > 0L && pendingConversationId == conversationId
+
+/** Reason-specific disabled explanation for every refusal state. */
+internal fun SteerAvailability.unavailableExplanationRes(): Int = when (this) {
+    SteerAvailability.FEATURE_DISABLED -> R.string.composer_steer_unavailable_feature_disabled
+    SteerAvailability.NO_ACTIVE_GENERATING_RUN -> R.string.composer_steer_unavailable_no_run
+    SteerAvailability.COMPRESSING -> R.string.composer_steer_unavailable_compressing
+    SteerAvailability.SCOPED_DEVICE -> R.string.composer_steer_unavailable_scoped_device
+    SteerAvailability.MEDIA_GENERATION -> R.string.composer_steer_unavailable_media_generation
+    SteerAvailability.SUB_AGENT_TARGET -> R.string.composer_steer_unavailable_sub_agent_target
+    SteerAvailability.AVAILABLE,
+    SteerAvailability.AWAITING_APPROVAL,
+    SteerAvailability.AWAITING_QUESTION,
+    SteerAvailability.SUB_AGENT_RUNNING,
+    -> R.string.composer_steer_unavailable_default
+}
+
+/** Note shown while a steer is accepted but delivery waits for a blocking interaction. */
+internal fun SteerAvailability.waitNoteRes(): Int? = when (this) {
+    SteerAvailability.AWAITING_APPROVAL -> R.string.composer_steer_wait_approval
+    SteerAvailability.AWAITING_QUESTION -> R.string.composer_steer_wait_question
+    SteerAvailability.SUB_AGENT_RUNNING -> R.string.composer_steer_wait_sub_agent
+    else -> null
+}
+
+/**
+ * True while any owner is running the conversation: a controller job (generating or
+ * compressing) or a scoped device-control task. Sends queue while this is true.
+ */
+internal fun conversationBusy(
+    conversationId: Long,
+    operationActive: Boolean,
+    scopedDeviceRunning: (Long) -> Boolean,
+): Boolean = operationActive || scopedDeviceRunning(conversationId)
+
+/**
+ * Auto-compression temporarily swaps the generating job's operation marker to COMPRESSING.
+ * When compression returns, the same job is generating again, so the marker must be restored:
+ * otherwise steering stays blocked with a compression explanation after compression ended.
+ * A superseded job must not overwrite a newer owner's marker.
+ */
+internal fun shouldRestoreGeneratingMarker(
+    operationIsCompressing: Boolean,
+    owningJobIsCurrent: Boolean,
+): Boolean = operationIsCompressing && owningJobIsCurrent
+
+/**
+ * Maps the store's atomic steer drain to the agent's text-only source. A drained steer is
+ * removed from the channel before it is returned, so each steering text reaches the agent at
+ * most once; blank captures are skipped because the agent persists plain user turns.
+ */
+internal fun steerSourceFrom(drain: (Long) -> List<PendingSteer>): SteerSource = SteerSource { conversationId ->
+    drain(conversationId)
+        .map { steer -> steer.capture.composedInput }
+        .filter { text -> text.isNotBlank() }
+}
+
+/** What the post-run queue handler must do with the conversation's queue items. */
+internal enum class QueueDrain { DELIVER_NEXT, PARK_ALL }
+
+internal const val pendingInputExcerptMaxLength = 60
+private const val LOG_TAG = "ChatController"
+
+/**
+ * Normal completion drains exactly one queued item. Stop, cancellation, failure,
+ * a failed compression, or the feature being off parks every queued item.
+ */
+internal fun queueDrainFor(
+    outcome: ConversationRunOutcome,
+    compressionFailed: Boolean,
+    featureEnabled: Boolean,
+): QueueDrain = if (featureEnabled && outcome == ConversationRunOutcome.Completed && !compressionFailed) {
+    QueueDrain.DELIVER_NEXT
+} else {
+    QueueDrain.PARK_ALL
+}
+
+/** Late steers join the queue in the same mode the queue drain chose. */
+internal fun lateSteerQueueState(drain: QueueDrain): PendingInputState = when (drain) {
+    QueueDrain.DELIVER_NEXT -> PendingInputState.QUEUED
+    QueueDrain.PARK_ALL -> PendingInputState.PARKED
+}
+
+/**
+ * Moves every undrained steer into the persistent queue so late text is not lost.
+ * Steering carries no attachments, so the captured request is enqueued unchanged.
+ */
+internal fun carryLateSteers(
+    store: PendingInputStore,
+    conversationId: Long,
+    state: PendingInputState,
+): List<PendingInputItem> = store.drainSteers(conversationId).map { steer ->
+    store.enqueue(conversationId, steer.capture, state)
+}
+
+internal fun CapturedChatRequest.toPendingInputCapture(): PendingInputCapture = PendingInputCapture(
+    rawText = rawText,
+    composedInput = composedInput,
+    attachments = attachments.map { attachment ->
+        PendingAttachment(
+            name = attachment.name,
+            kind = attachment.mediaKind,
+            mimeType = attachment.mimeType,
+            uri = attachment.uri,
+            size = attachment.size,
+        )
+    },
+    forcedSkillIds = forcedSkillIds.toList(),
+)
+
+internal fun PendingInputCapture.toCapturedChatRequest(): CapturedChatRequest = CapturedChatRequest(
+    rawText = rawText,
+    composedInput = composedInput,
+    forcedSkillIds = forcedSkillIds.toList(),
+    attachments = attachments.map { attachment ->
+        CapturedChatAttachment(
+            name = attachment.name,
+            size = attachment.size,
+            mimeType = attachment.mimeType,
+            mediaKind = attachment.kind,
+            uri = attachment.uri,
+        )
+    },
+)
+
+/** Chip text: the typed text, else the attachment or workspace file that made the item sendable. */
+internal fun pendingInputExcerpt(
+    capture: PendingInputCapture,
+    maxLength: Int = pendingInputExcerptMaxLength,
+): String {
+    val raw = capture.rawText.trim().replace(WHITESPACE_REGEX, " ")
+    if (raw.isNotBlank()) return raw.take(maxLength)
+    val attachmentName = capture.attachments.firstOrNull()?.name.orEmpty().trim()
+    if (attachmentName.isNotBlank()) return attachmentName.take(maxLength)
+    return workspaceFileName(capture.composedInput).take(maxLength)
+}
+
+internal fun composerQueueRowUis(
+    snapshot: PendingInputSnapshot?,
+): List<ComposerQueueRowUi> =
+    snapshot?.let { current ->
+        current.queue.map { item ->
+            ComposerQueueRowUi(
+                id = item.id,
+                excerpt = pendingInputExcerpt(item.capture),
+                attachmentCount = item.capture.attachments.size,
+                missingAttachmentCount = item.capture.attachments.count { it.uri.trim() in current.missingAttachmentUris },
+                state = when (item.state) {
+                    PendingInputState.QUEUED -> ComposerQueueItemState.QUEUED
+                    PendingInputState.PARKED -> ComposerQueueItemState.PARKED
+                },
+            )
+        }
+    }.orEmpty()
+
+/**
+ * URIs in the queue whose backing files are absent. Called when a queue is loaded on IO; the
+ * result is stored in [PendingInputSnapshot.missingAttachmentUris] for composition to read.
+ */
+internal fun missingAttachmentUris(
+    snapshot: PendingInputSnapshot,
+    attachmentExists: (PendingAttachment) -> Boolean,
+): Set<String> = snapshot.queue
+    .asSequence()
+    .flatMap { it.capture.attachments.asSequence() }
+    .filter { it.uri.trim().isNotEmpty() }
+    .filterNot(attachmentExists)
+    .map { it.uri.trim() }
+    .toSet()
+
+private val WHITESPACE_REGEX = Regex("\\s+")
+private val WORKSPACE_REFERENCE_REGEX = Regex("<lyra_workspace_refs_v1>([\\s\\S]*?)</lyra_workspace_refs_v1>")
+
+private fun workspaceFileName(composedInput: String): String =
+    WORKSPACE_REFERENCE_REGEX.find(composedInput)?.let { match ->
+        runCatching {
+            JSONObject(match.groupValues[1]).optJSONArray("files")?.optJSONObject(0)?.optString("name")
+        }.getOrNull()
+    }.orEmpty().trim()
+
 class ChatController(
     private val appContext: Context,
     private val settings: AppSettings,
@@ -96,6 +383,8 @@ class ChatController(
     private val uploadedFileManager: UploadedFileManager,
     private val workspaceManager: WorkspaceManager,
     private val agent: OpenAiAgent,
+    /** Read-only view of the scoped device-control run for one conversation. */
+    private val scopedDeviceRunning: (Long) -> Boolean = DeviceTaskCoordinator::isRunningConversation,
 ) {
     private enum class ConversationOperation {
         GENERATING,
@@ -103,9 +392,66 @@ class ChatController(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    /**
+     * A scoped device task has no controller run outcome, so the coordinator reports when it
+     * releases its conversation. The callback arrives on the coordinator's worker thread:
+     * switch to Main, then recheck that no newer run has taken the conversation before
+     * touching its queue. A completed task drains one item; failure or cancellation parks.
+     */
+    private val deviceConversationIdleListener: (Long, ConversationIdleOutcome) -> Unit = { conversationId, outcome ->
+        scope.launch {
+            // A newer run may have started between the coordinator's notification and this
+            // main-thread coroutine; it owns the queue and releases it when it finishes.
+            if (isConversationBusy(conversationId)) return@launch
+            // Use the in-memory snapshot: an idle conversation with no loaded queue must not
+            // trigger a disk read on the main thread.
+            val queued = pendingInput.snapshots.value[conversationId]?.queuedCount ?: 0
+            if (queued <= 0) return@launch
+            dispatchConversationIdle(
+                outcome = outcome,
+                deliverNext = { deliverNextQueued(conversationId) },
+                parkAll = { parkQueued(conversationId) },
+            )
+        }
+    }
+    /**
+     * Queue file IO and attachment reference checks run on one dedicated thread. It is not a
+     * child of [scope], so close can flush queued writes before cancelling UI work.
+     */
+    private val pendingInputExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "lyra-pending-input").apply { isDaemon = true }
+    }
+    private val pendingInputScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = mutableMapOf<Long, Job>()
+    private val jobOutcomes = mutableMapOf<Long, (ConversationRunOutcome) -> Unit>()
     private val conversationRunGate = ConversationRunGate()
     private val conversationOperations = mutableStateMapOf<Long, ConversationOperation>()
+    /**
+     * One versioned document per conversation. Restored items are always parked; nothing here
+     * can start a run. The checker excludes the conversation being mutated from the persisted
+     * queue scan and also checks delivered user messages.
+     */
+    private val pendingInputFileStore = PendingInputFileStore(
+        filesDir = appContext.filesDir,
+        conversationExists = { id -> conversationStore.conversation(id) != null },
+        deliveredAttachmentUris = { conversationStore.userMessageAttachmentUris() },
+    )
+    private val pendingInput = PendingInputStore(
+        readQueue = pendingInputFileStore::readQueue,
+        writeQueue = pendingInputFileStore::writeQueue,
+        persistenceExecutor = pendingInputExecutor,
+        onPersistenceFailure = { error -> Log.w(LOG_TAG, "Pending input persistence failed", error) },
+    )
+    private val pendingInputReaper = PendingInputAttachmentReaper(pendingInputFileStore, pendingInputExecutor)
+    private val pendingInputRestorer = PendingInputRestorer(
+        fileStore = pendingInputFileStore,
+        store = pendingInput,
+        conversationExists = { id -> conversationStore.conversation(id) != null },
+        onRestored = { id -> markMissingAttachments(id) },
+        onSwept = { id, candidates -> pendingInputReaper.reap(id, candidates) },
+    )
+    /** Read-only queue snapshots for the UI; mutate them only through controller actions. */
+    internal val pendingInputSnapshots: StateFlow<Map<Long, PendingInputSnapshot>> = pendingInput.snapshots
     private var editorContextPath = ""
     private var editorMutationId = 0L
     private var editorActivityId = 0L
@@ -163,6 +509,8 @@ class ChatController(
     private var transientAutoCompressionTurnThreshold = ConversationStore.DEFAULT_AUTO_COMPRESSION_TURNS
     private var transientAutoCompressionTokenThreshold = ConversationStore.DEFAULT_AUTO_COMPRESSION_TOKENS
     private val todoByConversation = mutableMapOf<Long, MutableList<TodoItem>>()
+    /** Recomposes the composer guards when a sub-agent call starts or ends. */
+    private val subAgentRunRevision = mutableIntStateOf(0)
 
     init {
         agent.approvalHandler = ::requestToolApproval
@@ -173,14 +521,62 @@ class ChatController(
         agent.fileEditHandler = ::handleAgentFileEdit
         agent.fileMutationHandler = ::handleAgentFileMutation
         agent.fileActivityHandler = ::handleAgentFileActivity
+        agent.subAgentRunStateChanged = { scope.launch { subAgentRunRevision.intValue++ } }
+        DeviceTaskCoordinator.addConversationIdleListener(deviceConversationIdleListener)
+        // Steers are transient: the store drains them atomically at an agent round boundary.
+        agent.steerSource = steerSourceFrom(pendingInput::drainSteers)
         reloadProfiles()
         markAbandonedRunsInterrupted()
         reloadConversations()
         showTransientNewConversation()
+        pendingInputScope.launch { pendingInputRestorer.restoreAll() }
     }
 
     fun close() {
+        DeviceTaskCoordinator.removeConversationIdleListener(deviceConversationIdleListener)
+        // The executor is independent of [scope]. Flush submits a barrier behind every queued
+        // write and waits for it, so no pending document work is lost to cancellation.
+        runCatching { runBlocking(NonCancellable) { pendingInput.flush() } }
+            .onFailure { error -> Log.w(LOG_TAG, "Pending input flush failed", error) }
+        pendingInputScope.cancel()
+        pendingInputExecutor.shutdown()
+        runCatching { pendingInputExecutor.awaitTermination(5, TimeUnit.SECONDS) }
         scope.cancel()
+    }
+
+    /**
+     * Deletes the persisted queue and reports attachments for the IO reference check. Runs on
+     * the queue executor so an unloaded conversation never reads its document on the main thread;
+     * close's flush barrier is ordered behind this task.
+     */
+    private fun deletePendingInput(conversationId: Long) {
+        runCatching {
+            pendingInputExecutor.execute {
+                runCatching { pendingInputReaper.reap(conversationId, pendingInput.delete(conversationId)) }
+            }
+        }
+    }
+
+    /** Lazily restores a conversation's queue without blocking the main thread. */
+    private fun ensurePendingInputLoaded(conversationId: Long) {
+        if (conversationId <= 0L || pendingInput.snapshots.value.containsKey(conversationId)) return
+        pendingInputScope.launch { loadPendingInput(conversationId) }
+    }
+
+    /** Load and attachment checks are file IO; call only from [pendingInputScope]. */
+    private fun loadPendingInput(conversationId: Long) {
+        pendingInput.load(conversationId)
+        markMissingAttachments(conversationId)
+    }
+
+    /**
+     * Computes missing backing files once per load on IO. Recomposition reads the resulting set
+     * from [PendingInputSnapshot]; it never touches the filesystem.
+     */
+    private fun markMissingAttachments(conversationId: Long) {
+        val snapshot = pendingInput.snapshots.value[conversationId] ?: return
+        val missing = missingAttachmentUris(snapshot, pendingInputFileStore::attachmentExists)
+        pendingInput.updateMissingAttachments(conversationId, missing)
     }
 
     fun usageStore(): ConversationStore = conversationStore
@@ -353,14 +749,17 @@ class ChatController(
         reloadMessages()
         reloadTodos()
         refreshContextWindowUsage()
+        ensurePendingInputLoaded(id)
     }
 
     fun deleteConversation(id: Long) {
-        jobs.remove(id)?.cancel()
-        conversationOperations.remove(id)
+        cancelConversationJob(id)
+        // Delete the messages first: attachments that only that conversation referenced then
+        // become orphans and can be removed with the queue document.
+        conversationStore.deleteConversation(id)
+        deletePendingInput(id)
         autoApprovedConversations.remove(id)
         todoByConversation.remove(id)
-        conversationStore.deleteConversation(id)
         reloadConversations()
         val next = conversations.firstOrNull()?.id
         if (next == null) {
@@ -428,6 +827,7 @@ class ChatController(
     }
 
     fun archiveProject(id: Long) {
+        conversationStore.conversationsForProject(id, archived = null).forEach { pendingInput.archive(it.id) }
         conversationStore.setProjectArchived(id, true)
         if (activeProjectId() == id) showTransientNewConversation()
         reloadConversations()
@@ -441,12 +841,13 @@ class ChatController(
     fun deleteProject(id: Long) {
         val conversationIds = conversationStore.conversationsForProject(id, archived = null).map { it.id }
         conversationIds.forEach { conversationId ->
-            jobs.remove(conversationId)?.cancel()
+            cancelConversationJob(conversationId)
             autoApprovedConversations.remove(conversationId)
             todoByConversation.remove(conversationId)
         }
         val wasActive = activeProjectId() == id
         conversationStore.deleteProject(id)
+        conversationIds.forEach(::deletePendingInput)
         if (wasActive) showTransientNewConversation()
         reloadConversations()
     }
@@ -666,7 +1067,7 @@ class ChatController(
             onDone(Result.failure(IllegalStateException(appContext.getString(R.string.error_no_history_to_compress))))
             return
         }
-        if (jobs[conversationId]?.isActive == true) {
+        if (isConversationBusy(conversationId)) {
             onDone(
                 Result.failure(
                     IllegalStateException(appContext.getString(R.string.error_history_compression_conversation_busy)),
@@ -684,7 +1085,18 @@ class ChatController(
             AppSettings.MAX_HISTORY_COMPRESSION_CHUNKS,
         )
         settings.historyCompressionChunkCount = normalizedChunkCount
-        launchConversationJob(conversationId, ConversationOperation.COMPRESSING) {
+        var compressionSucceeded = false
+        launchConversationJob(
+            conversationId,
+            ConversationOperation.COMPRESSING,
+            onOutcome = { outcome ->
+                handleConversationRunOutcome(
+                    conversationId,
+                    outcome,
+                    compressionFailed = !compressionSucceeded,
+                )
+            },
+        ) {
             conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_RUNNING)
             reloadConversations()
             status.value = appContext.getString(R.string.status_compressing_history)
@@ -699,6 +1111,7 @@ class ChatController(
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 conversationStore.setCompressedContext(conversationId, summary, throughMessageId)
             }
+            compressionSucceeded = result.isSuccess
             result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
             conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_IDLE)
             reloadMessages()
@@ -757,12 +1170,32 @@ class ChatController(
             .exceptionOrNull()
     }
 
+    /**
+     * Runs [maybeAutoCompress] and restores the generating marker afterwards, on success and
+     * on failure. Only the job that still owns the conversation may restore it.
+     */
+    private suspend fun autoCompressDuringRun(conversationId: Long): Throwable? {
+        val owningJob = kotlinx.coroutines.currentCoroutineContext()[Job]
+        return try {
+            maybeAutoCompress(conversationId)
+        } finally {
+            if (shouldRestoreGeneratingMarker(
+                    operationIsCompressing = conversationOperations[conversationId] == ConversationOperation.COMPRESSING,
+                    owningJobIsCurrent = owningJob != null && jobs[conversationId] === owningJob,
+                )
+            ) {
+                conversationOperations[conversationId] = ConversationOperation.GENERATING
+            }
+        }
+    }
+
     fun setConversationPinned(id: Long, pinned: Boolean) {
         conversationStore.setPinned(id, pinned)
         reloadConversations()
     }
 
     fun archiveConversation(id: Long) {
+        pendingInput.archive(id)
         conversationStore.setArchived(id, true)
         reloadConversations()
     }
@@ -774,19 +1207,21 @@ class ChatController(
 
     fun permanentlyDeleteArchivedConversation(id: Long) {
         if (conversationStore.conversation(id)?.archivedAt?.let { it > 0L } != true) return
-        jobs.remove(id)?.cancel()
+        cancelConversationJob(id)
+        conversationStore.deleteConversation(id)
+        deletePendingInput(id)
         autoApprovedConversations.remove(id)
         todoByConversation.remove(id)
-        conversationStore.deleteConversation(id)
         reloadConversations()
     }
 
     fun deleteConversations(ids: Collection<Long>) {
         ids.forEach { id ->
-            jobs.remove(id)?.cancel()
+            cancelConversationJob(id)
+            conversationStore.deleteConversation(id)
+            deletePendingInput(id)
             autoApprovedConversations.remove(id)
             todoByConversation.remove(id)
-            conversationStore.deleteConversation(id)
         }
         reloadConversations()
         if (activeConversationId.value in ids) {
@@ -804,22 +1239,380 @@ class ChatController(
         reloadConversations()
     }
 
-    fun send(text: String, forcedSkillIds: List<String> = emptyList(), workspaceFiles: List<WorkspaceFileReference> = emptyList()) {
+    /**
+     * Handles one user-initiated send. Queueing captures the composed request once and
+     * never touches the draft; callers clear their own editor state on SENT or QUEUED.
+     */
+    internal fun send(
+        text: String,
+        forcedSkillIds: List<String> = emptyList(),
+        workspaceFiles: List<WorkspaceFileReference> = emptyList(),
+    ): SendOutcome {
         val uploads = pendingUploads.toList()
-        if (text.isBlank() && uploads.isEmpty() && workspaceFiles.isEmpty()) return
+        if (!composerHasSendableContent(text, uploads.size, workspaceFiles.size)) return SendOutcome.BLOCKED
+        val activeId = activeConversationId.value
+        // A scoped device-control run owns the conversation too, even though it is not a
+        // controller job: queue instead of starting a concurrent run on the same history.
+        val runActive = isConversationBusy(activeId)
+        if (runActive && !settings.composerDeliveryEnabled) {
+            status.value = appContext.getString(R.string.status_message_refused)
+            return SendOutcome.BLOCKED
+        }
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: createPersistedConversation()
         conversationStore.conversation(conversationId)?.let { workspaceManager.setActiveWorkspaceUri(it.workspaceUri) }
-        if (jobs[conversationId]?.isActive == true) return
-        val isFirstUserMessage = conversationStore.messages(conversationId).none { it.role == "user" }
+        val request = captureChatRequest(
+            rawText = text,
+            uploads = uploads,
+            workspaceFiles = workspaceFiles,
+            forcedSkillIds = forcedSkillIds,
+            editorContextPath = editorContextPath,
+        )
+        if (runActive) {
+            pendingInput.enqueue(conversationId, request.toPendingInputCapture())
+            pendingUploads.clear()
+            uploadingStatus.value = ""
+            status.value = appContext.getString(
+                R.string.status_message_queued,
+                pendingInput.snapshot(conversationId).queuedCount,
+            )
+            return SendOutcome.QUEUED
+        }
         val profile = currentProfile()
         val model = activeModel.value.ifBlank { profile.selectedModel }
-        val userInput = composeUserInput(text, uploads, workspaceFiles)
-        val titleBeforeSend = activeConversation()?.title
+        deliverConversationRequest(
+            conversationId = conversationId,
+            request = request,
+            profile = profile,
+            model = model,
+            clearComposerUploadsOnPersisted = true,
+        )
+        return SendOutcome.SENT
+    }
+
+    /**
+     * Moves one queued or parked message into the active run's steer channel. The item leaves
+     * the queue only after every guard passes, so a refusal never loses it. Steering carries
+     * text only; a captured item with attachments keeps its place in the queue instead of
+     * silently dropping them.
+     */
+    internal fun steerQueued(itemId: String): SteerOutcome {
+        val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return SteerOutcome.REFUSED
+        val availability = steerAvailabilityFor(conversationId)
+        if (!availability.acceptsSteer()) {
+            status.value = appContext.getString(availability.unavailableExplanationRes())
+            return SteerOutcome.REFUSED
+        }
+        val item = pendingInput.snapshot(conversationId).queue.firstOrNull { it.id == itemId }
+            ?: return SteerOutcome.REFUSED
+        if (item.capture.attachments.isNotEmpty()) {
+            status.value = appContext.getString(R.string.status_message_steer_attachments)
+            return SteerOutcome.REFUSED
+        }
+        if (pendingInput.takeForSteering(conversationId, itemId) == null) return SteerOutcome.REFUSED
+        status.value = appContext.getString(
+            availability.waitNoteRes() ?: R.string.status_message_steer_queued,
+        )
+        return SteerOutcome.STEERED
+    }
+
+    /**
+     * Policy inputs for one conversation. The pending approval and question slots are
+     * global in the controller, so they are filtered to the target conversation here.
+     */
+    private fun steerAvailabilityFor(conversationId: Long): SteerAvailability {
+        val conversation = conversationStore.conversation(conversationId)
+        val operation = conversationOperations[conversationId]
+        return steerAvailability(
+            featureEnabled = settings.composerDeliveryEnabled,
+            generating = operation == ConversationOperation.GENERATING,
+            compressing = operation == ConversationOperation.COMPRESSING,
+            scopedDeviceRunning = conversationId > 0L && scopedDeviceRunning(conversationId),
+            mediaGeneration = isMediaGenerationModel(conversation?.model.orEmpty()),
+            subAgentTarget = conversation?.mode == ConversationStore.MODE_SUBAGENT,
+            pendingApprovalForConversation = isPendingInteractionForConversation(
+                pendingToolApproval.value?.request?.conversationId,
+                conversationId,
+            ),
+            pendingQuestionForConversation = isPendingInteractionForConversation(
+                pendingUserQuestion.value?.request?.conversationId,
+                conversationId,
+            ),
+            subAgentRunning = conversationId > 0L && agent.isSubAgentRunning(conversationId),
+        )
+    }
+
+    /**
+     * Current availability for the visible conversation. Reads [subAgentRunRevision] so
+     * Compose recomposes when a sub-agent call starts or ends.
+     */
+    internal fun activeSteerAvailability(): SteerAvailability {
+        subAgentRunRevision.intValue
+        return steerAvailabilityFor(activeConversationId.value)
+    }
+
+    /** Localized refusal explanation for a non-accepting availability value. */
+    internal fun steerUnavailableExplanation(availability: SteerAvailability): String =
+        appContext.getString(availability.unavailableExplanationRes())
+
+    /** Cancels a queued item that has not been delivered. */
+    fun removeQueued(itemId: String) {
+        val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
+        pendingInput.remove(conversationId, itemId)?.let { removal ->
+            pendingInputReaper.reap(conversationId, removal.orphanedAttachments)
+        }
+    }
+
+    /** Synchronous UI view of the loaded queue; IO restores publish through [pendingInputSnapshots]. */
+    internal fun pendingInputSnapshotFor(conversationId: Long = activeConversationId.value): PendingInputSnapshot =
+        pendingInput.snapshots.value[conversationId] ?: PendingInputSnapshot(conversationId)
+
+    /** Manual delivery of a parked item; only when the conversation is idle. */
+    fun sendQueuedNow(itemId: String) {
+        val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
+        val runActive = isConversationBusy(conversationId)
+        if (!composerCanSendParked(runActive)) {
+            status.value = appContext.getString(R.string.status_message_send_now_busy)
+            return
+        }
+        val conversation = conversationForQueuedDelivery(conversationId) ?: return
+        val profile = profileForQueuedDelivery(conversation) ?: return
+        // The item is removed only after every guard passed, so no guard can drop it.
+        val item = pendingInput.takeForDelivery(conversationId, itemId) ?: return
+        deliverQueuedItem(item, conversation, profile)
+    }
+
+    /** Feature-off transition: park everything already waiting so nothing auto-sends. */
+    fun parkAllQueuedForDisabledFeature() {
+        // Loaded queues carry the only QUEUED state; persisted-only queues are already parked.
+        // Park loaded ones synchronously for the UI, then restore every persisted queue on IO so
+        // feature-off covers conversations that were never opened in this process.
+        val loadedQueuedIds = pendingInput.snapshots.value
+            .filterValues { it.queuedCount > 0 }
+            .keys
+            .toList()
+        loadedQueuedIds.forEach(pendingInput::parkAllQueued)
+        pendingInputScope.launch {
+            val activeId = activeConversationId.value
+            (pendingInputFileStore.allConversationIds() + activeId).forEach { conversationId ->
+                if (conversationId > 0L &&
+                    conversationId !in loadedQueuedIds &&
+                    pendingInput.snapshots.value[conversationId] == null &&
+                    conversationStore.conversation(conversationId) != null
+                ) {
+                    pendingInput.load(conversationId)
+                    pendingInput.parkAllQueued(conversationId)
+                }
+            }
+        }
+    }
+
+    private fun deliverConversationRequest(
+        conversationId: Long,
+        request: CapturedChatRequest,
+        profile: ApiProfile,
+        model: String,
+        clearComposerUploadsOnPersisted: Boolean,
+        restoreWorkspaceTo: String? = null,
+    ) {
+        var compressionFailed = false
+        deliverCapturedRequest(
+            conversationId = conversationId,
+            request = request,
+            profile = profile,
+            model = model,
+            onStatus = { text ->
+                if (activeConversationId.value == conversationId) status.value = text
+            },
+            onUpdate = { update ->
+                if (activeConversationId.value == conversationId) {
+                    applyChatUpdate(update)
+                    status.value = update.status
+                }
+            },
+            // Viewer policy is live, not snapshotted: stream updates and the
+            // final status never apply to a conversation the user has switched
+            // away from. The old unconditional end-of-run status writes leaked
+            // into whichever conversation was visible; this is a deliberate
+            // deviation. The conversation list itself is global, so
+            // reloadConversations stays unconditional.
+            onViewerRefresh = {
+                val targetVisible = activeConversationId.value == conversationId
+                if (targetVisible) reloadMessages()
+                reloadConversations()
+                if (targetVisible) refreshContextWindowUsage()
+            },
+            onRunFinished = { failed ->
+                compressionFailed = failed
+                // A hidden run must not overwrite the visible conversation's
+                // finished status; markConversationFinished is viewer-scoped.
+                if (!failed && activeConversationId.value == conversationId) {
+                    markConversationFinished(conversationId)
+                }
+            },
+            onPersisted = {
+                if (clearComposerUploadsOnPersisted) {
+                    pendingUploads.clear()
+                    uploadingStatus.value = ""
+                }
+            },
+            onOutcome = { outcome ->
+                if (restoreWorkspaceTo != null) {
+                    restoreWorkspaceAfterQueuedDelivery(conversationId, restoreWorkspaceTo)
+                }
+                handleConversationRunOutcome(conversationId, outcome, compressionFailed)
+            },
+        )
+    }
+
+    /**
+     * Runs after the completed job has left the registry and the run gate is free.
+     * Only one queued item is delivered per completed run; every other outcome parks.
+     * Late steers move into the queue before the drain so a completed run can deliver
+     * them as its next run (older queue items stay ahead). Stop, cancellation and
+     * failure park them instead of dropping text the UI already acknowledged.
+     */
+    private fun handleConversationRunOutcome(
+        conversationId: Long,
+        outcome: ConversationRunOutcome,
+        compressionFailed: Boolean,
+    ) {
+        val drain = queueDrainFor(outcome, compressionFailed, settings.composerDeliveryEnabled)
+        val carried = carryLateSteers(
+            store = pendingInput,
+            conversationId = conversationId,
+            state = lateSteerQueueState(drain),
+        )
+        if (outcome == ConversationRunOutcome.Completed &&
+            carried.isNotEmpty() &&
+            activeConversationId.value == conversationId &&
+            conversationStore.conversation(conversationId) != null
+        ) {
+            // A following delivered/running/parked status may replace this one; when
+            // the item cannot be delivered, this status explains where the text went.
+            status.value = appContext.getString(R.string.status_message_steer_carried)
+        }
+        when (drain) {
+            QueueDrain.DELIVER_NEXT -> deliverNextQueued(conversationId)
+            QueueDrain.PARK_ALL -> parkQueued(conversationId)
+        }
+    }
+
+    private fun parkQueued(conversationId: Long) {
+        val queued = pendingInput.snapshot(conversationId).queuedCount
+        if (queued <= 0) return
+        pendingInput.parkAllQueued(conversationId)
+        if (activeConversationId.value == conversationId) {
+            status.value = appContext.getString(R.string.status_message_parked, queued)
+        }
+    }
+
+    private fun deliverNextQueued(conversationId: Long) {
+        if (!settings.composerDeliveryEnabled) {
+            parkQueued(conversationId)
+            return
+        }
+        val runActive = isConversationBusy(conversationId)
+        if (runActive) return
+        val conversation = conversationForQueuedDelivery(conversationId) ?: return
+        val profile = profileForQueuedDelivery(conversation) ?: return
+        val item = pendingInput.deliverNextQueued(conversationId) ?: return
+        deliverQueuedItem(item, conversation, profile)
+    }
+
+    /**
+     * Validates the delivery target before the item leaves the queue. A deleted
+     * conversation discards its queue; an archived one keeps its items parked.
+     */
+    private fun conversationForQueuedDelivery(conversationId: Long): Conversation? {
+        val conversation = conversationStore.conversation(conversationId) ?: run {
+            deletePendingInput(conversationId)
+            return null
+        }
+        if (conversation.archivedAt > 0L || isProjectArchived(conversation.projectId)) {
+            pendingInput.archive(conversationId)
+            return null
+        }
+        return conversation
+    }
+
+    /** Never substitute the visible profile: the item must run under its own. */
+    private fun profileForQueuedDelivery(conversation: Conversation): ApiProfile? {
+        val profile = profiles.firstOrNull { it.id == conversation.profileId }
+        if (profile == null) {
+            pendingInput.parkAllQueued(conversation.id)
+            if (activeConversationId.value == conversation.id) {
+                status.value = appContext.getString(R.string.status_message_profile_unavailable)
+            }
+        }
+        return profile
+    }
+
+    private fun deliverQueuedItem(
+        item: PendingInputItem,
+        conversation: Conversation,
+        profile: ApiProfile,
+    ) {
+        val model = conversation.model.ifBlank { profile.selectedModel }
+        // Delivery may target a hidden conversation. WorkspaceManager is one global
+        // mutable workspace, so a visible conversation can re-point it while this
+        // run is active and the run's tools can then use the wrong files. This is
+        // accepted pre-existing overlap: per-conversation runs already share one
+        // workspace. Scoped device-control runs are also invisible here (ticket
+        // #10). The prior workspace is restored after the run only if nothing has
+        // re-pointed it in the meantime.
+        val previousWorkspace = workspaceManager.activeWorkspaceUri()
+        workspaceManager.setActiveWorkspaceUri(conversation.workspaceUri)
+        if (activeConversationId.value == item.conversationId) {
+            // The delivered run's first status_running overwrites this immediately;
+            // chip removal from the strip is the durable delivery signal.
+            status.value = appContext.getString(R.string.status_message_delivered)
+        }
+        deliverConversationRequest(
+            conversationId = item.conversationId,
+            request = item.capture.toCapturedChatRequest(),
+            profile = profile,
+            model = model,
+            clearComposerUploadsOnPersisted = false,
+            restoreWorkspaceTo = previousWorkspace,
+        )
+    }
+
+    private fun restoreWorkspaceAfterQueuedDelivery(conversationId: Long, previousWorkspace: String) {
+        val deliveredWorkspace = conversationStore.conversation(conversationId)?.workspaceUri.orEmpty()
+        if (workspaceManager.activeWorkspaceUri() == deliveredWorkspace) {
+            workspaceManager.setActiveWorkspaceUri(previousWorkspace)
+        }
+    }
+
+    private fun isProjectArchived(projectId: Long): Boolean =
+        projectId > 0L && conversationStore.project(projectId)?.archivedAt?.let { it > 0L } == true
+
+
+    /**
+     * Delivers a captured request to one explicit conversation. Viewer-scoped
+     * UI work is delegated to the caller, so a delivery does not depend on or
+     * write into whichever conversation happens to be visible.
+     */
+    internal fun deliverCapturedRequest(
+        conversationId: Long,
+        request: CapturedChatRequest,
+        profile: ApiProfile,
+        model: String,
+        onStatus: (String) -> Unit = {},
+        onUpdate: (ChatUpdate) -> Unit = {},
+        onViewerRefresh: () -> Unit = {},
+        onRunFinished: (compressionFailed: Boolean) -> Unit = {},
+        onPersisted: () -> Unit = {},
+        onOutcome: (ConversationRunOutcome) -> Unit = {},
+    ) {
+        val isFirstUserMessage = conversationStore.messages(conversationId).none { it.role == "user" }
+        val titleBeforeSend = conversationStore.conversation(conversationId)?.title
+        val defaultTitle = appContext.getString(R.string.default_conversation_title)
         val provisionalTitle = if (titleBeforeSend in setOf(
-                appContext.getString(R.string.default_conversation_title),
+                defaultTitle,
                 appContext.getString(R.string.title_new_chat),
             )) {
-            fallbackConversationTitle(userInput)
+            fallbackConversationTitle(request.composedInput, defaultTitle)
         } else {
             null
         }
@@ -831,15 +1624,13 @@ class ChatController(
             profileId = profile.id,
             model = model,
         )
-        conversationStore.addMessage(conversationId, "user", userInput, profileId = profile.id, model = model)
-        reloadMessages()
-        reloadConversations()
-        pendingUploads.clear()
-        uploadingStatus.value = ""
+        conversationStore.addMessage(conversationId, "user", request.composedInput, profileId = profile.id, model = model)
+        onViewerRefresh()
+        onPersisted()
         if (isFirstUserMessage) {
             val topicProfile = settings.topicSummaryProfile()
             val topicModel = settings.topicSummaryModel.ifBlank { topicProfile.selectedModel }
-            val topicInput = text.trim().ifBlank { fallbackConversationTitle(userInput) }
+            val topicInput = request.rawText.trim().ifBlank { fallbackConversationTitle(request.composedInput, defaultTitle) }
             scope.launch {
                 runCatching { agent.summarizeConversationTopic(topicProfile, topicModel, topicInput) }
                     .onSuccess { title ->
@@ -859,28 +1650,36 @@ class ChatController(
                     }
             }
         }
-        launchConversationJob(conversationId, ConversationOperation.GENERATING) {
-            status.value = appContext.getString(R.string.status_running)
-            agent.chat(conversationId, userInput, profile, model, userMessagePersisted = true, forcedSkillIds = forcedSkillIds) {
+        launchConversationJob(conversationId, ConversationOperation.GENERATING, onOutcome) {
+            onStatus(appContext.getString(R.string.status_running))
+            agent.chat(conversationId, request.composedInput, profile, model, userMessagePersisted = true, forcedSkillIds = request.forcedSkillIds) {
                 withContext(Dispatchers.Main) {
-                    if (activeConversationId.value == conversationId) {
-                        applyChatUpdate(it)
-                        status.value = it.status
-                    }
+                    onUpdate(it)
                 }
             }
-            val compressionError = maybeAutoCompress(conversationId)
-            reloadMessages()
-            reloadConversations()
-            refreshContextWindowUsage()
-            if (compressionError == null) markConversationFinished(conversationId)
+            val compressionError = autoCompressDuringRun(conversationId)
+            onViewerRefresh()
+            onRunFinished(compressionError != null)
         }
     }
 
     fun stopActive() {
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
+        // A scoped device task owns the conversation outside the controller's job registry;
+        // stop that task instead of only touching controller state.
+        if (scopedDeviceRunning(conversationId)) {
+            DeviceTaskCoordinator.pause()
+            status.value = appContext.getString(R.string.status_interrupted)
+            return
+        }
         jobs[conversationId]?.cancel()
         conversationOperations.remove(conversationId)
+        // Park synchronously: a new send can supersede the cancelled job before its
+        // outcome callback runs, and a superseded job deliberately skips that callback.
+        pendingInput.parkAllQueued(conversationId)
+        // The stopped agent will not drain again, and the skipped outcome callback
+        // cannot preserve accepted steers, so park them from this stop path explicitly.
+        carryLateSteers(pendingInput, conversationId, PendingInputState.PARKED)
         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_INTERRUPTED)
         pendingToolApproval.value?.takeIf { it.request.conversationId == conversationId }?.let { pending ->
             approvalWaiters.remove(pending.id)?.complete(
@@ -905,6 +1704,9 @@ class ChatController(
         jobs.keys.toList().forEach { id ->
             if (conversationStore.conversation(id)?.profileId in profileIds) {
                 jobs[id]?.cancel()
+                // Same supersession race as stopActive: park before the job unwinds.
+                pendingInput.parkAllQueued(id)
+                carryLateSteers(pendingInput, id, PendingInputState.PARKED)
                 conversationStore.setConversationMeta(id, status = ConversationStore.STATUS_INTERRUPTED)
             }
         }
@@ -914,12 +1716,20 @@ class ChatController(
 
     fun continueActive() {
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
-        if (jobs[conversationId]?.isActive == true) return
+        if (isConversationBusy(conversationId)) {
+            status.value = appContext.getString(R.string.status_message_run_busy)
+            return
+        }
         if (conversationStore.conversation(conversationId)?.status != ConversationStore.STATUS_INTERRUPTED) return
         conversationStore.conversation(conversationId)?.let { workspaceManager.setActiveWorkspaceUri(it.workspaceUri) }
         val profile = currentProfile()
         val model = activeModel.value.ifBlank { profile.selectedModel }
-        launchConversationJob(conversationId, ConversationOperation.GENERATING) {
+        var compressionFailed = false
+        launchConversationJob(
+            conversationId,
+            ConversationOperation.GENERATING,
+            onOutcome = { outcome -> handleConversationRunOutcome(conversationId, outcome, compressionFailed) },
+        ) {
             conversationStore.setConversationMeta(
                 conversationId,
                 status = ConversationStore.STATUS_RUNNING,
@@ -936,7 +1746,8 @@ class ChatController(
                     }
                 }
             }
-            val compressionError = maybeAutoCompress(conversationId)
+            val compressionError = autoCompressDuringRun(conversationId)
+            compressionFailed = compressionError != null
             reloadMessages()
             reloadConversations()
             refreshContextWindowUsage()
@@ -946,7 +1757,10 @@ class ChatController(
 
     fun editAndRegenerateUserMessage(messageId: Long, newContent: String) {
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
-        if (jobs[conversationId]?.isActive == true) return
+        if (isConversationBusy(conversationId)) {
+            status.value = appContext.getString(R.string.status_message_run_busy)
+            return
+        }
         val message = conversationStore.message(messageId) ?: return
         if (message.conversationId != conversationId || message.role != "user") return
         conversationStore.conversation(conversationId)?.let { workspaceManager.setActiveWorkspaceUri(it.workspaceUri) }
@@ -957,7 +1771,12 @@ class ChatController(
         reloadConversations()
         val profile = currentProfile()
         val model = activeModel.value.ifBlank { profile.selectedModel }
-        launchConversationJob(conversationId, ConversationOperation.GENERATING) {
+        var compressionFailed = false
+        launchConversationJob(
+            conversationId,
+            ConversationOperation.GENERATING,
+            onOutcome = { outcome -> handleConversationRunOutcome(conversationId, outcome, compressionFailed) },
+        ) {
             status.value = appContext.getString(R.string.status_regenerate)
             agent.continueConversation(conversationId, profile, model) {
                 withContext(Dispatchers.Main) {
@@ -967,7 +1786,8 @@ class ChatController(
                     }
                 }
             }
-            val compressionError = maybeAutoCompress(conversationId)
+            val compressionError = autoCompressDuringRun(conversationId)
+            compressionFailed = compressionError != null
             reloadMessages()
             reloadConversations()
             refreshContextWindowUsage()
@@ -1018,92 +1838,6 @@ class ChatController(
         pendingUploads.getOrNull(index) ?: return
         pendingUploads.removeAt(index)
         uploadingStatus.value = if (pendingUploads.isEmpty()) "" else appContext.getString(R.string.label_pending_attachments, pendingUploads.size)
-    }
-
-    private fun composeUserInput(text: String, uploads: List<UploadedFile>, workspaceFiles: List<WorkspaceFileReference> = emptyList()): String {
-        return buildString {
-            val cleanText = text.trim()
-            if (cleanText.isNotBlank()) append(cleanText)
-            workspaceFiles.distinctBy { it.relativePath }.take(24).takeIf { it.isNotEmpty() }?.let { files ->
-                if (isNotBlank()) append("\n\n")
-                append(workspaceReferenceMarker(files))
-            }
-            editorContextPath.takeIf { it.isNotBlank() }?.let { path ->
-                if (isNotBlank()) append("\n\n")
-                append(editorContextMarker(path))
-            }
-            uploads.forEach { file ->
-                if (isNotBlank()) append("\n\n")
-                append(uploadedAttachmentMarker(file))
-            }
-        }
-    }
-
-
-    private fun workspaceReferenceMarker(files: List<WorkspaceFileReference>): String {
-        val payload = JSONObject()
-            .put("instruction", "Prioritize these workspace files explicitly selected by the user. Every path is workspace-relative.")
-            .put("files", org.json.JSONArray().also { array ->
-                files.forEach { file ->
-                    array.put(JSONObject().put("name", file.name).put("path", file.relativePath).put("size", file.size))
-                }
-            })
-        return "$WORKSPACE_REFERENCE_MARKER_START$payload$WORKSPACE_REFERENCE_MARKER_END"
-    }
-
-    private fun editorContextMarker(path: String): String {
-        val payload = JSONObject()
-            .put("path", path)
-            .put(
-                "instruction",
-                "This is the Android shared-storage file currently open in the user's editor. Read it with global_read_file/global_read_file_lines as needed; prefer global_edit_file for precise changes and preserve the user-approval flow. Workspace tools may be used for related files when a workspace is selected.",
-            )
-        return "$EDITOR_CONTEXT_MARKER_START$payload$EDITOR_CONTEXT_MARKER_END"
-    }
-
-    private fun uploadedAttachmentMarker(file: UploadedFile): String {
-        val payload = JSONObject()
-            .put("name", file.name)
-            .put("kind", file.mediaKind)
-            .put("mime_type", file.mimeType)
-            .put("size", file.size)
-            .put("uri", file.uri)
-        if (file.mediaKind == "text") {
-            payload.put("text", file.content)
-        }
-        return "$ATTACHMENT_MARKER_START$payload$ATTACHMENT_MARKER_END"
-    }
-
-    private companion object {
-        const val ATTACHMENT_MARKER_START = "<lyra_attachment_v1>"
-        const val ATTACHMENT_MARKER_END = "</lyra_attachment_v1>"
-        const val WORKSPACE_REFERENCE_MARKER_START = "<lyra_workspace_refs_v1>"
-        const val WORKSPACE_REFERENCE_MARKER_END = "</lyra_workspace_refs_v1>"
-        const val EDITOR_CONTEXT_MARKER_START = "<lyra_editor_context_v1>"
-        const val EDITOR_CONTEXT_MARKER_END = "</lyra_editor_context_v1>"
-    }
-    private fun fallbackConversationTitle(userInput: String): String {
-        val markerRegex = Regex("<lyra_attachment_v1>([\\s\\S]*?)</lyra_attachment_v1>")
-        val workspaceRegex = Regex("<lyra_workspace_refs_v1>([\\s\\S]*?)</lyra_workspace_refs_v1>")
-        val editorRegex = Regex("<lyra_editor_context_v1>([\\s\\S]*?)</lyra_editor_context_v1>")
-        val workspaceTitle = workspaceRegex.find(userInput)?.let { match ->
-            runCatching { JSONObject(match.groupValues[1]).optJSONArray("files")?.optJSONObject(0)?.optString("name") }.getOrNull()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { "@$it" }
-        }
-        val attachmentTitle = markerRegex.find(userInput)?.let { match ->
-            runCatching { JSONObject(match.groupValues[1]).optString("name") }.getOrNull()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { "上传附件：$it" }
-        }
-        return editorRegex.replace(workspaceRegex.replace(markerRegex.replace(userInput, ""), ""), "")
-            .lineSequence()
-            .firstOrNull()
-            .orEmpty()
-            .replace(Regex("""\s+"""), " ")
-            .trim()
-            .take(36)
-            .ifBlank { workspaceTitle ?: attachmentTitle ?: appContext.getString(R.string.default_conversation_title) }
     }
 
     fun fetchModels(onDone: (Result<List<String>>) -> Unit) {
@@ -1293,30 +2027,64 @@ class ChatController(
     private fun launchConversationJob(
         conversationId: Long,
         operation: ConversationOperation,
+        onOutcome: (ConversationRunOutcome) -> Unit = {},
         block: suspend CoroutineScope.() -> Unit,
     ): Job {
         lateinit var launchedJob: Job
         launchedJob = scope.launch(start = CoroutineStart.LAZY) {
+            var failure: Throwable? = null
             try {
                 conversationRunGate.run(conversationId) { block() }
+            } catch (error: Throwable) {
+                failure = error
+                throw error
             } finally {
                 // A cancelled job may finish after a new operation has already
-                // started for this conversation. Only clear our own state.
+                // started for this conversation. Only clear our own state. A
+                // superseded run also skips its outcome callback here because
+                // the registry entry now belongs to the newer job. Deletion
+                // paths report Cancelled through cancelConversationJob instead.
                 if (jobs[conversationId] === launchedJob) {
                     jobs.remove(conversationId)
                     conversationOperations.remove(conversationId)
+                    val outcomeCallback = jobOutcomes.remove(conversationId)
+                    val status = runCatching { conversationStore.conversation(conversationId)?.status }.getOrNull()
+                    val outcome = classifyRunOutcome(failure, status)
+                    runCatching { outcomeCallback?.invoke(outcome) }
                 }
             }
         }
         jobs[conversationId] = launchedJob
+        jobOutcomes[conversationId] = onOutcome
         conversationOperations[conversationId] = operation
         launchedJob.start()
         return launchedJob
     }
 
+    private fun cancelConversationJob(conversationId: Long) {
+        val job = jobs.remove(conversationId) ?: return
+        val outcomeCallback = jobOutcomes.remove(conversationId)
+        conversationOperations.remove(conversationId)
+        job.cancel()
+        // The job's own finally now sees a foreign registry entry and skips its
+        // outcome, so report the deletion cancellation from here instead. The
+        // callback observes the registry and operation state already cleared.
+        runCatching { outcomeCallback?.invoke(ConversationRunOutcome.Cancelled) }
+    }
+
     fun isActiveConversationRunning(): Boolean = conversationOperations.containsKey(activeConversationId.value)
 
-    fun canContinueActive(): Boolean = !isActiveConversationRunning() &&
+    /** Unified busy predicate shared by controller actions, the screen, and the web bridge. */
+    private fun isConversationBusy(conversationId: Long): Boolean = conversationBusy(
+        conversationId = conversationId,
+        operationActive = conversationOperations.containsKey(conversationId),
+        scopedDeviceRunning = scopedDeviceRunning,
+    )
+
+    /** True while any owner runs the visible conversation, including a scoped device task. */
+    fun isActiveConversationBusy(): Boolean = isConversationBusy(activeConversationId.value)
+
+    fun canContinueActive(): Boolean = !isActiveConversationBusy() &&
         activeConversation()?.status == ConversationStore.STATUS_INTERRUPTED
 
     fun isActiveConversationGenerating(): Boolean =
@@ -1400,7 +2168,13 @@ class ChatController(
 
     private fun applyChatUpdate(update: ChatUpdate) {
         if (update.messageId <= 0L) {
-            reloadMessagesThrottled()
+            // A drained steer just inserted a user turn; its typed flag bypasses the throttle
+            // so the new bubble cannot be hidden behind a streaming token update.
+            if (update.forceReload) {
+                reloadMessages()
+            } else {
+                reloadMessagesThrottled()
+            }
             return
         }
         if (messageLoadJob?.isActive == true) updatesDuringLoad[update.messageId] = update

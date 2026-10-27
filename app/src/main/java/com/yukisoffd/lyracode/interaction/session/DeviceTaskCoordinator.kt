@@ -20,10 +20,74 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+
+/** Why a scoped device task released its conversation. */
+internal enum class ConversationIdleOutcome {
+    COMPLETED,
+    FAILED,
+    CANCELLED,
+}
+
+/**
+ * Final outcome from the body's explicit outcome flag and the job's completion cause.
+ * A body that swallowed an exception still reports failure, so only a true normal
+ * completion may deliver a queued follow-up. Cancellation parks like failure.
+ */
+internal fun deviceTaskIdleOutcome(
+    bodyOutcome: ConversationIdleOutcome,
+    completionCause: Throwable?,
+): ConversationIdleOutcome = when {
+    completionCause == null -> bodyOutcome
+    completionCause is CancellationException -> ConversationIdleOutcome.CANCELLED
+    else -> ConversationIdleOutcome.FAILED
+}
+
+/**
+ * A task superseded while a newer task is active on the same conversation must stay
+ * silent: the newer task releases that queue when it finishes.
+ */
+internal fun isSupersededIdleNotification(
+    token: Long,
+    generation: Long,
+    newerTaskActiveOnConversation: Boolean,
+): Boolean = token != generation && newerTaskActiveOnConversation
+
+/**
+ * Listeners notified after a scoped device task releases its conversation.
+ *
+ * The coordinator knows nothing about queues or agent runs; the chat controller uses
+ * this seam to drain or park a follow-up that was queued while the device task owned
+ * the conversation. A failing listener must not break job completion.
+ *
+ * Listeners run synchronously on the completing task's thread (a Default dispatcher
+ * worker), never on the main thread. A listener must not touch UI or block; the chat
+ * controller switches to Main and rechecks ownership there.
+ */
+internal class ConversationIdleCallbacks {
+    private val listeners = LinkedHashSet<(Long, ConversationIdleOutcome) -> Unit>()
+
+    @Synchronized
+    fun add(listener: (Long, ConversationIdleOutcome) -> Unit) {
+        listeners += listener
+    }
+
+    @Synchronized
+    fun remove(listener: (Long, ConversationIdleOutcome) -> Unit) {
+        listeners -= listener
+    }
+
+    fun notify(conversationId: Long, outcome: ConversationIdleOutcome) {
+        val snapshot = synchronized(this) { listeners.toList() }
+        snapshot.forEach { listener -> runCatching { listener(conversationId, outcome) } }
+    }
+}
 
 /** One explicitly requested foreground task at a time; process death never resumes actions. */
 internal object DeviceTaskCoordinator {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val idleCallbacks = ConversationIdleCallbacks()
     private var job: Job? = null
     private var generation = 0L
     private var taskExpiry = 0L
@@ -109,6 +173,14 @@ internal object DeviceTaskCoordinator {
             status = "思考中", providerLabel = "${profile.name} · ${profile.selectedModel}",
             modelLabel = profile.selectedModel, pureMode = settings.purePromptMode,
         ), target)
+        // The chat controller may have queued a follow-up while this task owned the
+        // conversation and needs to know when it becomes free again. Start from the
+        // conversation this task will reuse, if any, so an early failure still parks its
+        // queue. A session change cleared the id; the body replaces this value once it
+        // resolves or creates the conversation. Atomics make both values safely visible
+        // to the completion hook.
+        val taskConversationId = AtomicLong(conversationId ?: 0L)
+        val bodyOutcome = AtomicReference(ConversationIdleOutcome.CANCELLED)
         val next = scope.launch(start = CoroutineStart.LAZY) {
             var store: ConversationStore? = null
             var monitor: Job? = null
@@ -134,6 +206,7 @@ internal object DeviceTaskCoordinator {
                     conversationId?.takeIf { store.conversation(it) != null }
                         ?: store.createConversation(profile.id, profile.selectedModel, title = "悬浮对话 · ${input.take(24)}", workspaceUri = floatingWorkspace ?: settings.workspaceUri.orEmpty()).also { conversationId = it }
                 }
+                taskConversationId.set(id)
                 val provider = DeviceInteractionToolProvider(id, target.orEmpty(), expiry,
                     ExecutionBudget(SystemClock::elapsedRealtime),
                     checkAvailability = { checkAvailability(app) },
@@ -182,9 +255,16 @@ internal object DeviceTaskCoordinator {
                     }
                 }
                 update(token) { it.copy(running = false, status = "已完成") }
+                bodyOutcome.set(ConversationIdleOutcome.COMPLETED)
             } catch (error: CancellationException) {
+                // The body swallows cancellation to update the overlay; it must still
+                // report cancellation so a queued follow-up is parked, never delivered.
+                bodyOutcome.set(ConversationIdleOutcome.CANCELLED)
                 update(token) { it.copy(running = false, status = "已中断，可重新发起任务") }
             } catch (error: Exception) {
+                // Swallowing the exception keeps the process alive, but the release must
+                // not look like a normal completion.
+                bodyOutcome.set(ConversationIdleOutcome.FAILED)
                 update(token) { it.copy(running = false, status = "任务停止：${error.message.orEmpty().take(180)}") }
             } finally {
                 monitor?.cancel()
@@ -197,6 +277,23 @@ internal object DeviceTaskCoordinator {
                 }
                 synchronized(this@DeviceTaskCoordinator) { if (token == generation) activeAgent = null }
                 store?.close()
+            }
+        }
+        // Completion (not the job body's finally) is the point where isRunningConversation
+        // has already turned false, so a listener can safely release a queued follow-up.
+        next.invokeOnCompletion { cause ->
+            val id = taskConversationId.get().takeIf { it > 0L } ?: return@invokeOnCompletion
+            // A newer task may own this conversation before this one finishes; it will
+            // release the queue itself, so a stale completion must stay silent.
+            val superseded = synchronized(this@DeviceTaskCoordinator) {
+                isSupersededIdleNotification(
+                    token = token,
+                    generation = generation,
+                    newerTaskActiveOnConversation = job !== next && job?.isActive == true && conversationId == id,
+                )
+            }
+            if (!superseded) {
+                idleCallbacks.notify(id, deviceTaskIdleOutcome(bodyOutcome.get(), cause))
             }
         }
         job = next
@@ -221,6 +318,29 @@ internal object DeviceTaskCoordinator {
         conversationId = null
         ManualControlController.setApproval(null)
         ManualControlController.updateChat(ManualControlController.state.value.chat.copy(messages = emptyList(), running = false, status = ""), null)
+    }
+
+    /**
+     * Read-only query for other subsystems (the chat composer's steer guards). A scoped
+     * device task owns its persisted conversation and is invisible to ChatController's job
+     * registry, so callers need this to avoid starting a concurrent run or accepting a
+     * steer the device agent will never drain.
+     */
+    @Synchronized
+    fun isRunningConversation(id: Long): Boolean = job?.isActive == true && conversationId == id
+
+    /**
+     * Registers a listener for the end of a scoped device task on its conversation.
+     * The listener runs on the completing task's thread (not Main) and must not touch
+     * UI or block.
+     */
+    fun addConversationIdleListener(listener: (Long, ConversationIdleOutcome) -> Unit) {
+        idleCallbacks.add(listener)
+    }
+
+    /** Removes a listener registered with [addConversationIdleListener]. */
+    fun removeConversationIdleListener(listener: (Long, ConversationIdleOutcome) -> Unit) {
+        idleCallbacks.remove(listener)
     }
 
     @Synchronized

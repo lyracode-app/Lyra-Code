@@ -474,6 +474,7 @@ internal fun SettingsScreen(
                     "storage" -> StorageCacheSettings()
                     "prompts" -> PromptSettingsScreen(settings, controller.settingsRevision.intValue)
                     "memories" -> MemorySettingsScreen(settings)
+                    "composer" -> ComposerSettingsScreen(settings)
                     "skills" -> SkillsScreen(
                         skills = skills,
                         status = skillStatus,
@@ -551,6 +552,7 @@ internal fun SettingsScreen(
             SettingsMenuEntry(Icons.Default.EditNote, context.getString(R.string.menu_system_prompt), context.getString(R.string.menu_system_prompt_desc), "prompts"),
             SettingsMenuEntry(Icons.Default.Psychology, context.getString(R.string.menu_memory), context.getString(R.string.menu_memory_desc, settings.memories().count { it.enabled }), "memories"),
             SettingsMenuEntry(Icons.Default.School, context.getString(R.string.menu_skills), context.getString(R.string.menu_skills_desc, skills.size), "skills"),
+            SettingsMenuEntry(Icons.Default.Send, context.getString(R.string.menu_composer), context.getString(R.string.menu_composer_desc), "composer"),
         )
         val generalEntries = listOf(
             SettingsMenuEntry(Icons.Default.Construction, context.getString(R.string.menu_agent_tools), context.getString(R.string.menu_agent_tools_desc), "tools"),
@@ -769,6 +771,7 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "backup" -> context.getString(R.string.detail_backup)
     "prompts" -> context.getString(R.string.detail_prompts)
     "memories" -> context.getString(R.string.detail_memories)
+    "composer" -> context.getString(R.string.detail_composer)
     "skills" -> context.getString(R.string.detail_skills)
     "licenses" -> context.getString(R.string.detail_licenses)
     "about" -> context.getString(R.string.detail_about)

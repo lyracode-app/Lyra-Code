@@ -109,6 +109,9 @@ internal fun ChatMessageComposer(
     enabled: Boolean,
     canSend: Boolean,
     isRunning: Boolean,
+    stopVisible: Boolean,
+    sendWhileRunning: Boolean,
+    sendAction: ComposerSendAction,
     onOpenMenu: () -> Unit,
     onOpenReasoning: () -> Unit,
     onOpenContextInfo: () -> Unit,
@@ -130,6 +133,9 @@ internal fun ChatMessageComposer(
         settings = settings,
         canSend = canSend,
         isRunning = isRunning,
+        stopVisible = stopVisible,
+        sendWhileRunning = sendWhileRunning,
+        sendAction = sendAction,
         onFullscreen = { fullscreen = true },
         onOpenMenu = onOpenMenu,
         onOpenReasoning = onOpenReasoning,
@@ -185,6 +191,9 @@ internal fun ChatMessageComposer(
                         settings = settings,
                         canSend = canSend,
                         isRunning = isRunning,
+                        stopVisible = stopVisible,
+                        sendWhileRunning = sendWhileRunning,
+                        sendAction = sendAction,
                         showFullscreen = false,
                         onFullscreen = {},
                         onOpenMenu = {
@@ -246,12 +255,41 @@ private fun ComposerTextEditor(
     )
 }
 
+/** Kept separate so the composed Stop path can be tested without a controller. */
+@Composable
+internal fun ComposerStopButton(
+    visible: Boolean,
+    accent: Color,
+    onStop: () -> Unit,
+) {
+    AnimatedVisibility(visible) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(accent)
+                .clickable(onClick = onStop),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Stop,
+                contentDescription = stringResource(R.string.cd_stop),
+                modifier = Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ComposerActionBar(
     controller: ChatController,
     settings: AppSettings,
     canSend: Boolean,
     isRunning: Boolean,
+    stopVisible: Boolean,
+    sendWhileRunning: Boolean,
+    sendAction: ComposerSendAction,
     showFullscreen: Boolean = true,
     onFullscreen: () -> Unit,
     onOpenMenu: () -> Unit,
@@ -341,24 +379,8 @@ private fun ComposerActionBar(
                 tint = composerAccent.first,
             )
         }
-        AnimatedVisibility(isRunning) {
-            Box(
-                modifier = Modifier
-                    .size(26.dp)
-                    .clip(CircleShape)
-                    .background(composerAccent.first)
-                    .clickable(onClick = onStop),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.Stop,
-                    contentDescription = stringResource(R.string.cd_stop),
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                )
-            }
-        }
-        AnimatedVisibility(canSend && !isRunning) {
+        ComposerStopButton(visible = stopVisible, accent = composerAccent.first, onStop = onStop)
+        AnimatedVisibility(canSend && (!isRunning || sendWhileRunning)) {
             Box(
                 modifier = Modifier
                     .size(26.dp)
@@ -369,7 +391,12 @@ private fun ComposerActionBar(
             ) {
                 Icon(
                     Icons.Default.ArrowUpward,
-                    contentDescription = stringResource(R.string.cd_send),
+                    contentDescription = stringResource(
+                        when (sendAction) {
+                            ComposerSendAction.QUEUE -> R.string.cd_queue
+                            ComposerSendAction.SEND, ComposerSendAction.BLOCKED -> R.string.cd_send
+                        },
+                    ),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onPrimary,
                 )
