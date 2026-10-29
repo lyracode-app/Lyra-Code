@@ -584,6 +584,13 @@ class OpenAiAgent(
                 currentCoroutineContext().ensureActive()
                 scopedToolsFor(conversationId)?.let {
                     if (it.finished) {
+                        it.completionSummary?.takeIf(String::isNotBlank)?.let { summary ->
+                            val messageId = conversationStore.addMessage(
+                                conversationId, "assistant", summary, profileId = profile.id, model = model,
+                            )
+                            activeAssistantId = messageId
+                            onUpdate(ChatUpdate(summary, "", uiText(R.string.ui_model_completed), messageId, forceReload = true))
+                        }
                         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_IDLE)
                         return
                     }
@@ -670,20 +677,39 @@ class OpenAiAgent(
                 result.toolCalls.forEach { call ->
                     currentCoroutineContext().ensureActive()
                     if (scopedToolsFor(conversationId)?.finished == true) return@forEach
+                    // Scoped tools may wait for foreground approval or be interrupted. Keep
+                    // their row in execution order before starting, and update that same row.
+                    val pendingToolId = if (scopedToolsFor(conversationId) != null) {
+                        conversationStore.addMessage(
+                            conversationId, "tool", runningToolStatus(call),
+                            profileId = profile.id, model = model, toolCallId = call.id,
+                        ).also {
+                            onUpdate(ChatUpdate("", "", runningToolStatus(call), forceReload = true))
+                        }
+                    } else null
                     onUpdate(ChatUpdate(result.content, result.thinking, runningToolStatus(call), assistantId))
-                    val toolResult = executeTool(conversationId, call) { toolStatus ->
-                        onUpdate(ChatUpdate(result.content, result.thinking, toolStatus, assistantId))
+                    val toolResult = try {
+                        val output = executeTool(conversationId, call) { toolStatus ->
+                            onUpdate(ChatUpdate(result.content, result.thinking, toolStatus, assistantId))
+                        }
+                        currentCoroutineContext().ensureActive()
+                        output
+                    } catch (error: Throwable) {
+                        pendingToolId?.let {
+                            conversationStore.updateMessage(it, content = uiText(R.string.ui_request_interrupted) + error.message.orEmpty())
+                        }
+                        throw error
                     }
-                    currentCoroutineContext().ensureActive()
-                    conversationStore.addMessage(
-                        conversationId,
-                        "tool",
-                        toolResult.take(MAX_TOOL_RESULT_CHARS),
-                        profileId = profile.id,
-                        model = model,
-                        toolCallId = call.id,
-                    )
-                    onUpdate(ChatUpdate(result.content, result.thinking, uiText(R.string.ui_tool_complete) + call.name, assistantId))
+                    if (pendingToolId != null) {
+                        conversationStore.updateMessage(pendingToolId, content = toolResult)
+                        onUpdate(ChatUpdate("", "", uiText(R.string.ui_tool_complete) + call.name, forceReload = true))
+                    } else {
+                        conversationStore.addMessage(
+                            conversationId, "tool", toolResult.take(MAX_TOOL_RESULT_CHARS),
+                            profileId = profile.id, model = model, toolCallId = call.id,
+                        )
+                        onUpdate(ChatUpdate(result.content, result.thinking, uiText(R.string.ui_tool_complete) + call.name, assistantId))
+                    }
                 }
             }
         } catch (error: CancellationException) {

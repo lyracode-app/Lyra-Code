@@ -56,8 +56,8 @@ android {
         applicationId = "com.yukisoffd.lyracode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 89
-        versionName = "4.2.0"
+        versionCode = 90
+        versionName = "4.2.1"
 
         if (!enableAbiSplits) {
             ndk {

@@ -168,6 +168,14 @@ class DeviceAgentSessionTest {
         assertTrue(runCatching { provider.execute("device_observe", JSONObject()) }.isFailure)
     }
 
+    @Test fun finishRetainsTheEntireUserFacingSummary() = runBlocking {
+        val provider = start()
+        val summary = "设备交互记录\n".repeat(900) + "结尾必须保留"
+        provider.execute("device_finish", JSONObject().put("summary", summary))
+        assertEquals(summary, provider.completionSummary)
+        assertTrue(provider.finished)
+    }
+
     @Test fun safeClickDispatchesWithoutUserApprovalAndKeepsVerification() = runBlocking {
         val provider = start()
         var dispatched = 0

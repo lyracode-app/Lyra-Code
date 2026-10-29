@@ -4,6 +4,10 @@ import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
 import android.os.SystemClock
+import com.yukisoffd.lyracode.ai.ChatUpdate
+import com.yukisoffd.lyracode.ai.RUNTIME_CONTEXT_ROLE
+import com.yukisoffd.lyracode.ai.enrichToolRecords
+import com.yukisoffd.lyracode.ai.toRecord
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.ConversationStore
 import com.yukisoffd.lyracode.interaction.DeviceInteractionAvailability
@@ -88,6 +92,7 @@ internal class ConversationIdleCallbacks {
 internal object DeviceTaskCoordinator {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val idleCallbacks = ConversationIdleCallbacks()
+    private val updateListeners = java.util.concurrent.CopyOnWriteArraySet<(Long, ChatUpdate) -> Unit>()
     private var job: Job? = null
     private var generation = 0L
     private var taskExpiry = 0L
@@ -201,27 +206,28 @@ internal object DeviceTaskCoordinator {
                     }
                 }
                 // The same persisted conversation is reused until the user clears context.
-                store = ConversationStore(app)
+                val taskStore = ConversationStore(app)
+                store = taskStore
                 val id = synchronized(this@DeviceTaskCoordinator) {
-                    conversationId?.takeIf { store.conversation(it) != null }
-                        ?: store.createConversation(profile.id, profile.selectedModel, title = "悬浮对话 · ${input.take(24)}", workspaceUri = floatingWorkspace ?: settings.workspaceUri.orEmpty()).also { conversationId = it }
+                    conversationId?.takeIf { taskStore.conversation(it) != null }
+                        ?: taskStore.createConversation(profile.id, profile.selectedModel, title = "悬浮对话 · ${input.take(24)}", workspaceUri = floatingWorkspace ?: settings.workspaceUri.orEmpty()).also { conversationId = it }
                 }
                 taskConversationId.set(id)
+                fun reloadTranscript() {
+                    val records = enrichToolRecords(taskStore.messages(id).filterNot { it.role == RUNTIME_CONTEXT_ROLE }.map { it.toRecord() })
+                    update(token) { it.copy(messages = records.map { record -> record.toDeviceChatMessage() }) }
+                }
+                taskStore.addMessage(id, "user", input, profileId = profile.id, model = profile.selectedModel)
+                reloadTranscript()
+                publishUpdate(token, id, ChatUpdate("", "", "思考中", forceReload = true))
                 val provider = DeviceInteractionToolProvider(id, target.orEmpty(), expiry,
                     ExecutionBudget(SystemClock::elapsedRealtime),
                     checkAvailability = { checkAvailability(app) },
                     onStatus = { status -> update(token) { it.copy(status = status.take(240)) } },
-                    onTool = { eventId, name, result -> update(token) { chat ->
-                        val message = DeviceChatMessage(eventId, "tool", result, toolName = name, createdAt = chat.messages.firstOrNull { it.id == eventId }?.createdAt ?: System.currentTimeMillis())
-                        chat.copy(messages = if (chat.messages.any { it.id == eventId })
-                            chat.messages.map { if (it.id == eventId) message else it }
-                            else chat.messages + message)
-                    } },
-                    onFinish = { summary -> update(token) {
-                        it.copy(messages = it.messages + DeviceChatMessage(-System.nanoTime(), "assistant", summary))
-                    } },
+                    // OpenAiAgent persists the summary after device_finish's tool result.
+                    onFinish = {},
                 )
-                val agent = DeviceAgentFactory.create(app, settings, store, floatingWorkspace ?: settings.workspaceUri)
+                val agent = DeviceAgentFactory.create(app, settings, taskStore, floatingWorkspace ?: settings.workspaceUri)
                 agent.scopedTools = provider
                 agent.userQuestionHandler = { request ->
                     DeviceQuestionBroker.ask(request, app.getString(com.yukisoffd.lyracode.R.string.ask_user_recommended))
@@ -241,19 +247,26 @@ internal object DeviceTaskCoordinator {
                 provider.capabilityProbe = { provider.extended!!.capabilities() }
                 activeAgent = agent
                 run {
-                    agent.chat(id, input, profile, profile.selectedModel, propagateErrors = true) { delta ->
+                    agent.chat(id, input, profile, profile.selectedModel, userMessagePersisted = true, propagateErrors = true) { delta ->
+                        if (delta.forceReload || delta.messageId <= 0L) reloadTranscript()
+                        val storedMessage = if (delta.messageId > 0L && ManualControlController.state.value.chat.messages.none { it.id == delta.messageId }) {
+                            taskStore.message(delta.messageId)?.toRecord()?.toDeviceChatMessage()
+                        } else null
                         update(token) { chat ->
-                            val messages = if (delta.content.isBlank() && delta.thinking.isBlank()) chat.messages else {
-                                val messageId = token * 1_000_000L + delta.messageId
-                                val message = DeviceChatMessage(messageId, "assistant", delta.content, thinking = delta.thinking, createdAt = chat.messages.firstOrNull { it.id == messageId }?.createdAt ?: System.currentTimeMillis())
-                                if (chat.messages.any { it.id == messageId }) chat.messages.map { if (it.id == messageId) message else it }
-                                else chat.messages + message
+                            val messages = if (delta.messageId <= 0L) chat.messages else {
+                                val existing = chat.messages.firstOrNull { it.id == delta.messageId } ?: storedMessage
+                                val message = existing?.copy(text = delta.content, thinking = delta.thinking)
+                                if (message == null) chat.messages
+                                else if (chat.messages.any { it.id == message.id }) chat.messages.map { if (it.id == message.id) message else it }
+                                else (chat.messages + message).sortedBy { it.id }
                             }
                             chat.copy(messages = messages, status = if (ManualControlController.state.value.selection != null)
                                 chat.status else delta.status.take(240))
                         }
+                        publishUpdate(token, id, delta)
                     }
                 }
+                reloadTranscript()
                 update(token) { it.copy(running = false, status = "已完成") }
                 bodyOutcome.set(ConversationIdleOutcome.COMPLETED)
             } catch (error: CancellationException) {
@@ -268,6 +281,23 @@ internal object DeviceTaskCoordinator {
                 update(token) { it.copy(running = false, status = "任务停止：${error.message.orEmpty().take(180)}") }
             } finally {
                 monitor?.cancel()
+                // Also reconcile interrupted/failed tool rows before closing the store.
+                val savedId = taskConversationId.get()
+                store?.let { savedStore ->
+                    runCatching {
+                        if (savedId > 0L) {
+                            val records = enrichToolRecords(savedStore.messages(savedId).filterNot { it.role == RUNTIME_CONTEXT_ROLE }.map { it.toRecord() })
+                            synchronized(this@DeviceTaskCoordinator) {
+                                val state = ManualControlController.state.value
+                                // pause() invalidates live deltas, but may still reconcile this
+                                // task's final rows. A new task or cleared context must win.
+                                if (job === coroutineContext[Job] && conversationId == savedId && state.sessionId == sessionId) {
+                                    ManualControlController.updateChat(state.chat.copy(messages = records.map { record -> record.toDeviceChatMessage() }))
+                                }
+                            }
+                        }
+                    }.onFailure { android.util.Log.w("DeviceTaskCoordinator", "Could not reconcile device transcript", it) }
+                }
                 synchronized(this@DeviceTaskCoordinator) {
                     if (token == generation && ManualControlController.state.value.sessionId == sessionId) {
                         ManualControlController.clearSelection()
@@ -341,6 +371,15 @@ internal object DeviceTaskCoordinator {
     /** Removes a listener registered with [addConversationIdleListener]. */
     fun removeConversationIdleListener(listener: (Long, ConversationIdleOutcome) -> Unit) {
         idleCallbacks.remove(listener)
+    }
+
+    /** Worker-thread updates from the persisted conversation, shared with the main chat. */
+    fun addConversationUpdateListener(listener: (Long, ChatUpdate) -> Unit) { updateListeners += listener }
+    fun removeConversationUpdateListener(listener: (Long, ChatUpdate) -> Unit) { updateListeners -= listener }
+
+    private fun publishUpdate(token: Long, id: Long, delta: ChatUpdate) {
+        if (synchronized(this) { token != generation }) return
+        updateListeners.forEach { listener -> runCatching { listener(id, delta) } }
     }
 
     @Synchronized

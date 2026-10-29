@@ -26,6 +26,7 @@ internal object DeviceChatTranscriptStore {
                     writer.name("text").value(message.text)
                     writer.name("thinking").value(message.thinking)
                     writer.name("toolName").value(message.toolName)
+                    writer.name("toolInput").value(message.toolInput)
                     writer.name("createdAt").value(message.createdAt)
                     writer.endObject()
                 }
@@ -51,6 +52,7 @@ internal object DeviceChatTranscriptStore {
                         var text = ""
                         var thinking = ""
                         var toolName = ""
+                        var toolInput = ""
                         var createdAt = 0L
                         reader.beginObject()
                         while (reader.hasNext()) when (reader.nextName()) {
@@ -59,11 +61,12 @@ internal object DeviceChatTranscriptStore {
                             "text" -> text = reader.nextString()
                             "thinking" -> thinking = reader.nextString()
                             "toolName" -> toolName = reader.nextString()
+                            "toolInput" -> toolInput = reader.nextString()
                             "createdAt" -> createdAt = reader.nextLong()
                             else -> reader.skipValue()
                         }
                         reader.endObject()
-                        add(DeviceChatMessage(id, role, text, thinking, toolName, createdAt))
+                        add(DeviceChatMessage(id, role, text, thinking, toolName, createdAt, toolInput))
                     }
                     reader.endArray()
                 }
