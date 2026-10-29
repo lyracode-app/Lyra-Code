@@ -52,6 +52,13 @@
 #include "attribute.h"
 #include "compat.h"
 
+/* Not in compat.h: glibc >= 2.43 declares SYS_SECCOMP as an enum
+ * constant in <signal.h>, so the fallback must only be seen once
+ * <signal.h> has been included.  */
+#ifndef SYS_SECCOMP
+#define SYS_SECCOMP 1
+#endif
+
 static bool seccomp_after_ptrace_enter = false;
 static bool seccomp_ptrace_event_supported = false;
 
@@ -424,6 +431,13 @@ int event_loop()
 		/* Get information about this tracee. */
 		tracee = get_tracee(NULL, pid, true);
 		assert(tracee != NULL);
+
+		/* The execve(2) of a thread other than the leader of
+		 * its process is reported with the PID of the leader
+		 * (see get_execve_tracee()).  */
+		if (WIFSTOPPED(tracee_status)
+		    && (tracee_status & 0xfff00) >> 8 == (SIGTRAP | PTRACE_EVENT_EXEC << 8))
+			tracee = get_execve_tracee(tracee);
 
 		tracee->running = false;
 

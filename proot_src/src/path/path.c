@@ -111,13 +111,47 @@ int join_paths(int number_paths, char result[PATH_MAX], ...)
 }
 
 /**
- * Put in @host_path the full path to the given shell @command.  The
+ * Put in @guest_path the canonicalized form of @path, like realpath2()
+ * but without the translation: the guest path can't be told from the
+ * host one when that latter is bound elsewhere too, for instance
+ * "-b /bin:/foo" makes "/usr/bin/test" "/foo/test" as well, and a
+ * relative symlink doesn't lead to the same place from both.  This
+ * function returns -errno on error, otherwise 0.
+ */
+static int guest_realpath(Tracee *tracee, char guest_path[PATH_MAX], const char *path, bool deref_final)
+{
+	char base[PATH_MAX];
+	char joined[PATH_MAX];
+	int status;
+
+	if (tracee == NULL)
+		return realpath2(tracee, guest_path, path, deref_final);
+
+	if (path[0] == '/')
+		strcpy(base, "/");
+	else {
+		status = getcwd2(tracee, base);
+		if (status < 0)
+			return status;
+	}
+
+	status = join_paths(2, joined, base, path);
+	if (status < 0)
+		return status;
+
+	strcpy(guest_path, "/");
+	return canonicalize(tracee, joined, deref_final, guest_path, 0);
+}
+
+/**
+ * Put in @guest_path the full path to the given shell @command.  The
  * @command is searched in @paths if not null, otherwise in $PATH
  * (relatively to the @tracee's file-system name-space).  This
  * function always returns -1 on error, otherwise 0.
  */
-int which(Tracee *tracee, const char *paths, char host_path[PATH_MAX], const char *command)
+int which(Tracee *tracee, const char *paths, char guest_path[PATH_MAX], const char *command)
 {
+	char host_path[PATH_MAX];
 	char path[PATH_MAX];
 	const char *cursor;
 	struct stat statr;
@@ -142,11 +176,9 @@ int which(Tracee *tracee, const char *paths, char host_path[PATH_MAX], const cha
 			return -EACCES;
 		}
 
-		found = true;
-
 		/* Don't dereference the final component to preserve
 		 * argv0 in case it is a symlink to script.  */
-		(void) realpath2(tracee, host_path, command, false);
+		found = (guest_realpath(tracee, guest_path, command, false) == 0);
 	}
 	else
 		found = false;
@@ -191,12 +223,11 @@ int which(Tracee *tracee, const char *paths, char host_path[PATH_MAX], const cha
 		if (status == 0
 		    && stat(host_path, &statr) == 0
 		    && S_ISREG(statr.st_mode)
-		    && (statr.st_mode & S_IXUSR) != 0) {
-			/* Don't dereference the final component to preserve
-			 * argv0 in case it is a symlink to script.  */
-			(void) realpath2(tracee, host_path, path, false);
+		    && (statr.st_mode & S_IXUSR) != 0
+		    /* Don't dereference the final component to preserve
+		     * argv0 in case it is a symlink to script.  */
+		    && guest_realpath(tracee, guest_path, path, false) == 0)
 			return 0;
-		}
 	} while (*(cursor - 1) != '\0');
 
 not_found:
@@ -225,12 +256,33 @@ not_found:
  */
 int realpath2(Tracee *tracee, char host_path[PATH_MAX], const char *path, bool deref_final)
 {
+	char parent[PATH_MAX];
+	const char *name;
 	int status;
 
-	if (tracee == NULL)
-		status = (realpath(path, host_path) == NULL ? -errno : 0);
-	else
-		status = translate_path(tracee, host_path, AT_FDCWD, path, deref_final);
+	if (tracee != NULL)
+		return translate_path(tracee, host_path, AT_FDCWD, path, deref_final);
+
+	name = strrchr(path, '/');
+	name = (name == NULL ? path : name + 1);
+
+	/* realpath(3) dereferences the final component in any case: a
+	 * symbolic link to a multi-call program, "false" to coreutils
+	 * on Termux for instance, would be run under the name of that
+	 * program.  */
+	if (deref_final || name[0] == '\0' || strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+		return (realpath(path, host_path) == NULL ? -errno : 0);
+
+	if ((size_t) (name - path) >= PATH_MAX)
+		return -ENAMETOOLONG;
+	memcpy(parent, path, name - path);
+	parent[name - path] = '\0';
+
+	if (realpath(parent[0] != '\0' ? parent : ".", host_path) == NULL)
+		return -errno;
+	strcpy(parent, host_path);
+
+	status = join_paths(2, host_path, parent, name);
 	return status;
 }
 

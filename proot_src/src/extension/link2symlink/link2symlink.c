@@ -1,5 +1,5 @@
 #include <stdio.h>     /* rename(2), renameat(2), */
-#include <stdlib.h>    /* atoi */
+#include <stdlib.h>    /* getenv, free, */
 #include <fcntl.h>     /* open(2), openat(2), AT_FDCWD, O_*, */
 #include <unistd.h>    /* symlink(2), symlinkat(2), readlink(2), lstat(2), unlink(2), unlinkat(2)*/
 #include <string.h>    /* str*, strrchr, strcat, strcpy, strncpy, strncmp */
@@ -10,6 +10,7 @@
 #include <limits.h>    /* PATH_MAX, */
 #include <ctype.h>     /* isdigit, */
 #include <stdbool.h>   /* bool, true, false, */
+#include <dirent.h>    /* DT_LNK, IFTODT, */
 #include <talloc.h>    /* talloc_*, */
 
 #include "cli/note.h"
@@ -33,7 +34,19 @@
 #endif 
 #define DELETED_SUFFIX " (deleted)"
 
-static int decrement_link_count(Tracee *tracee, Reg sysarg);
+#ifndef RENAME_NOREPLACE
+#define RENAME_NOREPLACE (1 << 0)
+#endif
+#ifndef RENAME_EXCHANGE
+#define RENAME_EXCHANGE (1 << 1)
+#endif
+
+#ifndef IFTODT
+#define IFTODT(mode) (((mode) & S_IFMT) >> 12)
+#endif
+
+static int decrement_intermediate_count(Tracee *tracee, const char original[PATH_MAX],
+					const char intermediate[PATH_MAX]);
 
 /**
  * Configuration of this extension, attached to each tracee.  It only
@@ -50,6 +63,13 @@ typedef struct {
 	 * was redirected away from, when this syscall is about to return
 	 * a descriptor on it.  Empty otherwise.  */
 	char pending_link[PATH_MAX];
+
+	/* Host path of the faked hard link the syscall being processed
+	 * is about to remove -- unlink(2), or rename(2) onto it -- and
+	 * the intermediate it points to, c.f. remember_removed_link().
+	 * Empty otherwise.  */
+	char removed_link[PATH_MAX];
+	char removed_intermediate[PATH_MAX];
 } Link2SymlinkConfig;
 
 /**
@@ -222,7 +242,7 @@ static int l2s_entry(const char *path, int *dir_fd, const char **name)
  * when that is where it lies.  They keep the return convention of the
  * calls they stand for: 0 or -1 with errno set.
  */
-static int l2s_access(const char *path)
+static int l2s_lstat(const char *path, struct stat *statl)
 {
 	const char *name;
 	int dir_fd;
@@ -230,9 +250,7 @@ static int l2s_access(const char *path)
 	if (l2s_entry(path, &dir_fd, &name) < 0)
 		return -1;
 
-	/* No AT_SYMLINK_NOFOLLOW: access(2) follows, and a dangling
-	 * intermediate has always counted as a free slot here.  */
-	return (dir_fd < 0) ? access(path, F_OK) : faccessat(dir_fd, name, F_OK, 0);
+	return (dir_fd < 0) ? lstat(path, statl) : fstatat(dir_fd, name, statl, AT_SYMLINK_NOFOLLOW);
 }
 
 static int l2s_symlink(const char *target, const char *path)
@@ -295,7 +313,7 @@ static int my_readlink(const char symlink[PATH_MAX], char value[PATH_MAX])
 		? readlink(symlink, value, PATH_MAX)
 		: readlinkat(dir_fd, name, value, PATH_MAX);
 	if (size < 0)
-		return size;
+		return -errno;
 	if (size >= PATH_MAX)
 		return -ENAMETOOLONG;
 	value[size] = '\0';
@@ -322,47 +340,97 @@ static bool is_open_syscall(Sysnum sysnum)
 }
 
 /**
- * Check whether @host_path names a file this extension has moved into
- * the l2s directory, that is, "<PREFIX><name><NNNN>.<NNNN>".
+ * The highest link count, c.f. get_link_count().
  */
-static bool is_l2s_file(const char *host_path)
+#define MAX_LINK_COUNT 999999999
+
+/**
+ * Return the link count recorded in the name of @host_path, a file this
+ * extension has moved into the l2s directory, that is,
+ * "<PREFIX><name><NNNN>.<count>" where <NNNN> is the suffix of its
+ * intermediate and <count> is written with 4 digits at least -- 5 from
+ * 10000 links on -- and 9 at most, so it fits an int.  This function
+ * returns -1 if @host_path is not named that way.
+ */
+static int get_link_count(const char *host_path)
 {
 	const char *name;
+	const char *dot;
 	size_t length;
 	size_t i;
+	int count;
 
 	name = strrchr(host_path, '/');
 	if (name == NULL)
-		return false;
+		return -1;
 	name++;
 
 	if (strncmp(name, PREFIX, strlen(PREFIX)) != 0)
-		return false;
+		return -1;
 
-	/* 5 = strlen(".0002")  */
-	length = strlen(name);
-	if (length < strlen(PREFIX) + 5)
-		return false;
+	/* Note: PREFIX ends with a dot, hence there's one.  */
+	dot = strrchr(name, '.');
+	if ((size_t) (dot - name) < strlen(PREFIX) + 4)
+		return -1;
 
-	if (name[length - 5] != '.')
-		return false;
-
+	/* Not "dot[-i]": -i is a huge unsigned offset, clang 21 then
+	 * assumes dot is NULL, and PRoot crashes.  */
 	for (i = 1; i <= 4; i++) {
-		if (!isdigit(name[length - i]))
-			return false;
+		if (!isdigit((unsigned char) *(dot - i)))
+			return -1;
 	}
 
-	return true;
+	length = strlen(dot + 1);
+	if (length < 4 || length > 9)
+		return -1;
+
+	count = 0;
+	for (i = 1; i <= length; i++) {
+		if (!isdigit((unsigned char) dot[i]))
+			return -1;
+		count = count * 10 + (dot[i] - '0');
+	}
+
+	return count;
 }
 
 /**
- * Copy in @final the path of the file the faked hard link @link -- a
- * host path -- refers to.  This function returns -errno if @link is
- * not a faked hard link or if it is a broken one, otherwise 0.
+ * Check whether @host_path names a file this extension has moved into
+ * the l2s directory, c.f. get_link_count().
  */
-static int resolve_faked_hard_link(const char link[PATH_MAX], char final[PATH_MAX])
+static bool is_l2s_file(const char *host_path)
 {
-	char intermediate[PATH_MAX];
+	return get_link_count(host_path) >= 0;
+}
+
+/**
+ * Copy in @new_final the name the file @final -- c.f. get_link_count()
+ * -- has once its link count is @link_count.  This function returns
+ * -errno if an error occured, otherwise 0.
+ */
+static int name_link_count(const char final[PATH_MAX], int link_count, char new_final[PATH_MAX])
+{
+	int length;
+	int status;
+
+	/* The count is rewritten as a whole, rather than its last 4
+	 * characters, since it gains or loses a digit at 10000.  */
+	length = strrchr(final, '.') + 1 - final;
+
+	status = snprintf(new_final, PATH_MAX, "%.*s%04d", length, final, link_count);
+	if (status < 0 || status >= PATH_MAX)
+		return -ENAMETOOLONG;
+
+	return 0;
+}
+
+/**
+ * Copy in @intermediate the path of the intermediate the faked hard
+ * link @link -- a host path -- points to.  This function returns
+ * -errno if @link is not a faked hard link, otherwise 0.
+ */
+static int read_faked_hard_link(const char link[PATH_MAX], char intermediate[PATH_MAX])
+{
 	const char *name;
 	int status;
 
@@ -378,7 +446,78 @@ static int resolve_faked_hard_link(const char link[PATH_MAX], char final[PATH_MA
 	if (strncmp(name, PREFIX, strlen(PREFIX)) != 0)
 		return -EINVAL;
 
+	return 0;
+}
+
+/**
+ * Copy in @final the path of the file the faked hard link @link -- a
+ * host path -- refers to.  This function returns -errno if @link is
+ * not a faked hard link or if it is a broken one, otherwise 0.
+ */
+static int resolve_faked_hard_link(const char link[PATH_MAX], char final[PATH_MAX])
+{
+	char intermediate[PATH_MAX];
+	int status;
+
+	status = read_faked_hard_link(link, intermediate);
+	if (status < 0)
+		return status;
+
 	return my_readlink(intermediate, final);
+}
+
+/**
+ * Copy in @final the path of the file the @intermediate -- a host path
+ * -- points to.  This function returns -errno if @intermediate can't be
+ * read, -ENOENT if it doesn't point to a file named with a link count,
+ * that is, if the chain is broken, otherwise 0.
+ */
+static int read_intermediate(const char intermediate[PATH_MAX], char final[PATH_MAX])
+{
+	int status;
+
+	status = my_readlink(intermediate, final);
+	if (status < 0)
+		return status;
+
+	/* Not a chain this extension made: there is no count to read in
+	 * this name, and nothing to rename or to delete on its behalf.  */
+	if (!is_l2s_file(final))
+		return -ENOENT;
+
+	return 0;
+}
+
+/**
+ * Copy in @intermediate the path of the intermediate that points to
+ * @final, a file this extension has moved into the l2s directory, c.f.
+ * get_link_count().  This function returns -errno if there's none,
+ * otherwise 0.
+ */
+static int find_intermediate(const char final[PATH_MAX], char intermediate[PATH_MAX])
+{
+	char pointee[PATH_MAX];
+	struct stat statf;
+	struct stat statp;
+	size_t length;
+	int status;
+
+	/* "<PREFIX><name><NNNN>" lies next to "<PREFIX><name><NNNN>.<count>".  */
+	length = strrchr(final, '.') - final;
+	memcpy(intermediate, final, length);
+	intermediate[length] = '\0';
+
+	status = read_intermediate(intermediate, pointee);
+	if (status < 0)
+		return status;
+
+	/* The same file, whatever the path spells.  */
+	if (stat(final, &statf) < 0 || stat(pointee, &statp) < 0)
+		return -errno;
+	if (statf.st_dev != statp.st_dev || statf.st_ino != statp.st_ino)
+		return -ENOENT;
+
+	return 0;
 }
 
 /**
@@ -504,12 +643,13 @@ static void remember_dereferenced_link(Extension *extension, const char *link, c
 
 	/* Both a faked hard link and its intermediate point to a name
 	 * that starts with PREFIX, but only the intermediate points to
-	 * its own name followed by the link count: "<name>.<NNNN>".  */
+	 * its own name followed by the link count: "<name>.<NNNN>", with
+	 * more digits from 10000 links on.  */
 	link_name = strrchr(link, '/');
 	link_name = (link_name == NULL ? link : link_name + 1);
 	length = strlen(link_name);
 
-	if (   strlen(name) == length + 5
+	if (   strlen(name) >= length + 5
 	    && strncmp(name, link_name, length) == 0
 	    && name[length] == '.') {
 		for (i = length + 1; isdigit((unsigned char) name[i]); i++)
@@ -580,6 +720,37 @@ static void execve_proc_exe(Extension *extension, struct execve_proc_exe_state *
 }
 
 /**
+ * Make the path @tracee's @link_target_sysarg names a symbolic link to
+ * @target, the content of the ordinary symbolic link link(2) is asked to
+ * link -- it doesn't follow it.  That link is left where it is: its
+ * content is a path of the guest, relative to the directory of the link
+ * more often than not, not the host path the files of a faked hard link
+ * could be created at.  Both names are then two symbolic links with the
+ * same content rather than a single one with a link count of 2; the
+ * content of a symbolic link can't be changed, so this only shows in
+ * their own metadata -- inode, link count, owner, times.  This function
+ * returns -errno if an error occured, otherwise 0.
+ */
+static int link_symbolic_link(Tracee *tracee, const char target[PATH_MAX], Reg link_target_sysarg)
+{
+	char link[PATH_MAX];
+	int status;
+
+	/* Note: this path was already canonicalized.  */
+	status = read_path(tracee, link, peek_reg(tracee, CURRENT, link_target_sysarg));
+	if (status < 0)
+		return status;
+
+	if (symlink(target, link) < 0)
+		return -errno;
+
+	poke_reg(tracee, SYSARG_RESULT, 0);
+	set_sysnum(tracee, PR_void);
+
+	return 0;
+}
+
+/**
  * Move the path pointed to by @tracee's @sysarg to a new location,
  * symlink the original path to this new one, make @tracee's @sysarg
  * point to the new location.  This function returns -errno if an
@@ -629,6 +800,23 @@ static int move_and_symlink_path(Tracee *tracee, Reg sysarg, Reg link_target_sys
 
 		if (strncmp(name, PREFIX, strlen(PREFIX)) == 0)
 			first_link = 0;
+		else {
+			/* An ordinary symbolic link used to be moved as a
+			 * file, under the name its content spells, followed
+			 * by the suffixes: in the directory of PRoot for a
+			 * relative content, and anywhere on the host for an
+			 * absolute one, out of the guest rootfs.  */
+			return link_symbolic_link(tracee, intermediate, link_target_sysarg);
+		}
+	} else if (is_l2s_file(original) && find_intermediate(original, intermediate) == 0) {
+		/* linkat(AT_SYMLINK_FOLLOW) -- what ln(1) does on Termux
+		 * -- is handed the file a faked hard link stands for:
+		 * PRoot dereferenced that link like any symbolic link.
+		 * It is linked like the faked hard link, through its
+		 * intermediate.  It used to be linked as a new file, under
+		 * a name made of its own, so the count of the first chain
+		 * stayed as it was.  */
+		first_link = 0;
 	} else {
 		/* compute new name */
 		name = strrchr(original,'/');
@@ -671,46 +859,77 @@ static int move_and_symlink_path(Tracee *tracee, Reg sysarg, Reg link_target_sys
 	}
 
 	if (first_link) {
-		/*Move the original content to the new path. */
-		do {
+		/* Reserve a free intermediate by creating it, pointing to
+		 * the final file the original one is about to become, since
+		 * symlink(2) fails on anything in the way.  The slot used to
+		 * be told free by access(2), which follows a dangling
+		 * intermediate -- that of a broken chain -- so the file was
+		 * moved, then left without any name when the intermediate
+		 * could not be created.  The final file a broken chain left
+		 * behind is not replaced either, and nothing is moved when
+		 * there's no free slot left.  The suffix has 4 digits, so
+		 * up to 9999 files of the same name can be linked at once:
+		 * per directory, or in the whole l2s directory.  */
+		for (intermediate_suffix = 1; ; intermediate_suffix++) {
+			if (intermediate_suffix > 9999)
+				return -EMLINK;
+
+			status = snprintf(final, PATH_MAX, "%s%04d.0002", intermediate, intermediate_suffix);
+			if (status < 0 || status >= PATH_MAX)
+				return -ENAMETOOLONG;
 			sprintf(new_intermediate, "%s%04d", intermediate, intermediate_suffix);
-			intermediate_suffix++;
-		} while ((l2s_access(new_intermediate) != -1) && (intermediate_suffix < 1000));
+
+			if (l2s_lstat(final, &statl) == 0)
+				continue;
+
+			if (l2s_symlink(final, new_intermediate) == 0)
+				break;
+
+			if (errno != EEXIST)
+				return -errno;
+		}
 		strcpy(intermediate, new_intermediate);
 
-		strcpy(final, intermediate);
-		strcat(final, ".0002");
+		/*Move the original content to the new path. */
 		status = l2s_rename(original, final);
-		if (status < 0)
+		if (status < 0) {
+			status = -errno;
+			(void) l2s_unlink(intermediate);
 			return status;
+		}
 		status = notify_extensions(tracee, LINK2SYMLINK_RENAME, (intptr_t) original, (intptr_t) final);
-		if (status < 0)
-			return status;
-
-		/* Symlink the intermediate to the final file.  */
-		status = l2s_symlink(final, intermediate);
-		if (status < 0)
-			return status;
 
 		/* Symlink the original path to the intermediate one.  */
-		status = symlink(intermediate, original);
-		if (status < 0)
+		if (status >= 0 && symlink(intermediate, original) < 0)
+			status = -errno;
+
+		/* Otherwise put the file back where it was, unless its name
+		 * was taken in the meantime.  */
+		if (status < 0) {
+			if (status != -EEXIST && l2s_rename(final, original) == 0) {
+				(void) notify_extensions(tracee, LINK2SYMLINK_RENAME,
+							(intptr_t) final, (intptr_t) original);
+				(void) l2s_unlink(intermediate);
+			}
 			return status;
+		}
 	} else {
 		/*Move the original content to new location, by incrementing count at end of path. */
-		size = my_readlink(intermediate, final);
-		if (size < 0)
-			return size;
+		status = read_intermediate(intermediate, final);
+		if (status < 0)
+			return status;
 
-		link_count = atoi(final + strlen(final) - 4);
-		link_count++;
+		link_count = get_link_count(final);
+		if (link_count >= MAX_LINK_COUNT)
+			return -EMLINK;
 
-		strncpy(new_final, final, strlen(final) - 4);
-		sprintf(new_final + strlen(final) - 4, "%04d", link_count);
+		status = name_link_count(final, link_count + 1, new_final);
+		if (status < 0)
+			return status;
 
 		status = l2s_rename(final, new_final);
 		if (status < 0)
-			return status;
+			return -errno;
 		status = notify_extensions(tracee, LINK2SYMLINK_RENAME, (intptr_t) final, (intptr_t) new_final);
 		if (status < 0)
 			return status;
@@ -718,21 +937,18 @@ static int move_and_symlink_path(Tracee *tracee, Reg sysarg, Reg link_target_sys
 		/* Symlink the intermediate to the final file.  */
 		status = l2s_unlink(intermediate);
 		if (status < 0)
-			return status;
+			return -errno;
 		status = l2s_symlink(final, intermediate);
 		if (status < 0)
-			return status;
+			return -errno;
 	}
 
 	/* Perform symlink() operation within PRoot.  */
 	status = read_path(tracee, final, peek_reg(tracee, CURRENT, link_target_sysarg));
-	if (status >= 0) {
-		status = symlink(intermediate, final);
-		if (status < 0) status = -errno;
-	}
-	if (status < 0) {
+	if (status >= 0 && symlink(intermediate, final) < 0)
 		status = -errno;
-		decrement_link_count(tracee, sysarg);
+	if (status < 0) {
+		(void) decrement_intermediate_count(tracee, original, intermediate);
 		return status;
 	}
 	poke_reg(tracee, SYSARG_RESULT, 0);
@@ -742,72 +958,40 @@ static int move_and_symlink_path(Tracee *tracee, Reg sysarg, Reg link_target_sys
 }
 
 
-/* If path points a file that is a symlink to a file that begins
- *   with PREFIX, let the file be deleted, but also delete the
- *   symlink that was created and decremnt the count that is tacked
- *   to end of original file.
+/**
+ * Decrement the count of the file the @intermediate of the faked hard
+ * link @original -- both host paths -- points to, deleting both of them
+ * when it was the last link.  This function returns -errno if an error
+ * occured, otherwise 0.
  */
-static int decrement_link_count(Tracee *tracee, Reg sysarg)
+static int decrement_intermediate_count(Tracee *tracee, const char original[PATH_MAX],
+					const char intermediate[PATH_MAX])
 {
-	char original[PATH_MAX];
-	char intermediate[PATH_MAX];
 	char final[PATH_MAX];
 	char new_final[PATH_MAX];
-	char * name;
-	struct stat statl;
-	ssize_t size;
 	int status;
 	int link_count;
-
-	/* Note: this path was already canonicalized.  */
-	size = read_string(tracee, original, peek_reg(tracee, CURRENT, sysarg), PATH_MAX);
-	if (size < 0)
-		return size;
-	if (size >= PATH_MAX)
-		return -ENAMETOOLONG;
-
-	/* Check if it is a converted link already.  */
-	status = lstat(original, &statl);
-	if (status < 0)
-		return 0;
-
-	if (!S_ISLNK(statl.st_mode))
-		return 0;
-
-	size = my_readlink(original, intermediate);
-	if (size < 0)
-		return size;
-
-	name = strrchr(intermediate, '/');
-	if (name == NULL)
-		name = intermediate;
-	else
-		name++;
-
-	/* Check if an l2s file is pointed to */
-	if (strncmp(name, PREFIX, strlen(PREFIX)) != 0)
-		return 0;
 
 	/* Read intermediate link - if this fails then
 	 * this link2symlink is broken and we silently
 	 * skip as we were removing it anyway.  */
-	size = my_readlink(intermediate, final);
-	if (size < 0) {
+	if (read_intermediate(intermediate, final) < 0) {
 		VERBOSE(tracee, 1, "Skiping deref of broken link2symlink \"%s\" -> \"%s\"", original, intermediate);
 		return 0;
 	}
 
-	link_count = atoi(final + strlen(final) - 4);
+	link_count = get_link_count(final);
 	link_count--;
 
 	/* Check if it is or is not the last link to delete */
 	if (link_count > 0) {
-		strncpy(new_final, final, strlen(final) - 4);
-		sprintf(new_final + strlen(final) - 4, "%04d", link_count);
+		status = name_link_count(final, link_count, new_final);
+		if (status < 0)
+			return status;
 
 		status = l2s_rename(final, new_final);
 		if (status < 0)
-			return status;
+			return -errno;
 		status = notify_extensions(tracee, LINK2SYMLINK_RENAME, (intptr_t) final, (intptr_t) new_final);
 		if (status < 0)
 			return status;
@@ -817,23 +1001,338 @@ static int decrement_link_count(Tracee *tracee, Reg sysarg)
 		/* Symlink the intermediate to the final file.  */
 		status = l2s_unlink(intermediate);
 		if (status < 0)
-			return status;
+			return -errno;
 
 		status = l2s_symlink(final, intermediate);
 		if (status < 0)
-			return status;
+			return -errno;
 	} else {
 		/* If it is the last, delete the intermediate and final */
 		status = l2s_unlink(intermediate);
 		if (status < 0)
-			return status;
+			return -errno;
 		status = l2s_unlink(final);
 		if (status < 0)
-			return status;
+			return -errno;
 		status = notify_extensions(tracee, LINK2SYMLINK_UNLINK, (intptr_t) final, 0);
 		if (status < 0)
 			return status;
 		}
+
+	return 0;
+}
+
+/**
+ * Remember the faked hard link @sysarg names, if it is one, as the name
+ * the syscall being processed is about to remove.  Its count is
+ * decremented by forget_removed_link() once the kernel has actually
+ * removed that name: doing it beforehand deleted the data along with
+ * the last link even when the syscall then failed, and otherwise left
+ * the count one too low -- that is, the data deleted later on while a
+ * name of it still existed.  This function returns -errno if an error
+ * occured, otherwise 0.
+ */
+static int remember_removed_link(Extension *extension, Reg sysarg)
+{
+	Tracee *tracee = TRACEE(extension);
+	Link2SymlinkConfig *config;
+	char link[PATH_MAX];
+	char intermediate[PATH_MAX];
+	ssize_t size;
+
+	/* Note: this path was already canonicalized.  */
+	size = read_string(tracee, link, peek_reg(tracee, CURRENT, sysarg), PATH_MAX);
+	if (size < 0)
+		return size;
+	if (size >= PATH_MAX)
+		return -ENAMETOOLONG;
+
+	if (read_faked_hard_link(link, intermediate) < 0)
+		return 0;
+
+	config = get_config(extension, true);
+	if (config == NULL)
+		return -ENOMEM;
+
+	strcpy(config->removed_link, link);
+	strcpy(config->removed_intermediate, intermediate);
+
+	return 0;
+}
+
+/**
+ * Prepare the rename(2) of the path @old_sysarg names to the one
+ * @new_sysarg names, with the renameat2(2) @flags.  This function
+ * returns -errno if an error occured, otherwise 0.
+ */
+static int prepare_rename(Extension *extension, Reg old_sysarg, Reg new_sysarg, word_t flags)
+{
+	Tracee *tracee = TRACEE(extension);
+	Link2SymlinkConfig *config;
+	char old_path[PATH_MAX];
+	char old_intermediate[PATH_MAX];
+	ssize_t size;
+	int status;
+
+	/* Neither of these removes the new name: RENAME_NOREPLACE fails
+	 * when it exists, RENAME_EXCHANGE gives it to the old file.  */
+	if ((flags & (RENAME_NOREPLACE | RENAME_EXCHANGE)) != 0)
+		return 0;
+
+	status = remember_removed_link(extension, new_sysarg);
+	if (status < 0)
+		return status;
+
+	config = get_config(extension, false);
+	if (config == NULL || config->removed_link[0] == '\0')
+		return 0;
+
+	/* Note: this path was already canonicalized.  */
+	size = read_string(tracee, old_path, peek_reg(tracee, CURRENT, old_sysarg), PATH_MAX);
+	if (size < 0)
+		return size;
+	if (size >= PATH_MAX)
+		return -ENAMETOOLONG;
+
+	if (read_faked_hard_link(old_path, old_intermediate) < 0
+	    || strcmp(old_intermediate, config->removed_intermediate) != 0)
+		return 0;
+
+	/* Both names are links to the same file -- or are the same
+	 * name -- in which case rename(2) does nothing.  The kernel
+	 * sees two different symbolic links though, and would replace
+	 * the new one with the old one, that is, remove the old name.
+	 * Have it rename the old name onto itself instead: that is the
+	 * very same no-op, behind the very same checks (EROFS, ...).  */
+	poke_reg(tracee, new_sysarg, peek_reg(tracee, CURRENT, old_sysarg));
+	config->removed_link[0] = '\0';
+
+	return 0;
+}
+
+/**
+ * Decrement the count of the @intermediate of the faked hard link
+ * @link, as decrement_intermediate_count() does, now that the kernel
+ * has removed @link.  The directory of @link was writable to do so, but
+ * maybe only for the duration of that syscall -- that's how fake_id0
+ * grants it, c.f. override_permissions() -- and the directory of
+ * @intermediate can be another one.  The count is PRoot's own business
+ * though, hence the write permission on the latter is granted for the
+ * time being when it's lacking.  This function returns -errno if an
+ * error occured, otherwise 0.
+ */
+static int decrement_removed_link_count(Tracee *tracee, const char link[PATH_MAX],
+					const char intermediate[PATH_MAX])
+{
+	char directory[PATH_MAX];
+	struct stat statl;
+	char *slash;
+	int status;
+
+	status = decrement_intermediate_count(tracee, link, intermediate);
+	if (status != -EACCES)
+		return status;
+
+	strcpy(directory, intermediate);
+	slash = strrchr(directory, '/');
+	if (slash == NULL || slash == directory)
+		return status;
+	*slash = '\0';
+
+	if (stat(directory, &statl) < 0
+	    || chmod(directory, (statl.st_mode & 07777) | S_IWUSR) < 0)
+		return status;
+
+	status = decrement_intermediate_count(tracee, link, intermediate);
+
+	(void) chmod(directory, statl.st_mode & 07777);
+
+	return status;
+}
+
+/**
+ * Decrement the count of the faked hard link remembered by
+ * remember_removed_link(), now that the syscall being processed has
+ * returned, if it did remove that name.
+ */
+static void forget_removed_link(Extension *extension)
+{
+	Tracee *tracee = TRACEE(extension);
+	Link2SymlinkConfig *config;
+	char value[PATH_MAX];
+	int status;
+
+	config = get_config(extension, false);
+	if (config == NULL || config->removed_link[0] == '\0')
+		return;
+
+	/* The result is not enough on its own: when the outer seccomp
+	 * policy rejects the syscall after its sysenter stop -- under
+	 * PROOT_NO_SECCOMP, typically -- this register holds whatever
+	 * the kernel rolled back into it, not an error, and the exit
+	 * stage of rename(2) even turns that into 0.  The name must be
+	 * gone too, or be another file's after rename(2).  */
+	if ((int) peek_reg(tracee, CURRENT, SYSARG_RESULT) == 0
+	    && (my_readlink(config->removed_link, value) < 0
+		|| strcmp(value, config->removed_intermediate) != 0)) {
+		status = decrement_removed_link_count(tracee, config->removed_link,
+						      config->removed_intermediate);
+		if (status < 0)
+			VERBOSE(tracee, 1, "link2symlink: can't decrement the link count of \"%s\", status=%d",
+				config->removed_link, status);
+	}
+
+	config->removed_link[0] = '\0';
+}
+
+/**
+ * Return the d_type of what lstat(2) reports to the tracee for @path --
+ * a host path -- if it is a faked hard link, that is, the type of its
+ * file, c.f. translated_path().  This function returns -errno if @path
+ * is not a faked hard link, or if its file can't be reached.
+ */
+static int get_faked_hard_link_type(const char path[PATH_MAX])
+{
+	char final[PATH_MAX];
+	struct stat statl;
+	int status;
+
+	status = resolve_faked_hard_link(path, final);
+	if (status < 0)
+		return status;
+
+	/* The paths this extension records are absolute; a relative one
+	 * would be resolved against the directory of PRoot.  */
+	if (final[0] != '/')
+		return -EINVAL;
+
+	if (l2s_lstat(final, &statl) < 0)
+		return -errno;
+
+	return IFTODT(statl.st_mode);
+}
+
+/**
+ * Give the faked hard links listed by the getdents(2) or getdents64(2)
+ * @tracee has just performed the type lstat(2) reports for them, instead
+ * of DT_LNK, the type of the symbolic links they really are.  Programs
+ * that rely on d_type -- "find -type f", ripgrep, Rust's
+ * DirEntry::file_type(), Python's DirEntry.is_symlink() -- otherwise see
+ * a symbolic link where lstat(2) sees a regular file, then skip it or
+ * trip over the contradiction.
+ *
+ * Intermediates are left alone: they are symbolic links to statx(2),
+ * hence to most recent programs, even though the stat(2) family reports
+ * them as the file they point to, c.f. handle_sysexit_end().
+ *
+ * This syscall is never failed: an entry that can't be checked is left
+ * as the kernel reported it.
+ */
+static int handle_getdents_exit(Tracee *tracee)
+{
+	char directory[PATH_MAX];
+	char path[PATH_MAX];
+	bool directory_known = false;
+	bool dirent64;
+	size_t reclen_offset;
+	size_t name_offset;
+	size_t type_offset;
+	size_t first_modified;
+	size_t last_modified;
+	size_t offset;
+	size_t length;
+	unsigned short reclen;
+	const char *name;
+	char *buffer;
+	word_t address;
+	int status;
+	int fd;
+
+	status = (int) peek_reg(tracee, CURRENT, SYSARG_RESULT);
+	if (status <= 0)
+		return 0;
+	length = status;
+
+	/* The first argument is overwritten by the result on some
+	 * architectures, hence ORIGINAL.  */
+	fd = (int) peek_reg(tracee, ORIGINAL, SYSARG_1);
+	address = peek_reg(tracee, ORIGINAL, SYSARG_2);
+
+	dirent64 = (get_sysnum(tracee, ORIGINAL) == PR_getdents64);
+	if (dirent64) {
+		/* struct linux_dirent64: 64-bit d_ino and d_off whatever
+		 * the ABI, d_reclen, d_type, then d_name.  */
+		reclen_offset = 16;
+		name_offset = 19;
+	}
+	else {
+		/* struct linux_dirent: d_ino and d_off of a word each,
+		 * d_reclen, d_name, then d_type in the last byte of the
+		 * record.  */
+		reclen_offset = 2 * sizeof_word(tracee);
+		name_offset = reclen_offset + 2;
+	}
+
+	buffer = talloc_size(tracee->ctx, length);
+	if (buffer == NULL)
+		return 0;
+
+	status = read_data(tracee, buffer, address, length);
+	if (status < 0)
+		return 0;
+
+	first_modified = length;
+	last_modified = 0;
+
+	for (offset = 0; offset + name_offset < length; offset += reclen) {
+		memcpy(&reclen, buffer + offset + reclen_offset, sizeof(reclen));
+
+		/* Room for an empty name at least, plus d_type at the end
+		 * for struct linux_dirent.  */
+		if (reclen < name_offset + 2 || reclen > length - offset)
+			break;
+
+		type_offset = (dirent64 ? 18 : reclen - 1u);
+		if ((unsigned char) buffer[offset + type_offset] != DT_LNK)
+			continue;
+
+		name = buffer + offset + name_offset;
+		if (memchr(name, '\0', reclen - name_offset) == NULL)
+			break;
+
+		/* Only now that it's needed: most directories hold no
+		 * symbolic link at all.  */
+		if (!directory_known) {
+			status = readlink_proc_pid_fd(tracee->pid, fd, directory);
+			if (status < 0 || directory[0] != '/')
+				return 0;
+			if (strcmp(directory, "/") == 0)
+				directory[0] = '\0';
+			directory_known = true;
+		}
+
+		status = snprintf(path, PATH_MAX, "%s/%s", directory, name);
+		if (status < 0 || status >= PATH_MAX)
+			continue;
+
+		status = get_faked_hard_link_type(path);
+		if (status < 0 || status == DT_LNK)
+			continue;
+
+		buffer[offset + type_offset] = status;
+
+		if (first_modified == length)
+			first_modified = offset + type_offset;
+		last_modified = offset + type_offset;
+	}
+
+	if (first_modified == length)
+		return 0;
+
+	/* Only the span of the entries that changed: without
+	 * process_vm_writev(2), this is written word by word.  */
+	(void) write_data(tracee, address + first_modified, buffer + first_modified,
+			last_modified - first_modified + 1);
 
 	return 0;
 }
@@ -895,6 +1394,7 @@ static int handle_sysexit_end(Extension *extension)
 		char final[PATH_MAX];
 		char * name;
 		struct stat finalStat;
+		int link_count;
 
 		/* Override only if it succeed.  */
 		result = peek_reg(tracee, CURRENT, SYSARG_RESULT);
@@ -953,9 +1453,15 @@ static int handle_sysexit_end(Extension *extension)
 		if (!S_ISLNK(statl.st_mode))
 			return 0;
 
-		size = my_readlink(original, intermediate);
-		if (size < 0)
-			return size;
+		/* From here on, a faked hard link that can't be followed
+		 * down to its file -- whose backing files were removed
+		 * along with the directory of its first name, typically --
+		 * is left as the kernel reported it, that is, as the
+		 * dangling symbolic link it is.  Failing this syscall made it
+		 * impossible to lstat(2), hence to list or to remove with
+		 * most tools.  */
+		if (my_readlink(original, intermediate) < 0)
+			return 0;
 
 		name = strrchr(intermediate, '/');
 		if (name == NULL)
@@ -966,15 +1472,16 @@ static int handle_sysexit_end(Extension *extension)
 		if (strncmp(name, PREFIX, strlen(PREFIX)) != 0)
 			return 0;
 
-		intermediate_proc: size = my_readlink(intermediate, final);
-		if (size < 0)
-			return size;
+		intermediate_proc:
+		if (read_intermediate(intermediate, final) < 0)
+			return 0;
 
-		final_proc: status = lstat(final,&finalStat);
-		if (status < 0)
-			return status;
+		final_proc:
+		link_count = get_link_count(final);
+		if (link_count < 0 || lstat(final, &finalStat) < 0)
+			return 0;
 
-		finalStat.st_nlink = atoi(final + strlen(final) - 4);
+		finalStat.st_nlink = link_count;
 
 		/* Get the address of the 'stat' structure.  */
 		if (sysnum == PR_fstatat64 || sysnum == PR_newfstatat)
@@ -996,6 +1503,14 @@ static int handle_sysexit_end(Extension *extension)
 
 		return 0;
 	}
+
+	case PR_rename:                    //int rename(const char *oldpath, const char *newpath);
+	case PR_renameat:                  //int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
+	case PR_renameat2:                 //int renameat2(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, unsigned int flags);
+	case PR_unlink:                    //int unlink(const char *pathname);
+	case PR_unlinkat:                  //int unlinkat(int dirfd, const char *pathname, int flags);
+		forget_removed_link(extension);
+		return 0;
 
 	case PR_creat:                     //int creat(const char *pathname, mode_t mode);
 	case PR_open:                      //int open(const char *pathname, int flags, ...);
@@ -1019,6 +1534,10 @@ static int handle_sysexit_end(Extension *extension)
 		return 0;
 	}
 
+	case PR_getdents:                  //int getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int count);
+	case PR_getdents64:                //ssize_t getdents64(int fd, void *dirp, size_t count);
+		return handle_getdents_exit(tracee);
+
 	default:
 		return 0;
 	}
@@ -1026,14 +1545,16 @@ static int handle_sysexit_end(Extension *extension)
 
 static void link2symlink_handle_statx(struct statx_syscall_state *state)
 {
+	int link_count;
+
 	if (!(state->statx_buf.stx_mask & STATX_NLINK))
 		return;
 
-	if (!is_l2s_file(state->host_path))
+	link_count = get_link_count(state->host_path);
+	if (link_count < 0)
 		return;
 
-	size_t ending_len = strlen(state->host_path);
-	state->statx_buf.stx_nlink = atoi(&state->host_path[ending_len - 4]);
+	state->statx_buf.stx_nlink = link_count;
 
 	/* The statx() that PRoot let the kernel perform did succeed, so
 	 * its result was read back from the tracee and is not written
@@ -1076,14 +1597,6 @@ static void translated_path(Extension *extension, char translated_path[PATH_MAX]
 	Tracee *tracee = TRACEE(extension);
 	Link2SymlinkConfig *config;
 	char final[PATH_MAX];
-
-	/* The tracee is not started yet: PRoot is looking up the program
-	 * to launch, c.f. which().  Keep the name of a faked hard link
-	 * there, as the kernel would, so that the canonicalization of
-	 * the first execve(2) goes through it and "/proc/<PID>/exe"
-	 * reports it, c.f. execve_proc_exe().  */
-	if (tracee->exe == NULL)
-		return;
 
 	/* Don't translate l2s symlinks if call is (un)link */
 	Sysnum sysnum = get_sysnum(tracee, ORIGINAL);
@@ -1249,6 +1762,8 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 			{ PR_rename,		FILTER_SYSEXIT },
 			{ PR_renameat,		FILTER_SYSEXIT },
 			{ PR_renameat2,		FILTER_SYSEXIT },
+			{ PR_getdents,		FILTER_SYSEXIT },
+			{ PR_getdents64,	FILTER_SYSEXIT },
 			FILTERED_SYSNUM_END,
 		};
 		extension->filtered_sysnums = filtered_sysnums;
@@ -1259,8 +1774,10 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 		/* Forget any dereference that was not consumed by the exit
 		 * stage of the syscall it was made for.  */
 		Link2SymlinkConfig *config = get_config(extension, false);
-		if (config != NULL)
+		if (config != NULL) {
 			config->pending_link[0] = '\0';
+			config->removed_link[0] = '\0';
+		}
 
 		return 0;
 	}
@@ -1268,13 +1785,21 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 	case SYSCALL_ENTER_END: {
 		Tracee *tracee = TRACEE(extension);
 
+		/* Nothing to do if this syscall is being discarded
+		 * because its translation failed: its paths are not all
+		 * translated then, and an untranslated one names a file
+		 * of the host, out of the guest rootfs.  */
+		if ((int) data1 < 0)
+			return 0;
+
 		switch (get_sysnum(tracee, ORIGINAL)) {
 		case PR_rename:
 			/*int rename(const char *oldpath, const char *newpath);
-			 *If newpath is a psuedo hard link decrement the link count.
+			 *If newpath is a psuedo hard link decrement the link count
+			 *once it is replaced, c.f. prepare_rename().
 			 */
 
-			status = decrement_link_count(tracee, SYSARG_2);
+			status = prepare_rename(extension, SYSARG_1, SYSARG_2, 0);
 			if (status < 0)
 				return status;
 
@@ -1283,10 +1808,14 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 		case PR_renameat:
 		case PR_renameat2:
 			/*int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
-			 *If newpath is a psuedo hard link decrement the link count.
+			 *int renameat2(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, unsigned int flags);
+			 *If newpath is a psuedo hard link decrement the link count
+			 *once it is replaced, c.f. prepare_rename().
 			 */
 
-			status = decrement_link_count(tracee, SYSARG_4);
+			status = prepare_rename(extension, SYSARG_2, SYSARG_4,
+					get_sysnum(tracee, ORIGINAL) == PR_renameat2
+					? peek_reg(tracee, CURRENT, SYSARG_5) : 0);
 			if (status < 0)
 				return status;
 
@@ -1296,10 +1825,11 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 			/* If path points a file that is an symlink to a file that begins
 			 *   with PREFIX, let the file be deleted, but also decrement the
 			 *   hard link count, if it is greater than 1, otherwise delete
-			 *   the original file and intermediate file too.
+			 *   the original file and intermediate file too -- once the
+			 *   file is deleted, c.f. remember_removed_link().
 			 */
 
-			status = decrement_link_count(tracee, SYSARG_1);
+			status = remember_removed_link(extension, SYSARG_1);
 			if (status < 0)
 				return status;
 
@@ -1316,10 +1846,11 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 			/* If path points a file that is a symlink to a file that begins
 			 *   with PREFIX, let the file be deleted, but also delete the
 			 *   symlink that was created and decremnt the count that is tacked
-			 *   to end of original file.
+			 *   to end of original file -- once the file is deleted, c.f.
+			 *   remember_removed_link().
 			 */
 
-			status = decrement_link_count(tracee, SYSARG_2);
+			status = remember_removed_link(extension, SYSARG_2);
 			if (status < 0)
 				return status;
 
@@ -1388,20 +1919,26 @@ int link2symlink_callback(Extension *extension, ExtensionEvent event,
 		return handle_sysexit_end(extension);
 	}
 
-#ifdef USERLAND
-	/* fake_id0 emulates fstat(2) with a readlinkat(2) of
-	 * /proc/<pid>/fd/<fd> and a chained fstatat(2) of its target.  */
 	case SYSCALL_CHAINED_EXIT: {
 		Tracee *tracee = TRACEE(extension);
 		word_t sysnum = get_sysnum(tracee, ORIGINAL);
 		word_t chained_sysnum = get_sysnum(tracee, CURRENT);
 
+		/* hidden_files reissues getdents(2), with the same
+		 * arguments, when it hid every entry it returned.  */
+		if ((sysnum == PR_getdents || sysnum == PR_getdents64) && chained_sysnum == sysnum)
+			return handle_getdents_exit(tracee);
+
+#ifdef USERLAND
+		/* fake_id0 emulates fstat(2) with a readlinkat(2) of
+		 * /proc/<pid>/fd/<fd> and a chained fstatat(2) of its
+		 * target.  */
 		if ((sysnum == PR_fstat || sysnum == PR_fstat64)
 		    && (chained_sysnum == PR_fstatat64 || chained_sysnum == PR_newfstatat))
 			return handle_sysexit_end(extension);
+#endif
 		return 0;
 	}
-#endif
 
 	case GUEST_PATH: {
 		/* A new path is about to be canonicalized.  */
