@@ -173,7 +173,7 @@ internal class AgentReachabilityService(
                 if (response.isSuccessful) {
                     ReachabilityProbe(true, response.code, latencyMs, uiText(R.string.label_available))
                 } else {
-                    ReachabilityProbe(false, response.code, latencyMs, "HTTP ${response.code}: ${body.cleanProbeMessage()}")
+                    ReachabilityProbe(false, response.code, latencyMs, response.withGzipFailureHint("HTTP ${response.code}: ${body.cleanProbeMessage()}"))
                 }
             }
         } catch (error: IOException) {

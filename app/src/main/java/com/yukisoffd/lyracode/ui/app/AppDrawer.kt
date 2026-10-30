@@ -8,9 +8,14 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -59,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -75,6 +83,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -93,6 +102,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -122,6 +132,22 @@ internal fun KimiDrawerContent(
     var historyMode by rememberSaveable { mutableStateOf("sessions") }
     var functionsExpanded by rememberSaveable { mutableStateOf(true) }
     var historyExpanded by rememberSaveable { mutableStateOf(true) }
+    val functionsVisibility = updateTransition(functionsExpanded, label = "drawer-functions-visibility")
+    val historyVisibility = updateTransition(historyExpanded, label = "drawer-history-visibility")
+    // One clock controls every lazy row, including rows composed midway through the animation.
+    val historyExpansionProgress = historyVisibility.animateFloat(
+        transitionSpec = {
+            tween(
+                durationMillis = if (targetState) 260 else 220,
+                easing = LinearEasing,
+            )
+        },
+        label = "drawer-history-expansion-progress",
+    ) { expanded -> if (expanded) 1f else 0f }
+    // Remove all history items together when the shared animation reaches zero.
+    val showHistoryItems by remember {
+        derivedStateOf { historyExpansionProgress.value > 0f }
+    }
     val historyContentProgress = remember { Animatable(1f) }
     var lastAnimatedHistoryMode by remember { mutableStateOf(historyMode) }
     LaunchedEffect(historyMode) {
@@ -267,7 +293,6 @@ internal fun KimiDrawerContent(
             Modifier
                 .fillMaxSize()
                 .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
         item {
             KimiCardBox {
@@ -286,262 +311,322 @@ internal fun KimiDrawerContent(
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(Modifier.padding(top = 10.dp)) {
                 DrawerSectionHeader(
                     title = context.getString(R.string.label_functions),
                     expanded = functionsExpanded,
                     onToggle = { functionsExpanded = !functionsExpanded },
                 )
-                if (functionsExpanded) {
-                    pages.indices.forEach { index ->
-                        KimiFunctionRow(
-                            icon = functionPageIcon(index),
-                            title = pages[index],
-                            selected = selectedPage == index,
-                            onClick = { onSelectPage(index) },
-                        )
+                functionsVisibility.DrawerSectionContent {
+                    Column(
+                        modifier = Modifier.padding(top = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        pages.indices.forEach { index ->
+                            KimiFunctionRow(
+                                icon = functionPageIcon(index),
+                                title = pages[index],
+                                selected = selectedPage == index,
+                                onClick = { onSelectPage(index) },
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        KimiDivider()
                     }
-                    Spacer(Modifier.height(4.dp))
-                    KimiDivider()
                 }
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.padding(top = 10.dp)) {
                 DrawerSectionHeader(
                     title = context.getString(R.string.label_history_sessions),
                     expanded = historyExpanded,
                     onToggle = { historyExpanded = !historyExpanded },
                 )
-                if (historyExpanded) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp)
-                            .clip(KimiPillShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                                shape = KimiPillShape,
-                            )
-                            .padding(3.dp),
-                    ) {
-                        HistoryModeButton(
-                            selected = historyMode == "sessions",
-                            icon = Icons.Default.ChatBubbleOutline,
-                            label = context.getString(R.string.history_mode_sessions),
-                            onClick = {
-                                historyMode = "sessions"
-                                selectedHistoryIds = emptySet()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        HistoryModeButton(
-                            selected = historyMode == "projects",
-                            icon = Icons.Default.FolderOpen,
-                            label = context.getString(R.string.history_mode_projects),
-                            onClick = {
-                                historyMode = "projects"
-                                selectedHistoryIds = emptySet()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        val projectMode = historyMode == "projects"
-                        val projectButtonSlotWidth by animateDpAsState(
-                            targetValue = if (projectMode) 56.dp else 0.dp,
-                            animationSpec = tween(durationMillis = 260),
-                            label = "project-button-slot-width",
-                        )
-                        val searchWidth = (maxWidth - projectButtonSlotWidth).coerceAtLeast(0.dp)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                if (showHistoryItems) {
+                    DrawerHistoryContent(historyExpansionProgress) {
+                        Column(
+                            modifier = Modifier.padding(top = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            CapsuleTextField(
-                                value = historyQuery,
-                                onValueChange = { historyQuery = it },
+                            Row(
                                 modifier = Modifier
-                                    .width(searchWidth)
-                                    .bringIntoViewRequester(searchBringIntoViewRequester)
-                                    .onFocusChanged { searchFocused = it.isFocused },
-                                placeholder = context.getString(
-                                    if (projectMode) R.string.search_projects_placeholder
-                                    else R.string.search_history_placeholder,
-                                ),
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Search,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(19.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                                    .clip(KimiPillShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                                        shape = KimiPillShape,
                                     )
-                                },
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .width(projectButtonSlotWidth)
-                                    .height(48.dp),
-                                contentAlignment = Alignment.CenterEnd,
+                                    .padding(3.dp),
                             ) {
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = projectMode,
-                                    enter = fadeIn(tween(180)) + expandHorizontally(
-                                        animationSpec = tween(260),
-                                        expandFrom = Alignment.End,
-                                    ),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(
-                                        animationSpec = tween(220),
-                                        shrinkTowards = Alignment.End,
-                                    ),
+                                HistoryModeButton(
+                                    selected = historyMode == "sessions",
+                                    icon = Icons.Default.ChatBubbleOutline,
+                                    label = context.getString(R.string.history_mode_sessions),
+                                    onClick = {
+                                        historyMode = "sessions"
+                                        selectedHistoryIds = emptySet()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                HistoryModeButton(
+                                    selected = historyMode == "projects",
+                                    icon = Icons.Default.FolderOpen,
+                                    label = context.getString(R.string.history_mode_projects),
+                                    onClick = {
+                                        historyMode = "projects"
+                                        selectedHistoryIds = emptySet()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                val projectMode = historyMode == "projects"
+                                val projectButtonSlotWidth by animateDpAsState(
+                                    targetValue = if (projectMode) 56.dp else 0.dp,
+                                    animationSpec = tween(durationMillis = 260),
+                                    label = "project-button-slot-width",
+                                )
+                                val searchWidth = (maxWidth - projectButtonSlotWidth).coerceAtLeast(0.dp)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    NewProjectButton(onClick = onCreateProject)
+                                    CapsuleTextField(
+                                        value = historyQuery,
+                                        onValueChange = { historyQuery = it },
+                                        modifier = Modifier
+                                            .width(searchWidth)
+                                            .bringIntoViewRequester(searchBringIntoViewRequester)
+                                            .onFocusChanged { searchFocused = it.isFocused },
+                                        placeholder = context.getString(
+                                            if (projectMode) R.string.search_projects_placeholder
+                                            else R.string.search_history_placeholder,
+                                        ),
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Search,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(19.dp),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        },
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .width(projectButtonSlotWidth)
+                                            .height(48.dp),
+                                        contentAlignment = Alignment.CenterEnd,
+                                    ) {
+                                        androidx.compose.animation.AnimatedVisibility(
+                                            visible = projectMode,
+                                            enter = fadeIn(tween(180)) + expandHorizontally(
+                                                animationSpec = tween(260),
+                                                expandFrom = Alignment.End,
+                                            ),
+                                            exit = fadeOut(tween(120)) + shrinkHorizontally(
+                                                animationSpec = tween(220),
+                                                shrinkTowards = Alignment.End,
+                                            ),
+                                        ) {
+                                            NewProjectButton(onClick = onCreateProject)
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }
-                    if (historyMode == "sessions" && selectedHistoryIds.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(context.getString(R.string.label_selected_count, selectedHistoryIds.size), modifier = Modifier.weight(1f), color = KimiMuted)
-                            KimiChip(context.getString(R.string.action_pin), onClick = {
-                                controller.setConversationsPinned(selectedHistoryIds, true)
-                                selectedHistoryIds = emptySet()
-                            })
-                            KimiChip(context.getString(R.string.action_delete), onClick = {
-                                controller.deleteConversations(selectedHistoryIds)
-                                selectedHistoryIds = emptySet()
-                            })
-                            IconButton(onClick = { selectedHistoryIds = emptySet() }) {
-                                Icon(Icons.Default.Close, contentDescription = context.getString(R.string.action_cancel_select))
+                            if (historyMode == "sessions" && selectedHistoryIds.isNotEmpty()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(context.getString(R.string.label_selected_count, selectedHistoryIds.size), modifier = Modifier.weight(1f), color = KimiMuted)
+                                    KimiChip(context.getString(R.string.action_pin), onClick = {
+                                        controller.setConversationsPinned(selectedHistoryIds, true)
+                                        selectedHistoryIds = emptySet()
+                                    })
+                                    KimiChip(context.getString(R.string.action_delete), onClick = {
+                                        controller.deleteConversations(selectedHistoryIds)
+                                        selectedHistoryIds = emptySet()
+                                    })
+                                    IconButton(onClick = { selectedHistoryIds = emptySet() }) {
+                                        Icon(Icons.Default.Close, contentDescription = context.getString(R.string.action_cancel_select))
+                                    }
+                                }
+                            }
+                            if (historyMode == "sessions" && filteredConversations.isEmpty()) {
+                                Text(
+                                    context.getString(R.string.notice_no_sessions),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            } else if (historyMode == "projects" && projectGroups.isEmpty()) {
+                                Text(
+                                    context.getString(R.string.notice_no_projects),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
-                    }
-                    if (historyMode == "sessions" && filteredConversations.isEmpty()) {
-                        Text(
-                            context.getString(R.string.notice_no_sessions),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else if (historyMode == "projects" && projectGroups.isEmpty()) {
-                        Text(
-                            context.getString(R.string.notice_no_projects),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
         }
-        if (historyExpanded && historyMode == "sessions") {
+        if (showHistoryItems && historyMode == "sessions") {
             groupedConversations.forEach { (label, conversations) ->
                 item(key = "history-group-$label") {
-                    Text(
-                        label,
-                        color = KimiMuted,
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = historyContentModifier
-                            .padding(horizontal = 8.dp)
-                            .padding(top = 2.dp),
-                    )
+                    DrawerHistoryContent(historyExpansionProgress) {
+                        Text(
+                            label,
+                            color = KimiMuted,
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = historyContentModifier
+                                .padding(horizontal = 8.dp)
+                                .padding(top = 12.dp),
+                        )
+                    }
                 }
                 items(conversations, key = { "session-${it.id}" }) { conversation ->
-                    KimiConversationRow(
-                        conversation = conversation,
-                        selected = controller.activeConversationId.value == conversation.id,
-                        multiSelected = conversation.id in selectedHistoryIds,
-                        selectionMode = selectedHistoryIds.isNotEmpty(),
-                        onSelect = {
-                            if (selectedHistoryIds.isEmpty()) {
-                                onSelectConversation(conversation.id)
-                            } else {
-                                selectedHistoryIds = if (conversation.id in selectedHistoryIds) {
-                                    selectedHistoryIds - conversation.id
+                    DrawerHistoryContent(historyExpansionProgress) {
+                        KimiConversationRow(
+                            conversation = conversation,
+                            selected = controller.activeConversationId.value == conversation.id,
+                            multiSelected = conversation.id in selectedHistoryIds,
+                            selectionMode = selectedHistoryIds.isNotEmpty(),
+                            onSelect = {
+                                if (selectedHistoryIds.isEmpty()) {
+                                    onSelectConversation(conversation.id)
                                 } else {
-                                    selectedHistoryIds + conversation.id
+                                    selectedHistoryIds = if (conversation.id in selectedHistoryIds) {
+                                        selectedHistoryIds - conversation.id
+                                    } else {
+                                        selectedHistoryIds + conversation.id
+                                    }
                                 }
-                            }
-                        },
-                        onLongPress = { actionConversation = conversation },
-                        modifier = historyContentModifier,
-                    )
+                            },
+                            onLongPress = { actionConversation = conversation },
+                            modifier = historyContentModifier.padding(top = 10.dp),
+                        )
+                    }
                 }
             }
-        } else if (historyExpanded) {
+        } else if (showHistoryItems) {
             projectGroups.forEach { (project, conversations) ->
                 val projectExpanded = project.id !in collapsedProjectIds
                 item(key = "project-${project.id}") {
-                    ProjectHeaderRow(
-                        project = project,
-                        conversationCount = conversationSnapshot.count { it.projectId == project.id },
-                        expanded = projectExpanded,
-                        active = controller.activeProjectId() == project.id,
-                        onToggle = {
-                            collapsedProjectIds = if (project.id in collapsedProjectIds) {
-                                collapsedProjectIds - project.id
-                            } else {
-                                collapsedProjectIds + project.id
-                            }
-                        },
-                        onNewConversation = { onNewProjectConversation(project.id) },
-                        onLongPress = { actionProject = project },
-                        modifier = historyContentModifier,
-                    )
+                    DrawerHistoryContent(historyExpansionProgress) {
+                        ProjectHeaderRow(
+                            project = project,
+                            conversationCount = conversationSnapshot.count { it.projectId == project.id },
+                            expanded = projectExpanded,
+                            active = controller.activeProjectId() == project.id,
+                            onToggle = {
+                                collapsedProjectIds = if (project.id in collapsedProjectIds) {
+                                    collapsedProjectIds - project.id
+                                } else {
+                                    collapsedProjectIds + project.id
+                                }
+                            },
+                            onNewConversation = { onNewProjectConversation(project.id) },
+                            onLongPress = { actionProject = project },
+                            modifier = historyContentModifier.padding(top = 10.dp),
+                        )
+                    }
                 }
                 if (conversations.isEmpty()) {
                     item(key = "project-empty-${project.id}") {
-                        AnimatedVisibility(
-                            visible = projectExpanded,
-                            enter = fadeIn(tween(180)) + expandVertically(
-                                animationSpec = tween(240),
-                                expandFrom = Alignment.Top,
-                            ),
-                            exit = fadeOut(tween(140)) + shrinkVertically(
-                                animationSpec = tween(220),
-                                shrinkTowards = Alignment.Top,
-                            ),
-                        ) {
-                            Text(
-                                context.getString(R.string.notice_no_project_sessions),
-                                color = KimiMuted,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = historyContentModifier
-                                    .padding(start = 42.dp, end = 8.dp),
-                            )
+                        DrawerHistoryContent(historyExpansionProgress) {
+                            AnimatedVisibility(
+                                visible = projectExpanded,
+                                enter = fadeIn(tween(180)) + expandVertically(
+                                    animationSpec = tween(240),
+                                    expandFrom = Alignment.Top,
+                                ),
+                                exit = fadeOut(tween(140)) + shrinkVertically(
+                                    animationSpec = tween(220),
+                                    shrinkTowards = Alignment.Top,
+                                ),
+                            ) {
+                                Text(
+                                    context.getString(R.string.notice_no_project_sessions),
+                                    color = KimiMuted,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = historyContentModifier
+                                        .padding(start = 42.dp, end = 8.dp, top = 10.dp),
+                                )
+                            }
                         }
                     }
                 } else {
                     items(conversations, key = { "project-session-${it.id}" }) { conversation ->
-                        AnimatedVisibility(
-                            visible = projectExpanded,
-                            enter = fadeIn(tween(180)) + expandVertically(
-                                animationSpec = tween(240),
-                                expandFrom = Alignment.Top,
-                            ),
-                            exit = fadeOut(tween(140)) + shrinkVertically(
-                                animationSpec = tween(220),
-                                shrinkTowards = Alignment.Top,
-                            ),
-                        ) {
-                            KimiConversationRow(
-                                conversation = conversation,
-                                selected = controller.activeConversationId.value == conversation.id,
-                                multiSelected = false,
-                                selectionMode = false,
-                                onSelect = { onSelectConversation(conversation.id) },
-                                onLongPress = { actionConversation = conversation },
-                                modifier = historyContentModifier
-                                    .padding(start = 28.dp),
-                            )
+                        DrawerHistoryContent(historyExpansionProgress) {
+                            AnimatedVisibility(
+                                visible = projectExpanded,
+                                enter = fadeIn(tween(180)) + expandVertically(
+                                    animationSpec = tween(240),
+                                    expandFrom = Alignment.Top,
+                                ),
+                                exit = fadeOut(tween(140)) + shrinkVertically(
+                                    animationSpec = tween(220),
+                                    shrinkTowards = Alignment.Top,
+                                ),
+                            ) {
+                                KimiConversationRow(
+                                    conversation = conversation,
+                                    selected = controller.activeConversationId.value == conversation.id,
+                                    multiSelected = false,
+                                    selectionMode = false,
+                                    onSelect = { onSelectConversation(conversation.id) },
+                                    onLongPress = { actionConversation = conversation },
+                                    modifier = historyContentModifier
+                                        .padding(start = 28.dp, top = 10.dp),
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+    }
+}
+
+@Composable
+private fun Transition<Boolean>.DrawerSectionContent(content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = { it },
+        enter = fadeIn(tween(180)) + expandVertically(
+            animationSpec = tween(260, easing = FastOutSlowInEasing),
+            expandFrom = Alignment.Top,
+        ),
+        exit = fadeOut(tween(140)) + shrinkVertically(
+            animationSpec = tween(220, easing = FastOutSlowInEasing),
+            shrinkTowards = Alignment.Top,
+        ),
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun DrawerHistoryContent(
+    progress: State<Float>,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clipToBounds()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val height = (placeable.height * progress.value).roundToInt()
+                layout(placeable.width, height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
+            .graphicsLayer { alpha = progress.value },
+    ) {
+        content()
     }
 }
 

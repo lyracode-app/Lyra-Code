@@ -27,6 +27,7 @@ import com.yukisoffd.lyracode.ai.UserQuestionAnswer
 import com.yukisoffd.lyracode.ai.UserQuestionRequest
 import com.yukisoffd.lyracode.ai.isMediaGenerationModel
 import com.yukisoffd.lyracode.ai.toRecord
+import com.yukisoffd.lyracode.ai.enrichToolRecords
 import com.yukisoffd.lyracode.chat.pending.PendingAttachment
 import com.yukisoffd.lyracode.chat.pending.PendingInputAttachmentReaper
 import com.yukisoffd.lyracode.chat.pending.PendingInputCapture
@@ -392,6 +393,15 @@ class ChatController(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val deviceConversationUpdateListener: (Long, ChatUpdate) -> Unit = { conversationId, update ->
+        scope.launch {
+            if (update.forceReload || update.messageId <= 0L) reloadConversations()
+            if (activeConversationId.value == conversationId) {
+                status.value = update.status
+                applyChatUpdate(update)
+            }
+        }
+    }
     /**
      * A scoped device task has no controller run outcome, so the coordinator reports when it
      * releases its conversation. The callback arrives on the coordinator's worker thread:
@@ -400,6 +410,13 @@ class ChatController(
      */
     private val deviceConversationIdleListener: (Long, ConversationIdleOutcome) -> Unit = { conversationId, outcome ->
         scope.launch {
+            // History refresh is unconditional, including when there is no queued input.
+            reloadConversations()
+            if (activeConversationId.value == conversationId) {
+                reloadMessages()
+                refreshContextWindowUsage()
+                if (!isConversationBusy(conversationId)) status.value = ""
+            }
             // A newer run may have started between the coordinator's notification and this
             // main-thread coroutine; it owns the queue and releases it when it finishes.
             if (isConversationBusy(conversationId)) return@launch
@@ -523,6 +540,7 @@ class ChatController(
         agent.fileActivityHandler = ::handleAgentFileActivity
         agent.subAgentRunStateChanged = { scope.launch { subAgentRunRevision.intValue++ } }
         DeviceTaskCoordinator.addConversationIdleListener(deviceConversationIdleListener)
+        DeviceTaskCoordinator.addConversationUpdateListener(deviceConversationUpdateListener)
         // Steers are transient: the store drains them atomically at an agent round boundary.
         agent.steerSource = steerSourceFrom(pendingInput::drainSteers)
         reloadProfiles()
@@ -534,6 +552,7 @@ class ChatController(
 
     fun close() {
         DeviceTaskCoordinator.removeConversationIdleListener(deviceConversationIdleListener)
+        DeviceTaskCoordinator.removeConversationUpdateListener(deviceConversationUpdateListener)
         // The executor is independent of [scope]. Flush submits a barrier behind every queued
         // write and waits for it, so no pending document work is lost to cancellation.
         runCatching { runBlocking(NonCancellable) { pendingInput.flush() } }
@@ -1986,39 +2005,6 @@ class ChatController(
         deepSeekCacheHitRate = update.deepSeekCacheHitRate ?: deepSeekCacheHitRate,
     )
 
-    private fun enrichToolRecords(records: List<ChatRecord>): List<ChatRecord> {
-        val calls = mutableMapOf<String, Pair<String, String>>()
-        return records.map { record ->
-            if (record.role == "assistant") {
-                runCatching { JSONObject(record.rawJson.orEmpty()) }.getOrNull()
-                    ?.optJSONArray("tool_calls")
-                    ?.let { array ->
-                        for (index in 0 until array.length()) {
-                            val call = array.optJSONObject(index) ?: continue
-                            val id = call.optString("id")
-                            val function = call.optJSONObject("function") ?: continue
-                            if (id.isNotBlank()) {
-                                calls[id] = function.optString("name") to prettyToolJson(function.optString("arguments"))
-                            }
-                        }
-                    }
-                record
-            } else if (record.role == "tool") {
-                val details = calls[record.toolCallId]
-                record.copy(toolName = details?.first.orEmpty(), toolInput = details?.second.orEmpty())
-            } else {
-                record
-            }
-        }
-    }
-
-    private fun prettyToolJson(value: String): String {
-        val trimmed = value.trim()
-        if (trimmed.isBlank()) return "{}"
-        return runCatching { JSONObject(trimmed).toString(2) }
-            .recoverCatching { org.json.JSONArray(trimmed).toString(2) }
-            .getOrDefault(trimmed)
-    }
     fun reloadTodos() {
         todoItems.clear()
         todoItems.addAll(todoByConversation[activeConversationId.value].orEmpty())
@@ -2072,7 +2058,7 @@ class ChatController(
         runCatching { outcomeCallback?.invoke(ConversationRunOutcome.Cancelled) }
     }
 
-    fun isActiveConversationRunning(): Boolean = conversationOperations.containsKey(activeConversationId.value)
+    fun isActiveConversationRunning(): Boolean = isActiveConversationBusy()
 
     /** Unified busy predicate shared by controller actions, the screen, and the web bridge. */
     private fun isConversationBusy(conversationId: Long): Boolean = conversationBusy(
@@ -2167,6 +2153,10 @@ class ChatController(
     }
 
     private fun applyChatUpdate(update: ChatUpdate) {
+        if (update.forceReload) {
+            reloadMessages()
+            return
+        }
         if (update.messageId <= 0L) {
             // A drained steer just inserted a user turn; its typed flag bypasses the throttle
             // so the new bubble cannot be hidden behind a streaming token update.
@@ -2271,7 +2261,7 @@ class ChatController(
 
     private fun markAbandonedRunsInterrupted() {
         conversationStore.conversations(archived = null)
-            .filter { it.status == ConversationStore.STATUS_RUNNING }
+            .filter { it.status == ConversationStore.STATUS_RUNNING && !scopedDeviceRunning(it.id) }
             .forEach { conversationStore.setConversationMeta(it.id, status = ConversationStore.STATUS_INTERRUPTED) }
     }
 }

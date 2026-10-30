@@ -42,9 +42,9 @@ val packagedAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
 
 val bundledProotRuntimeDir = layout.projectDirectory.dir("src/debianRuntime/jniLibs")
 val bundledProotRuntimeHashes = mapOf(
-    "arm64-v8a/libproot_exec.so" to "be2fbd3a0e88c0d159ef6cd044392720ea3f0bc1ee524bf67879d49f5e9b9eb4",
+    "arm64-v8a/libproot_exec.so" to "8cd986e8e9505f20ef263095037d59ece8756b230e5730315dc142332a8032e2",
     "arm64-v8a/libproot_loader.so" to "825d0362db3319c2b3ed3b75fe300287c0f9eeb7f2427ceb05a4a004ad33ed12",
-    "x86_64/libproot_exec.so" to "5f4dc068cb80fa23713573f14105d597c225e8d56ace3b4d0a77c87824710dad",
+    "x86_64/libproot_exec.so" to "e3c6a7bde6a8e4851b2ddc36965b5a6c3fe71b5e630731aa7869e046cce82a72",
     "x86_64/libproot_loader.so" to "61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869",
 )
 
@@ -56,8 +56,8 @@ android {
         applicationId = "com.yukisoffd.lyracode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 89
-        versionName = "4.2.0"
+        versionCode = 90
+        versionName = "4.2.1"
 
         if (!enableAbiSplits) {
             ndk {

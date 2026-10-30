@@ -7,6 +7,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatRenderItemsTest {
+    @Test fun `tool call placeholders do not create empty reasoning rows`() {
+        val messages = listOf(
+            ChatRecord(1, "user", "task"),
+            ChatRecord(2, "assistant", "", rawJson = "tool metadata"),
+            ChatRecord(3, "tool", "result"),
+            ChatRecord(4, "assistant", "summary", thinking = "check"),
+        )
+        for (streaming in listOf(false, true)) {
+            val process = chatRenderItems(messages, isStreaming = streaming).flatMap { it.process }
+            assertEquals(listOf(3L, -4L), process.map { it.id })
+        }
+    }
+
+    @Test fun `interrupted turn keeps intermediate prose before its tools`() {
+        val messages = listOf(
+            ChatRecord(1, "user", "task"),
+            ChatRecord(2, "assistant", "I will scroll", thinking = "plan"),
+            ChatRecord(3, "tool", "interrupted"),
+        )
+        val items = chatRenderItems(messages)
+        assertEquals(listOf(2L, 3L), items.last().process.map { it.id })
+        assertEquals(listOf("task"), items.mapNotNull { it.message?.content })
+    }
+
     @Test
     fun `collapses intermediate assistant output into one process item`() {
         val messages = listOf(

@@ -9,6 +9,7 @@ import okhttp3.ResponseBody
 import okio.Buffer
 import okio.BufferedSource
 import okio.ForwardingSource
+import okio.GzipSource
 import okio.buffer
 import org.json.JSONArray
 import org.json.JSONObject
@@ -47,14 +48,16 @@ internal class ModelHttpAudit(private val sink: HttpAuditSink, private val tempD
         write(id, "request.headers", headers(request.headers))
         runCatching {
             val body = request.body ?: return@runCatching
-            // An encoded body is unreadable here; keep the plain JSON that application interception recorded.
-            if (observed && request.header("Content-Encoding") != null) return@runCatching
+            val encoding = request.header("Content-Encoding")
+            if (observed && encoding != null && !encoding.equals("gzip", ignoreCase = true)) return@runCatching
             if (body.isDuplex() || body.isOneShot()) {
                 write(id, "request.body", "[non-repeatable body; not read by logger]")
             } else {
                 val buffer = Buffer()
                 body.writeTo(buffer)
-                write(id, "request.body", buffer.readString(body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8))
+                // Decode this exchange's actual body, including redirects and automatic retries.
+                val source = if (observed && encoding.equals("gzip", ignoreCase = true)) GzipSource(buffer).buffer() else buffer
+                source.use { write(id, "request.body", it.readString(body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8)) }
             }
         }.onFailure { write(id, "capture.error", it.toString()) }
     }

@@ -27,7 +27,11 @@ data class FileTransferFile(
     val modified: String,
 )
 
-class FileTransferClient(private val context: Context) {
+class FileTransferClient internal constructor(private val stringResource: (Int, Array<out Any>) -> String) {
+    constructor(context: Context) : this({ id, args -> context.getString(id, *args) })
+
+    private fun message(id: Int, vararg args: Any): String = stringResource(id, args)
+
     fun test(server: FileTransferServerConfig): Result<List<FileTransferFile>> = runCatching {
         list(server, server.initialPath.ifBlank { "/" })
     }
@@ -36,13 +40,13 @@ class FileTransferClient(private val context: Context) {
         return when (server.protocol) {
             AppSettings.FILE_TRANSFER_SFTP -> sftpList(server, path)
             AppSettings.FILE_TRANSFER_FTPS, AppSettings.FILE_TRANSFER_FTP -> FtpSession(server).use { it.list(path) }
-            else -> error(context.getString(R.string.error_ft_unsupported_protocol, server.protocol))
+            else -> error(message(R.string.error_ft_unsupported_protocol, server.protocol))
         }
     }
 
     fun search(server: FileTransferServerConfig, query: String, basePath: String = server.initialPath, limit: Int = 80): List<FileTransferFile> {
         val cleanQuery = query.trim().lowercase()
-        require(cleanQuery.isNotBlank()) { context.getString(R.string.error_ft_search_keyword_empty) }
+        require(cleanQuery.isNotBlank()) { message(R.string.error_ft_search_keyword_empty) }
         val result = ArrayList<FileTransferFile>()
         val queue = ArrayDeque<String>()
         queue.add(basePath.ifBlank { "/" })
@@ -62,7 +66,7 @@ class FileTransferClient(private val context: Context) {
         return when (server.protocol) {
             AppSettings.FILE_TRANSFER_SFTP -> sftpDownload(server, remotePath, onProgress)
             AppSettings.FILE_TRANSFER_FTPS, AppSettings.FILE_TRANSFER_FTP -> FtpSession(server).use { it.download(remotePath, onProgress) }
-            else -> error(context.getString(R.string.error_ft_unsupported_protocol, server.protocol))
+            else -> error(message(R.string.error_ft_unsupported_protocol, server.protocol))
         }
     }
 
@@ -70,7 +74,7 @@ class FileTransferClient(private val context: Context) {
         when (server.protocol) {
             AppSettings.FILE_TRANSFER_SFTP -> sftpUpload(server, remotePath, bytes, onProgress)
             AppSettings.FILE_TRANSFER_FTPS, AppSettings.FILE_TRANSFER_FTP -> FtpSession(server).use { it.upload(remotePath, bytes, onProgress) }
-            else -> error(context.getString(R.string.error_ft_unsupported_protocol, server.protocol))
+            else -> error(message(R.string.error_ft_unsupported_protocol, server.protocol))
         }
     }
 
@@ -117,7 +121,7 @@ class FileTransferClient(private val context: Context) {
         val total = attrs?.size ?: 0L
         val output = ByteArrayOutputStream()
         channel.get(remotePath).use { input ->
-            readWithProgress(input, output, context.getString(R.string.ft_downloading, remotePath.substringAfterLast('/')), total, onProgress)
+            readWithProgress(input, output, message(R.string.ft_downloading, remotePath.substringAfterLast('/')), total, onProgress)
         }
         output.toByteArray()
     }
@@ -135,7 +139,7 @@ class FileTransferClient(private val context: Context) {
                 override fun count(count: Long): Boolean {
                     done += count
                     val elapsed = (System.currentTimeMillis() - started).coerceAtLeast(1)
-                    onProgress(TransferProgress(context.getString(R.string.ft_uploading, remotePath.substringAfterLast('/')), done, bytes.size.toLong(), done * 1000 / elapsed))
+                    onProgress(TransferProgress(message(R.string.ft_uploading, remotePath.substringAfterLast('/')), done, bytes.size.toLong(), done * 1000 / elapsed))
                     return true
                 }
 
@@ -187,72 +191,89 @@ class FileTransferClient(private val context: Context) {
         private var writer = OutputStreamWriter(control.getOutputStream(), charset)
 
         init {
-            val hello = readResponse()
-            require(hello.code in 200..299) { context.getString(R.string.error_ftp_connect_failed, hello.text) }
-            if (server.protocol == AppSettings.FILE_TRANSFER_FTPS && server.explicitFtps) {
-                command("AUTH TLS", 234)
-                control = wrapSsl(control)
-                reader = BufferedReader(InputStreamReader(control.getInputStream(), charset))
-                writer = OutputStreamWriter(control.getOutputStream(), charset)
-            }
-            command("USER ${server.username.ifBlank { "anonymous" }}", expected = null)
-            val passwordResult = readResponseIfNeeded()
-            if (passwordResult == null || passwordResult.code == 331) command("PASS ${server.password}", expected = null)
-            val login = readResponseIfNeeded()
-            require(login == null || login.code in 200..299) { context.getString(R.string.error_ftp_login_failed, login?.text.orEmpty()) }
-            command("TYPE I", 200)
-            if (server.protocol == AppSettings.FILE_TRANSFER_FTPS) {
-                runCatching { command("PBSZ 0", 200) }
-                runCatching { command("PROT P", 200) }
+            try {
+                var hello = readResponse()
+                if (hello.code == 120) hello = readResponse()
+                require(hello.code == 220) { message(R.string.error_ftp_connect_failed, hello.text) }
+                if (server.protocol == AppSettings.FILE_TRANSFER_FTPS && server.explicitFtps) {
+                    command("AUTH TLS", 234)
+                    control = wrapSsl(control)
+                    reader = BufferedReader(InputStreamReader(control.getInputStream(), charset))
+                    writer = OutputStreamWriter(control.getOutputStream(), charset)
+                }
+                val user = command("USER ${server.username.ifBlank { "anonymous" }}", expected = null)
+                val login = if (user.code == 331) command("PASS ${server.password}", expected = null) else user
+                require(login.code == 230) { message(R.string.error_ftp_login_failed, login.text) }
+                command("TYPE I", 200)
+                if (server.protocol == AppSettings.FILE_TRANSFER_FTPS) {
+                    command("PBSZ 0", 200)
+                    command("PROT P", 200)
+                }
+            } catch (error: Throwable) {
+                runCatching { control.close() }
+                throw error
             }
         }
 
         fun list(path: String): List<FileTransferFile> {
             val clean = normalizePath(path.ifBlank { "/" })
-            val data = openPassiveDataSocket()
-            val response = command("MLSD $clean", expected = null)
-            require(response.code in listOf(125, 150, 226)) { context.getString(R.string.error_ftp_list_failed, response.text) }
+            val text = readListing("MLSD", clean)
+            return if (text == null) {
+                parseList(requireNotNull(readListing("LIST", clean)), clean)
+            } else {
+                parseMlsd(text, clean)
+            }
+        }
+
+        private fun readListing(verb: String, path: String): String? = openPassiveDataSocket().use { data ->
+            val response = command("$verb $path", expected = null)
+            if (verb == "MLSD" && response.code in listOf(500, 501, 502, 504)) return@use null
+            require(response.code in listOf(125, 150, 226)) { message(R.string.error_ftp_list_failed, response.text) }
             val text = data.getInputStream().bufferedReader(charset).use { it.readText() }
-            data.close()
-            if (response.code != 226) readResponse()
-            return parseMlsd(text, clean).ifEmpty { parseList(text, clean) }
+            if (response.code != 226) completeTransfer(R.string.error_ftp_list_failed)
+            text
         }
 
         fun download(remotePath: String, onProgress: (TransferProgress) -> Unit): ByteArray {
-            val data = openPassiveDataSocket()
-            val response = command("RETR ${normalizePath(remotePath)}", expected = null)
-            require(response.code in listOf(125, 150)) { context.getString(R.string.error_ftp_download_failed, response.text) }
             val output = ByteArrayOutputStream()
-            data.getInputStream().use { input ->
-                readWithProgress(input, output, context.getString(R.string.ft_downloading, remotePath.substringAfterLast('/')), 0L, onProgress)
+            openPassiveDataSocket().use { data ->
+                val response = command("RETR ${normalizePath(remotePath)}", expected = null)
+                require(response.code in listOf(125, 150)) { message(R.string.error_ftp_download_failed, response.text) }
+                data.getInputStream().use { input ->
+                    readWithProgress(input, output, message(R.string.ft_downloading, remotePath.substringAfterLast('/')), 0L, onProgress)
+                }
             }
-            data.close()
-            readResponse()
+            completeTransfer(R.string.error_ftp_download_failed)
             return output.toByteArray()
         }
 
         fun upload(remotePath: String, bytes: ByteArray, onProgress: (TransferProgress) -> Unit) {
             ensureParents(remotePath)
-            val data = openPassiveDataSocket()
-            val response = command("STOR ${normalizePath(remotePath)}", expected = null)
-            require(response.code in listOf(125, 150)) { context.getString(R.string.error_ftp_upload_failed, response.text) }
-            val started = System.currentTimeMillis()
-            data.getOutputStream().use { output ->
-                var done = 0L
-                bytes.inputStream().use { input ->
-                    val buffer = ByteArray(32 * 1024)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        done += read
-                        val elapsed = (System.currentTimeMillis() - started).coerceAtLeast(1)
-                        onProgress(TransferProgress(context.getString(R.string.ft_uploading, remotePath.substringAfterLast('/')), done, bytes.size.toLong(), done * 1000 / elapsed))
+            openPassiveDataSocket().use { data ->
+                val response = command("STOR ${normalizePath(remotePath)}", expected = null)
+                require(response.code in listOf(125, 150)) { message(R.string.error_ftp_upload_failed, response.text) }
+                val started = System.currentTimeMillis()
+                data.getOutputStream().use { output ->
+                    var done = 0L
+                    bytes.inputStream().use { input ->
+                        val buffer = ByteArray(32 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                            done += read
+                            val elapsed = (System.currentTimeMillis() - started).coerceAtLeast(1)
+                            onProgress(TransferProgress(message(R.string.ft_uploading, remotePath.substringAfterLast('/')), done, bytes.size.toLong(), done * 1000 / elapsed))
+                        }
                     }
                 }
             }
-            data.close()
-            readResponse()
+            completeTransfer(R.string.error_ftp_upload_failed)
+        }
+
+        private fun completeTransfer(errorMessage: Int) {
+            val response = readResponse()
+            require(response.code in listOf(226, 250)) { message(errorMessage, response.text) }
         }
 
         private fun ensureParents(remotePath: String) {
@@ -264,15 +285,36 @@ class FileTransferClient(private val context: Context) {
         }
 
         private fun openPassiveDataSocket(): Socket {
-            require(server.passiveMode) { context.getString(R.string.error_ftp_passive_only) }
-            val response = command("PASV", 227)
-            val numbers = Regex("""\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)""").find(response.text)?.groupValues
-                ?: error(context.getString(R.string.error_ftp_pasv_parse_failed, response.text))
-            val host = listOf(numbers[1], numbers[2], numbers[3], numbers[4]).joinToString(".")
-            val port = numbers[5].toInt() * 256 + numbers[6].toInt()
+            require(server.passiveMode) { message(R.string.error_ftp_passive_only) }
+            val extended = command("EPSV", expected = null)
+            val port = if (extended.code == 229) {
+                val value = Regex("""\(([!-~])\1\1(\d+)\1\)""").find(extended.text)?.groupValues?.get(2)?.toIntOrNull()
+                require(value != null && value in 1..65535) { message(R.string.error_ftp_pasv_parse_failed, extended.text) }
+                value
+            } else {
+                require(extended.code in listOf(500, 501, 502, 504, 522)) {
+                    message(R.string.error_ftp_command_failed, "EPSV", extended.text)
+                }
+                val response = command("PASV", 227)
+                val numbers = Regex("""\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)""")
+                    .find(response.text)?.groupValues?.drop(1)?.mapNotNull { it.toIntOrNull() }
+                require(numbers != null && numbers.size == 6 && numbers.all { it in 0..255 }) {
+                    message(R.string.error_ftp_pasv_parse_failed, response.text)
+                }
+                (numbers[4] * 256 + numbers[5]).also {
+                    require(it > 0) { message(R.string.error_ftp_pasv_parse_failed, response.text) }
+                }
+            }
+            // Reuse the actual control peer: PASV often advertises an unreachable LAN address behind NAT.
             val socket = Socket()
-            socket.connect(InetSocketAddress(host, port), 20_000)
-            return if (server.protocol == AppSettings.FILE_TRANSFER_FTPS) wrapSsl(socket) else socket
+            return try {
+                socket.soTimeout = 20_000
+                socket.connect(InetSocketAddress(control.inetAddress, port), 20_000)
+                if (server.protocol == AppSettings.FILE_TRANSFER_FTPS) wrapSsl(socket) else socket
+            } catch (error: Throwable) {
+                runCatching { socket.close() }
+                throw error
+            }
         }
 
         private fun connectControl(): Socket {
@@ -281,34 +323,36 @@ class FileTransferClient(private val context: Context) {
             } else {
                 Socket()
             }
-            socket.connect(InetSocketAddress(server.host, server.port), 20_000)
-            return socket
+            return try {
+                socket.soTimeout = 20_000
+                socket.connect(InetSocketAddress(server.host, server.port), 20_000)
+                socket
+            } catch (error: Throwable) {
+                runCatching { socket.close() }
+                throw error
+            }
         }
 
         private fun wrapSsl(socket: Socket): Socket {
             val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
-            return factory.createSocket(socket, server.host, server.port, true) as Socket
+            return (factory.createSocket(socket, server.host, socket.port, true) as Socket).apply { soTimeout = 20_000 }
         }
 
         private fun command(command: String, expected: Int?): FtpResponse {
             writer.write("$command\r\n")
             writer.flush()
             val response = readResponse()
-            if (expected != null && response.code != expected) error(context.getString(R.string.error_ftp_command_failed, command, response.text))
+            if (expected != null && response.code != expected) error(message(R.string.error_ftp_command_failed, command, response.text))
             return response
         }
 
-        private fun readResponseIfNeeded(): FtpResponse? {
-            return if (reader.ready()) readResponse() else null
-        }
-
         private fun readResponse(): FtpResponse {
-            val first = reader.readLine() ?: error(context.getString(R.string.error_ftp_disconnected))
-            val code = first.take(3).toIntOrNull() ?: error(context.getString(R.string.error_ftp_response_parse_failed, first))
+            val first = reader.readLine() ?: error(message(R.string.error_ftp_disconnected))
+            val code = first.take(3).toIntOrNull() ?: error(message(R.string.error_ftp_response_parse_failed, first))
             val lines = mutableListOf(first)
             if (first.length > 3 && first[3] == '-') {
                 while (true) {
-                    val line = reader.readLine() ?: break
+                    val line = reader.readLine() ?: error(message(R.string.error_ftp_disconnected))
                     lines += line
                     if (line.startsWith("$code ")) break
                 }
@@ -317,7 +361,7 @@ class FileTransferClient(private val context: Context) {
         }
 
         override fun close() {
-            runCatching { command("QUIT", expected = null) }
+            runCatching { writer.write("QUIT\r\n"); writer.flush() }
             runCatching { control.close() }
         }
     }

@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.2.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.2.1-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <a href="https://github.com/termux/proot"><img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" /></a>
   <a href="https://github.com/termux/termux-app"><img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" /></a>
@@ -109,7 +109,7 @@ Lyra Code can execute commands, modify files, start servers, and connect to thir
 
 ## Contributing
 
-Pull requests are accepted from organization members; contact the administrator if you would like to join. AI-assisted contributions are welcome, but contributors must test and review their changes, remain responsible for the result, and describe the test scope in the PR.
+Pull requests are welcome from anyone. Frequent contributors may apply to join the organization. AI-assisted contributions are welcome, but contributors must test and review their changes, remain responsible for the result, and describe the test scope in the PR.
 
 ## License
 

@@ -55,7 +55,7 @@ internal object ApiProfileJson {
             savedModels = models,
             enabledModels = if (item.has("enabledModels")) strings("enabledModels") else models,
             useResponsesApi = isChatGpt || (format == ApiProfile.API_FORMAT_OPENAI && item.optBoolean("useResponsesApi")),
-            gzipRequestBodies = item.optBoolean("gzipRequestBodies", true),
+            gzipRequestBodies = item.optBoolean("gzipRequestBodies", ApiProfile.defaultGzipRequestBodies(format)),
             presetId = item.optString("presetId"),
             presetPlanId = item.optString("presetPlanId"),
             modelRequestOverrides = if (isChatGpt) emptyMap() else ModelRequestCustomization.decodeMap(item.optJSONObject("modelRequestOverrides")),

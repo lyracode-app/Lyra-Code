@@ -1,6 +1,8 @@
 package com.yukisoffd.lyracode.ai
 
 import com.yukisoffd.lyracode.data.ApiProfile
+import com.yukisoffd.lyracode.R
+import com.yukisoffd.lyracode.uiText
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -10,7 +12,7 @@ import okio.GzipSink
 import okio.buffer
 import java.util.concurrent.ConcurrentHashMap
 
-/** Every turn re-sends the whole conversation, so large JSON bodies go out gzipped (about half the upload).
+/** Compress large JSON bodies when the provider configuration enables it.
  * A server that refuses the encoding gets the plain body again, and that host stays plain for this client's lifetime. */
 internal class GzipRequestInterceptor : Interceptor {
     private val plainHosts = ConcurrentHashMap.newKeySet<String>()
@@ -22,7 +24,11 @@ internal class GzipRequestInterceptor : Interceptor {
         if (!refusesEncoding(response) || chain.call().isCanceled()) return response
         response.close()
         plainHosts += hostKey(original)
-        return chain.proceed(original)
+        val plain = chain.proceed(original)
+        if (plain.isSuccessful) return plain
+        // Preserve the server's error body and status; attach context for user-facing diagnostics.
+        return plain.newBuilder().request(plain.request.newBuilder()
+            .tag(GzipRequestRefused::class.java, GzipRequestRefused).build()).build()
     }
 
     private fun gzippedOrNull(request: Request): Request? {
@@ -62,3 +68,8 @@ internal class GzipRequestInterceptor : Interceptor {
         )
     }
 }
+
+private object GzipRequestRefused
+
+internal fun Response.withGzipFailureHint(message: String, hint: () -> String = { uiText(R.string.gzip_request_failed_hint) }): String =
+    if (request.tag(GzipRequestRefused::class.java) != null) "$message\n${hint()}" else message

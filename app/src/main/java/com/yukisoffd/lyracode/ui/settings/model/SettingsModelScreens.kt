@@ -706,7 +706,12 @@ internal fun ModelServiceSettings(
     var enabledModels by remember(editKey) { mutableStateOf(current?.enabledModels.orEmpty().toSet()) }
     var showEnabledModelsDialog by remember(editKey) { mutableStateOf(false) }
     var useResponsesApi by remember(editKey) { mutableStateOf(current?.usesResponsesApi == true) }
-    var gzipRequestBodies by remember(editKey) { mutableStateOf(current?.gzipRequestBodies ?: true) }
+    var gzipRequestBodies by remember(editKey) { mutableStateOf(current?.gzipRequestBodies ?: ApiProfile.defaultGzipRequestBodies(apiFormat)) }
+    var gzipRequestBodiesChanged by remember(editKey) { mutableStateOf(false) }
+    fun selectApiFormat(format: String) {
+        if (apiFormat != format && !gzipRequestBodiesChanged) gzipRequestBodies = ApiProfile.defaultGzipRequestBodies(format)
+        apiFormat = format
+    }
     var advancedExpanded by remember(editKey) { mutableStateOf(draftNewProfile == null || draftPresetId == null) }
     var selectedReachabilityModels by remember(editKey) { mutableStateOf<Set<String>>(emptySet()) }
     var providerReachabilityResult by remember(editKey) { mutableStateOf<ProviderReachabilityResult?>(null) }
@@ -1101,14 +1106,14 @@ internal fun ModelServiceSettings(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 ApiFormatOption("OpenAI SDK", ApiProfile.API_FORMAT_OPENAI, apiFormat) {
-                                    apiFormat = it
+                                    selectApiFormat(it)
                                     if (draftNewProfile?.id == editingProfileId) {
                                         if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
                                         if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
                                     }
                                 }
                                 ApiFormatOption("Anthropic Messages", ApiProfile.API_FORMAT_ANTHROPIC, apiFormat) {
-                                    apiFormat = it
+                                    selectApiFormat(it)
                                     useResponsesApi = false
                                     if (draftNewProfile?.id == editingProfileId) {
                                         if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
@@ -1116,7 +1121,7 @@ internal fun ModelServiceSettings(
                                     }
                                 }
                                 ApiFormatOption("Gemini GenerateContent", ApiProfile.API_FORMAT_GEMINI, apiFormat) {
-                                    apiFormat = it
+                                    selectApiFormat(it)
                                     useResponsesApi = false
                                     if (draftNewProfile?.id == editingProfileId) {
                                         if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
@@ -1155,7 +1160,7 @@ internal fun ModelServiceSettings(
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleSmall,
                                 )
-                                Switch(checked = gzipRequestBodies, onCheckedChange = { gzipRequestBodies = it })
+                                Switch(checked = gzipRequestBodies, onCheckedChange = { gzipRequestBodies = it; gzipRequestBodiesChanged = true })
                             }
                             Text(
                                 uiText(R.string.gzip_request_bodies_hint),

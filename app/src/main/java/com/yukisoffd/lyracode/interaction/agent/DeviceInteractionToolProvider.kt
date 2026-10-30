@@ -33,6 +33,8 @@ internal class DeviceInteractionToolProvider(
     override val includesNativeTools: Boolean get() = nativeDefinitions != null
     override var finished = false
         private set
+    override var completionSummary: String? = null
+        private set
     private var observed: ScreenSnapshot? = null
     private val sessionId = ManualControlController.state.value.sessionId
     override val systemPrompt: String
@@ -106,8 +108,9 @@ internal class DeviceInteractionToolProvider(
                     JSONObject().put("changed", changed).toString()
                 }
                 "device_finish" -> {
-                    val summary = arguments.getString("summary").trim().take(2000)
+                    val summary = arguments.getString("summary").trim()
                     require(summary.isNotBlank())
+                    completionSummary = summary
                     finished = true
                     observed = null
                     onFinish(summary)

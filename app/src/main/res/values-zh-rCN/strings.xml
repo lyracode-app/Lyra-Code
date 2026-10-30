@@ -1828,7 +1828,8 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="file_privileged_disabled">受限目录访问已停用</string>
     <string name="responses_api_enabled">使用 Responses API</string>
     <string name="gzip_request_bodies_enabled">压缩大型请求（gzip）</string>
-    <string name="gzip_request_bodies_hint">长对话的上传流量约减少一半。如果服务器拒绝压缩请求，Lyra 会改为发送未压缩的请求。</string>
+    <string name="gzip_request_bodies_hint">压缩大型请求以减少上传流量。仅 Anthropic Messages 格式默认开启，其他格式默认关闭。如果服务器拒绝压缩请求，Lyra 会改为发送未压缩的请求。</string>
+    <string name="gzip_request_failed_hint">此错误可能与启用了 gzip 请求压缩有关，服务可能不支持该功能。已尝试以未压缩正文重发，但请求仍失败。请在服务配置中关闭 gzip 后重试。</string>
     <string name="conversation_details">对话信息</string>
     <string name="conversation_title_label">对话标题</string>
     <string name="current_model_label">当前模型</string>
