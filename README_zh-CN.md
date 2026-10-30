@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.2.0-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.2.1-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <a href="https://github.com/termux/proot"><img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" /></a>
   <a href="https://github.com/termux/termux-app"><img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" /></a>
@@ -107,7 +107,7 @@ Lyra Code 可以执行命令、修改文件、启动服务器并连接第三方�
 
 ## 参与贡献
 
-本项目接受组织成员的 PR；如需加入，可联系管理员。欢迎 AI 辅助贡献，但提交者必须完成实际测试与人工审查、对结果负责，并在 PR 中说明测试范围。
+本项目接受任何人提交的 PR；频繁贡献的开发者可申请加入组织。欢迎 AI 辅助贡献，但提交者必须完成实际测试与人工审查、对结果负责，并在 PR 中说明测试范围。
 
 ## 许可证
 
