@@ -2499,6 +2499,15 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="deepseek_key_required">请输入有效的 DeepSeek API Key。</string>
     <string name="deepseek_config_hint">请先保存配置，再单独启用。开关状态即时保存；未配置时开关保持关闭且不可用。API Key 安全存储。</string>
     <string name="deepseek_config_saved">配置已保存</string>
+    <string name="terminal_font">终端字体</string>
+    <string name="terminal_font_hint">从下方导入的字体中选择，默认使用系统等宽字体。推荐 Maple Mono、JetBrains Mono 等等宽字体。应用不内置终端字体。</string>
+    <string name="terminal_font_size">终端字号：%1$d sp</string>
+    <string name="terminal_color_scheme">终端配色</string>
+    <string name="terminal_use_font">用于终端</string>
+    <string name="terminal_font_current">当前终端字体</string>
+    <string name="terminal_font_changed">终端字体已更改为 %1$s</string>
+    <string name="terminal_paste">粘贴</string>
+    <string name="terminal_clear">清空终端</string>
 </resources>
 
 

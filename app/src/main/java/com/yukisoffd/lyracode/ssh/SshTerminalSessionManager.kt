@@ -55,6 +55,7 @@ interface TerminalSession : AutoCloseable {
     fun disconnect(markRequested: Boolean = true)
     fun write(bytes: ByteArray): Boolean
     fun write(text: String): Boolean
+    fun clear()
     fun resize(newCols: Int, newRows: Int, widthPx: Int, heightPx: Int)
 }
 
@@ -179,6 +180,11 @@ class TerminalConnection internal constructor(
 
     override fun write(text: String): Boolean = write(text.toByteArray(Charsets.UTF_8))
 
+    override fun clear() = synchronized(terminal) {
+        terminal.clear()
+        _screen.value = terminal.snapshot()
+    }
+
     @Synchronized
     override fun resize(newCols: Int, newRows: Int, widthPx: Int, heightPx: Int) {
         val targetCols = newCols.coerceIn(2, 500)
@@ -190,8 +196,10 @@ class TerminalConnection internal constructor(
         rows = targetRows
         pixelWidth = targetWidth
         pixelHeight = targetHeight
-        terminal.resize(targetCols, targetRows)
-        _screen.value = terminal.snapshot()
+        synchronized(terminal) {
+            terminal.resize(targetCols, targetRows)
+            _screen.value = terminal.snapshot()
+        }
         if (transport?.channel?.isConnected == true && transport?.session?.isConnected == true) {
             resizeQueue.trySend(TerminalResize(targetCols, targetRows, targetWidth, targetHeight))
         }
@@ -246,6 +254,8 @@ class TerminalConnection internal constructor(
             val newChannel = newSession.openChannel("shell") as ChannelShell
             newChannel.setPty(true)
             newChannel.setPtyType("xterm-256color", cols, rows, pixelWidth, pixelHeight)
+            // RFC 8160: let the remote line discipline erase a UTF-8 character as one unit.
+            newChannel.setTerminalMode(byteArrayOf(42, 0, 0, 0, 1, 0))
             newChannel.setEnv("TERM", "xterm-256color")
             newChannel.setEnv("COLORTERM", "truecolor")
             val newInput = newChannel.inputStream
@@ -259,7 +269,12 @@ class TerminalConnection internal constructor(
                     return ConnectionResult(false, 0L)
                 }
                 transport = connectedTransport
+                synchronized(terminal) {
+                    terminal.resetForNewSession()
+                    _screen.value = terminal.snapshot()
+                }
             }
+            resizeQueue.trySend(TerminalResize(cols, rows, pixelWidth, pixelHeight))
             Log.d(TAG, "PTY connected cols=$cols rows=$rows")
             _state.value = SshTerminalState(
                 status = SshTerminalStatus.CONNECTED,
@@ -275,8 +290,13 @@ class TerminalConnection internal constructor(
                 if (count > 0) {
                     Log.d(TAG, "PTY read bytes=$count")
                     val received = buffer.copyOf(count)
-                    terminal.accept(received)
-                    _screen.value = terminal.snapshot()
+                    synchronized(terminal) {
+                        if (!isCurrent(myGeneration) || requestedClose || transport !== connectedTransport) {
+                            return ConnectionResult(false, 0L)
+                        }
+                        terminal.accept(received)
+                        _screen.value = terminal.snapshot()
+                    }
                     _output.emit(received)
                 }
             }

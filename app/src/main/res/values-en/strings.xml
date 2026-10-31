@@ -2416,4 +2416,13 @@ Revocation stops new access through that permission but does not automatically e
     <string name="deepseek_key_required">Enter a valid DeepSeek API Key.</string>
     <string name="deepseek_config_hint">Save your configuration first, then enable it separately. The switch is saved immediately and stays off and unavailable until configured. The API Key is stored securely.</string>
     <string name="deepseek_config_saved">Configuration saved</string>
+    <string name="terminal_font">Terminal font</string>
+    <string name="terminal_font_hint">Use an imported font below, or use the system monospace font. Monospace fonts such as Maple Mono and JetBrains Mono are recommended. No terminal fonts are bundled.</string>
+    <string name="terminal_font_size">Terminal size: %1$d sp</string>
+    <string name="terminal_color_scheme">Terminal color scheme</string>
+    <string name="terminal_use_font">Use for terminal</string>
+    <string name="terminal_font_current">Current terminal font</string>
+    <string name="terminal_font_changed">Terminal font changed to %1$s</string>
+    <string name="terminal_paste">Paste</string>
+    <string name="terminal_clear">Clear terminal</string>
 </resources>

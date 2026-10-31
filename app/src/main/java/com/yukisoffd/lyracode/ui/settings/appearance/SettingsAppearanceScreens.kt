@@ -70,11 +70,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.FontLibraryItem
+import com.yukisoffd.lyracode.ssh.TerminalPalette
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -763,6 +765,8 @@ internal fun FontLibrarySettings(
     var fontRevision by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf("") }
     var previewItem by remember { mutableStateOf<FontLibraryItem?>(null) }
+    var terminalSize by remember { mutableStateOf(settings.terminalFontSize) }
+    var terminalPalette by remember { mutableStateOf(TerminalPalette.fromId(settings.terminalColorScheme)) }
     val fontLibrary = remember(fontRevision) { settings.fontLibrary() }
     val fontMimeTypes = arrayOf(
         "font/ttf", "font/otf", "font/ttc", "font/collection", "application/x-font-ttf",
@@ -803,6 +807,61 @@ internal fun FontLibrarySettings(
                 }
             }
         }
+        item {
+            KimiCardBox {
+                FontSelectionSummary(
+                    title = uiText(R.string.terminal_font),
+                    currentName = settings.terminalFontName,
+                    onClear = {
+                        settings.selectTerminalFont(null)
+                        fontRevision++
+                        controller.settingsRevision.intValue++
+                    },
+                )
+                Text(uiText(R.string.terminal_font_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+                Text(uiText(R.string.terminal_font_size, terminalSize.roundToInt()), style = MaterialTheme.typography.titleSmall)
+                Slider(
+                    value = terminalSize,
+                    onValueChange = { terminalSize = it.roundToInt().toFloat() },
+                    onValueChangeFinished = {
+                        settings.terminalFontSize = terminalSize
+                        controller.settingsRevision.intValue++
+                    },
+                    valueRange = 8f..28f,
+                    steps = 19,
+                )
+                Text(uiText(R.string.terminal_color_scheme), style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TerminalPalette.entries.forEach { palette ->
+                        TextButton(onClick = {
+                            terminalPalette = palette
+                            settings.terminalColorScheme = palette.id
+                            controller.settingsRevision.intValue++
+                        }) {
+                            if (terminalPalette == palette) Icon(Icons.Default.Check, null, Modifier.size(16.dp))
+                            Text(palette.label)
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().background(Color(terminalPalette.background), RoundedCornerShape(8.dp)).padding(10.dp)) {
+                    (0..15).forEach { index ->
+                        Box(Modifier.weight(1f).height(16.dp).background(Color(terminalPalette.resolve(index))))
+                    }
+                }
+                val terminalFamily = remember(settings.terminalFontPath) {
+                    settings.terminalFontPath?.let { path ->
+                        runCatching { FontFamily(Typeface.createFromFile(path)) }.getOrNull()
+                    } ?: FontFamily.Monospace
+                }
+                Text(
+                    "user@host:~ $ echo Hello\n中文 · 한국어 · 日本語\n0123456789  []{}  -> !=",
+                    fontFamily = terminalFamily,
+                    fontSize = terminalSize.sp,
+                    color = Color(terminalPalette.foreground),
+                    modifier = Modifier.fillMaxWidth().background(Color(terminalPalette.background), RoundedCornerShape(8.dp)).padding(10.dp),
+                )
+            }
+        }
         if (notice.isNotBlank()) {
             item { Text(notice, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
         }
@@ -818,6 +877,7 @@ internal fun FontLibrarySettings(
                     item = item,
                     textSelected = settings.textFontPath == item.path,
                     codeSelected = settings.codeFontPath == item.path,
+                    terminalSelected = settings.terminalFontPath == item.path,
                     onPreview = { previewItem = item },
                     onSelectText = {
                         settings.selectFont(item, codeFont = false)
@@ -828,6 +888,12 @@ internal fun FontLibrarySettings(
                     onSelectCode = {
                         settings.selectFont(item, codeFont = true)
                         notice = uiText(R.string.ui_code_font_changed_to_1_s, item.name)
+                        fontRevision++
+                        controller.settingsRevision.intValue++
+                    },
+                    onSelectTerminal = {
+                        settings.selectTerminalFont(item)
+                        notice = uiText(R.string.terminal_font_changed, item.name)
                         fontRevision++
                         controller.settingsRevision.intValue++
                     },
@@ -896,9 +962,11 @@ private fun FontLibraryRow(
     item: FontLibraryItem,
     textSelected: Boolean,
     codeSelected: Boolean,
+    terminalSelected: Boolean,
     onPreview: () -> Unit,
     onSelectText: () -> Unit,
     onSelectCode: () -> Unit,
+    onSelectTerminal: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val itemFamily = remember(item.path) {
@@ -927,6 +995,10 @@ private fun FontLibraryRow(
                     if (codeSelected) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                     Text(if (codeSelected) uiText(R.string.ui_code_font_current) else uiText(R.string.ui_use_for_code))
                 }
+            }
+            TextButton(onClick = onSelectTerminal) {
+                if (terminalSelected) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(uiText(if (terminalSelected) R.string.terminal_font_current else R.string.terminal_use_font))
             }
         }
     }
