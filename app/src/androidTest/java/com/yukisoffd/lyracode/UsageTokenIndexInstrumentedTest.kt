@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.yukisoffd.lyracode.data.*
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,10 +17,46 @@ import kotlin.system.measureNanoTime
 @RunWith(AndroidJUnit4::class)
 class UsageTokenIndexInstrumentedTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private val tokenizer get() = DeepSeekV3Tokenizer.get(context)
+    private val tokenizer get() = DeepSeekV4Tokenizer.get(context)
     private fun ConversationStore.newConversation() = createConversation("test", "deepseek-chat", title = "token test")
     private fun ConversationStore.calculate() = UsageStatisticsRepository(context, this).calculate(UsageStatsPeriod.TOTAL)
     private fun ConversationStore.scalar(sql: String) = readableDatabase.rawQuery(sql, null).use { it.moveToFirst(); it.getLong(0) }
+
+    @Test fun bundledTokenizerLoadsV4Rules() {
+        // Surface parsing failures directly instead of letting the production fallback mask them.
+        context.assets.open("deepseek-v4.bin").buffered().use(DeepSeekBpeEncoder::read)
+        assertEquals(LOCAL_TOKEN_CACHE_VERSION, tokenizer.cacheVersion)
+        assertEquals(3L, tokenizer.count("<｜begin▁of▁file｜><｜end▁of▁file｜>｜DSML｜"))
+        assertEquals(4L, tokenizer.count("你好，世界！"))
+        assertEquals(1L, tokenizer.count(" "))
+        val fixture = InstrumentationRegistry.getInstrumentation().context.assets.open("deepseek-v4-counts.json")
+            .bufferedReader().use { JSONObject(it.readText()) }.getJSONArray("cases")
+        for (index in 0 until fixture.length()) {
+            val case = fixture.getJSONObject(index)
+            assertEquals("V4 reference case $index", case.getLong("count"), tokenizer.count(case.getString("text")))
+        }
+    }
+
+    @Test fun oldV3CountsAreRebuiltAndRecordedRequestsArePreserved() {
+        ConversationStore(context, inMemory = true).use { store ->
+            val conversation = store.newConversation()
+            store.addMessage(conversation, "user", "<｜begin▁of▁file｜>你好😀")
+            store.addMessage(conversation, "assistant", "｜DSML｜result")
+            val recorded = store.addMessage(conversation, "assistant", "recorded response")
+            store.recordUsageModelRequest(recorded, 123, 45)
+            store.calculate()
+            // Simulate a fully indexed V3 history with stale estimates and no message edits.
+            store.writableDatabase.execSQL("UPDATE messages SET token_version=1, prompt_tokens=999999, output_tokens=999999")
+            store.writableDatabase.execSQL("UPDATE usage_token_index_state SET token_version=1")
+            store.writableDatabase.execSQL("UPDATE usage_estimated_requests SET input_tokens=999999, output_tokens=999999")
+            val result = store.calculate()
+            assertEquals(store.referenceTokens(), result.userInputTokens to result.aiOutputTokens)
+            assertEquals(0L, store.scalar("SELECT COUNT(*) FROM messages WHERE token_version<>$LOCAL_TOKEN_CACHE_VERSION"))
+            assertEquals(123L, store.scalar("SELECT input_tokens FROM usage_model_requests WHERE assistant_message_id=$recorded"))
+            assertEquals(45L, store.scalar("SELECT output_tokens FROM usage_model_requests WHERE assistant_message_id=$recorded"))
+            store.prepareLegacyUsage(Long.MIN_VALUE, Long.MAX_VALUE, { error("Rebuilt history loaded tokenizer again") }, {})
+        }
+    }
 
     /** Independent version of the previous full-history calculation, including repeated context. */
     private fun ConversationStore.referenceTokens(): Pair<Long, Long> {

@@ -33,6 +33,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.swipe
 import androidx.test.platform.app.InstrumentationRegistry
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.ssh.*
@@ -246,6 +247,52 @@ class TerminalInteractionInstrumentedTest {
         }
     }
 
+    @Test fun firstCommandOutputScrollsWithoutPageSwitchAfterLayoutAndSessionResets() {
+        val settings = AppSettings(context)
+        var connection by mutableStateOf(BufferSession(initialColumns = 2))
+        var terminalVisible by mutableStateOf(true)
+        compose.setContent {
+            if (terminalVisible) {
+                val snapshot by connection.screen.collectAsState()
+                MaterialTheme {
+                    Box(Modifier.height(400.dp)) { TerminalSurface(snapshot, connection, true, settings) }
+                }
+            }
+        }
+
+        fun outputAndScroll(label: String) {
+            compose.runOnIdle { connection.accept((0..119).joinToString("\r\n") { "$label ROW-$it" }) }
+            compose.waitForIdle()
+            val output = compose.onNodeWithContentDescription("terminal-output")
+            compose.onNodeWithText("↑ ", substring = true).assertDoesNotExist()
+            output.performTouchInput {
+                swipe(Offset(centerX, height * .2f), Offset(centerX, height * .7f), durationMillis = 350)
+            }
+            compose.onNodeWithText("↑ ", substring = true).assertIsDisplayed()
+            output.performTouchInput {
+                swipe(Offset(centerX, height * .85f), Offset(centerX, height * .1f), durationMillis = 350)
+            }
+            compose.onNodeWithText("↑ ", substring = true).assertDoesNotExist()
+        }
+
+        // Empty first composition, then initial PTY sizing, then the first command's output.
+        compose.waitUntil(5_000) { connection.resizeCount > 0 }
+        outputAndScroll("FIRST")
+        compose.runOnIdle { connection.beginSession() }
+        compose.waitForIdle()
+        outputAndScroll("RECONNECTED")
+        compose.runOnIdle { connection.clear() }
+        compose.waitForIdle()
+        outputAndScroll("CLEARED")
+
+        // A fresh surface/session must work immediately again, with no navigation workaround.
+        compose.runOnIdle { terminalVisible = false }
+        compose.waitForIdle()
+        compose.runOnIdle { connection = BufferSession(initialColumns = 2); terminalVisible = true }
+        compose.waitUntil(5_000) { connection.resizeCount > 0 }
+        outputAndScroll("REOPENED")
+    }
+
     private fun bufferText(snapshot: TerminalSnapshot) = TerminalSelectionText.extract(snapshot,
         TerminalSelection(TerminalPosition(0, 0), TerminalPosition(snapshot.rows - 1, snapshot.columns - 1)),
     ).trimEnd()
@@ -274,14 +321,15 @@ class TerminalInteractionInstrumentedTest {
         override fun write(bytes: ByteArray) = write(bytes.toString(Charsets.UTF_8))
     }
 
-    private class BufferSession : TerminalSession {
-        private val terminal = TerminalEmulator(48, 30)
+    private class BufferSession(initialColumns: Int = 48) : TerminalSession {
+        private val terminal = TerminalEmulator(initialColumns, 30)
         override val screen = MutableStateFlow(terminal.snapshot())
         override val state = MutableStateFlow(SshTerminalState(SshTerminalStatus.CONNECTED))
         @Volatile var resizeCount = 0
         @Volatile var lastHeight = 0
         val writes = mutableListOf<String>()
         fun accept(text: String) { terminal.accept(text.toByteArray()); screen.value = terminal.snapshot() }
+        fun beginSession() { terminal.resetForNewSession(); screen.value = terminal.snapshot() }
         override fun clear() { terminal.clear(); screen.value = terminal.snapshot() }
         override fun resize(newCols: Int, newRows: Int, widthPx: Int, heightPx: Int) {
             terminal.resize(newCols, newRows)

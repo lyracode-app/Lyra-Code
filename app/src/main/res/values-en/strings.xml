@@ -1299,7 +1299,7 @@
     <string name="stats_message_format">%1$s messages</string>
     <string name="stats_ai_messages">AI messages</string>
     <string name="stats_tool_results">Tool results</string>
-    <string name="stats_disclaimer">Token counts are estimated locally with the DeepSeek V3 tokenizer and never require network access. The current method counts context again for every model request and adds fixed overhead for system prompts, tool schemas, and message templates; provider tokenizers, image billing, cache discounts, and actual usage may differ.</string>
+    <string name="stats_disclaimer">Token counts are estimated locally with the DeepSeek V4 tokenizer and never require network access. The current method counts context again for every model request and adds fixed overhead for system prompts, tool schemas, and message templates; provider tokenizers, image billing, cache discounts, and actual usage may differ.</string>
     <string name="stats_period_format">%1$s stats</string>
     <string name="compact_unit_wan">Compact Unit Wan</string>
     <string name="compact_unit_yi">Compact Unit Yi</string>

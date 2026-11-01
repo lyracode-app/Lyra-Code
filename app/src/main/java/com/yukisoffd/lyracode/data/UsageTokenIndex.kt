@@ -3,7 +3,8 @@ package com.yukisoffd.lyracode.data
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 
-internal const val LOCAL_TOKEN_CACHE_VERSION = 1
+// V4 BPE and added-token rules invalidate V3 greedy estimates, including historical message counts.
+internal const val LOCAL_TOKEN_CACHE_VERSION = 2
 
 /** Only schema changes run during upgrade. Historical tokenization is deferred to background reads. */
 internal fun createUsageTokenIndex(db: SQLiteDatabase) {
@@ -72,7 +73,7 @@ internal fun createUsageTokenIndex(db: SQLiteDatabase) {
 }
 
 /** Compare revisions when publishing: a streaming edit must not receive an older snapshot's count. */
-internal fun ConversationStore.messageTokenCosts(message: ChatMessage, tokenizer: DeepSeekV3Tokenizer): MessageTokenCosts {
+internal fun ConversationStore.messageTokenCosts(message: ChatMessage, tokenizer: DeepSeekV4Tokenizer): MessageTokenCosts {
     val version = tokenizer.cacheVersion
     if (message.tokenRevision >= 0L) {
         if (message.tokenCacheVersion == version) message.cachedTokenCosts?.let { return it }
@@ -98,7 +99,7 @@ internal fun ConversationStore.messageTokenCosts(message: ChatMessage, tokenizer
 internal fun ConversationStore.prepareLegacyUsage(
     startAt: Long,
     endAt: Long,
-    tokenizer: () -> DeepSeekV3Tokenizer,
+    tokenizer: () -> DeepSeekV4Tokenizer,
     checkCancelled: () -> Unit,
 ) = synchronized(usageTokenIndexLock) {
     checkCancelled()
@@ -121,7 +122,7 @@ internal fun ConversationStore.prepareLegacyUsage(
 
 private fun ConversationStore.rebuildLegacyUsage(
     conversationId: Long,
-    tokenizer: DeepSeekV3Tokenizer,
+    tokenizer: DeepSeekV4Tokenizer,
     checkCancelled: () -> Unit,
 ): Boolean {
     val args = arrayOf(conversationId.toString())

@@ -16,7 +16,7 @@ import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.ChatMessage
 import com.yukisoffd.lyracode.data.ConversationStore
-import com.yukisoffd.lyracode.data.DeepSeekV3Tokenizer
+import com.yukisoffd.lyracode.data.DeepSeekV4Tokenizer
 import com.yukisoffd.lyracode.data.messageTokenCosts
 import com.yukisoffd.lyracode.data.McpServerConfig
 import com.yukisoffd.lyracode.data.McpToolDefinition
@@ -174,7 +174,7 @@ class OpenAiAgent(
         .readTimeout(20, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val tokenizer by lazy { DeepSeekV3Tokenizer.get(context) }
+    private val tokenizer by lazy { DeepSeekV4Tokenizer.get(context) }
     private val forcedSkillsByConversation = ConcurrentHashMap<Long, List<String>>()
     private val subAgentContexts = ConcurrentHashMap<Long, SubAgentExecutionContext>()
     private val subAgentWriteCoordinator = SubAgentWriteCoordinator()

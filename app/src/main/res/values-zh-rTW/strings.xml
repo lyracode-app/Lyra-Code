@@ -1381,7 +1381,7 @@
     <string name="stats_message_format">%1$s 條</string>
     <string name="stats_ai_messages">AI 訊息</string>
     <string name="stats_tool_results">工具結果</string>
-    <string name="stats_disclaimer">Token 數由本地 DeepSeek V3 tokenizer 估算，不訪問網路。當前口徑按每次模型請求重複計算上下文，併為系統提示詞、工具 schema 和訊息模板加入固定開銷；不同服務商的 tokenizer、圖片計費、快取摺扣和實際 usage 仍可能不同。</string>
+    <string name="stats_disclaimer">Token 數由本地 DeepSeek V4 tokenizer 估算，不訪問網路。當前口徑按每次模型請求重複計算上下文，併為系統提示詞、工具 schema 和訊息模板加入固定開銷；不同服務商的 tokenizer、圖片計費、快取摺扣和實際 usage 仍可能不同。</string>
     <string name="stats_period_format">%1$s統計</string>
     <string name="compact_unit_wan">萬</string>
     <string name="compact_unit_yi">億</string>

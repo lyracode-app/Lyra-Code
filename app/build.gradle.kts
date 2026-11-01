@@ -1,5 +1,5 @@
 import java.security.MessageDigest
-import groovy.json.JsonGenerator
+import java.io.DataOutputStream
 import groovy.json.JsonSlurper
 
 plugins {
@@ -22,18 +22,72 @@ abstract class GenerateTokenizerAssets : DefaultTask() {
         val model = tokenizer["model"] as Map<*, *>
         val vocabulary = model["vocab"] as Map<*, *>
         check(vocabulary.isNotEmpty()) { "The bundled tokenizer vocabulary is empty" }
-        // DeepSeekV3Tokenizer reads only model.vocab. Keep the complete upstream file in
-        // the repository, but omit unused merges, metadata and Python files from the APK.
-        val output = outputDirectory.file("tokenizer.json").get().asFile
+        check(model["type"] == "BPE" && model["dropout"] == null && model["unk_token"] == null)
+        check(model["continuing_subword_prefix"] == null && model["end_of_word_suffix"] == null)
+        check(model["byte_fallback"] == false && model["fuse_unk"] == false)
+        val normalizer = tokenizer["normalizer"] as Map<*, *>
+        check(normalizer["type"] == "Sequence" && (normalizer["normalizers"] as List<*>).isEmpty())
+        val preTokenizer = tokenizer["pre_tokenizer"] as Map<*, *>
+        check(preTokenizer["type"] == "Sequence")
+        val steps = preTokenizer["pretokenizers"] as List<*>
+        val byteLevel = steps.last() as Map<*, *>
+        check(byteLevel["type"] == "ByteLevel" && byteLevel["add_prefix_space"] == false && byteLevel["use_regex"] == false)
+        val patterns = steps.dropLast(1).map { step ->
+            val split = step as Map<*, *>
+            check(split["type"] == "Split" && split["behavior"] == "Isolated" && split["invert"] == false)
+            (split["pattern"] as Map<*, *>)["Regex"] as String
+        }
+        fun tokenId(token: String) = (vocabulary[token] as? Number)?.toInt()
+            ?: error("Missing BPE token: $token")
+        // GPT-2 ByteLevel alphabet: printable bytes retain their code point, the rest use U+0100 onward.
+        var extra = 256
+        val byteTokens = IntArray(256) { byte ->
+            val codePoint = if (byte in 33..126 || byte in 161..172 || byte in 174..255) byte else extra++
+            tokenId(codePoint.toChar().toString())
+        }
+        val merges = (model["merges"] as List<*>).mapIndexed { rank, entry ->
+            val pair = (entry as String).split(' ')
+            check(pair.size == 2)
+            val key = (tokenId(pair[0]).toLong() shl 32) or tokenId(pair[1]).toLong()
+            Triple(key, rank, tokenId(pair[0] + pair[1]))
+        }.sortedBy { it.first }
+        check(merges.zipWithNext().all { (a, b) -> a.first < b.first })
+        val addedTokens = (tokenizer["added_tokens"] as List<*>).map { entry ->
+            val token = entry as Map<*, *>
+            check(token["single_word"] == false && token["lstrip"] == false && token["rstrip"] == false)
+            token["content"] as String
+        }
+        // Compile all counting rules into primitive tables. No Python or tokenizer library is needed on Android.
+        val output = outputDirectory.file("deepseek-v4.bin").get().asFile
         output.parentFile.mkdirs()
-        val json = JsonGenerator.Options().disableUnicodeEscaping().build()
-        output.writeText(json.toJson(mapOf("model" to mapOf("vocab" to vocabulary))), Charsets.UTF_8)
+        DataOutputStream(output.outputStream().buffered()).use { data ->
+            data.writeInt(0x44535634) // DSV4, kept in sync with DeepSeekBpeEncoder.read.
+            data.writeInt(1)
+            data.writeInt(patterns.size)
+            patterns.forEach(data::writeUTF)
+            byteTokens.forEach(data::writeInt)
+            data.writeInt(merges.size)
+            merges.forEach { (pair, rank, merged) ->
+                data.writeLong(pair)
+                data.writeInt(rank)
+                data.writeInt(merged)
+            }
+            data.writeInt(addedTokens.size)
+            addedTokens.forEach(data::writeUTF)
+        }
     }
 }
 
 val generateTokenizerAssets by tasks.registering(GenerateTokenizerAssets::class) {
-    tokenizerFile.set(rootProject.layout.projectDirectory.file("deepseek_v3_tokenizer/deepseek_v3_tokenizer/tokenizer.json"))
-    outputDirectory.set(layout.buildDirectory.dir("generated/tokenizerAssets"))
+    tokenizerFile.set(rootProject.layout.projectDirectory.file("deepseek_v4_tokenizer/tokenizer.json"))
+    outputDirectory.set(layout.buildDirectory.dir("generated/deepseekV4Assets"))
+}
+
+tasks.withType<Test>().configureEach {
+    val tokenizerAsset = generateTokenizerAssets.flatMap { it.outputDirectory.file("deepseek-v4.bin") }
+    dependsOn(generateTokenizerAssets)
+    inputs.file(tokenizerAsset)
+    systemProperty("lyra.tokenizerAsset", tokenizerAsset.get().asFile.absolutePath)
 }
 
 // Ship one universal APK for now; per-ABI outputs remain available on demand.
@@ -56,8 +110,8 @@ android {
         applicationId = "com.yukisoffd.lyracode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 90
-        versionName = "4.2.1"
+        versionCode = 91
+        versionName = "4.2.2"
 
         if (!enableAbiSplits) {
             ndk {
@@ -139,6 +193,9 @@ android {
         jniLibs.useLegacyPackaging = true
     }
     sourceSets {
+        getByName("androidTest") {
+            assets.directories.add("src/test/resources")
+        }
         getByName("main") {
             kotlin.directories.add("src/debianRuntime/java")
             res.directories.add("src/debianRuntime/res")

@@ -297,9 +297,10 @@ internal fun TerminalSurface(
     var alt by rememberSaveable { mutableStateOf(false) }
     var renderWidth by remember { mutableIntStateOf(0) }
     var renderHeight by remember { mutableIntStateOf(0) }
-    var scrollOffsetRows by remember(connection, liveScreen.columns, liveScreen.resetGeneration) { mutableIntStateOf(0) }
-    var priorSnapshotRows by remember(connection, liveScreen.columns, liveScreen.resetGeneration) { mutableIntStateOf(screen.rows) }
-    var scrollRemainder by remember(connection, liveScreen.columns, liveScreen.resetGeneration) { mutableStateOf(0f) }
+    val scrollOffsetState = remember(connection, liveScreen.columns, liveScreen.resetGeneration) { mutableIntStateOf(0) }
+    var scrollOffsetRows by scrollOffsetState
+    var priorSnapshotRows by remember(scrollOffsetState) { mutableIntStateOf(screen.rows) }
+    var scrollRemainder by remember(scrollOffsetState) { mutableStateOf(0f) }
     var selection by selectionUi::selection
     val fontPath = settings.terminalFontPath
     val textSizePx = with(density) { settings.terminalFontSize.sp.toPx() }
@@ -414,7 +415,9 @@ internal fun TerminalSurface(
     ) {
         Box(
             Modifier.weight(1f).fillMaxWidth().background(Color(palette.background))
-                .pointerInput(connection, selection == null) {
+                // Initial PTY sizing and session resets replace the remembered scroll state.
+                // Restart gestures with that state, or they keep writing to a discarded buffer.
+                .pointerInput(connection, scrollOffsetState, selectionUi, selection == null) {
                     val selectingAtStart = selection != null
                     detectTapGestures(onTap = {
                         if (selectingAtStart) selectionUi.clear() else {
@@ -423,7 +426,7 @@ internal fun TerminalSurface(
                         }
                     })
                 }
-                .pointerInput(connection, cellHeight, selection == null) {
+                .pointerInput(connection, scrollOffsetState, selectionUi, cellHeight, selection == null) {
                     if (selection == null) detectVerticalDragGestures { change, dragAmount ->
                         change.consume()
                         scrollRemainder += dragAmount
@@ -434,7 +437,7 @@ internal fun TerminalSurface(
                         }
                     }
                 }
-                .pointerInput(connection, screen.columns, renderer) {
+                .pointerInput(connection, scrollOffsetState, selectionUi, screen.columns, renderer) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { offset ->
                             terminalInputView?.finishComposingInput()
