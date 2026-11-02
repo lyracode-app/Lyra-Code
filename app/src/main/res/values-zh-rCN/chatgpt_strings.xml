@@ -10,7 +10,7 @@
     <string name="chatgpt_continue">使用 ChatGPT 继续</string>
     <string name="chatgpt_provided_by">该服务由 ChatGPT（OpenAI）提供</string>
     <string name="chatgpt_disclosure">登录后，仅可在 Lyra Code 应用内使用您授权的 ChatGPT 订阅。OpenAI 可能随时更改、限制或停止此功能。请遵守 ChatGPT 的使用条款与政策，不得转售、共享凭据或用于滥用及其他被禁止的行为，否则可能导致 ChatGPT 账户受到官方警告、限制甚至停用。</string>
-    <string name="chatgpt_privacy">登录将在系统浏览器中完成。本应用不会获取您的 ChatGPT 密码或既有聊天记录。登录凭据仅在此设备内加密保存，不会随备份导出。</string>
+    <string name="chatgpt_privacy">登录将在浏览器标签页中完成，可沿用所选浏览器的登录状态。本应用不会获取您的 ChatGPT 密码或既有聊天记录。登录凭据仅在此设备内加密保存，不会随备份导出。</string>
     <string name="chatgpt_service_description">使用授权的 ChatGPT 订阅；无需 API Key。通过所选登录方式使用 Responses，模型列表由当前账户提供。此服务不支持自定义地址、请求参数或媒体生成。</string>
     <string name="chatgpt_mode_official">ChatGPT 官方登录（SIWC）</string>
     <string name="chatgpt_mode_codex">Codex 兼容登录</string>
