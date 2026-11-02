@@ -123,6 +123,28 @@ class McpSettingsInstrumentedTest {
         }
     }
 
+    @Test fun connectedButtonsUpdateConnectionWithoutDiscardingCustomJson() {
+        var saved: McpServerConfig? = null
+        compose.setContent {
+            CompositionLocalProvider(LocalContext provides context.localizedContext(AppSettings.LANGUAGE_EN)) {
+                MaterialTheme { McpServerDialog(server(), onDismiss = {}, onSave = { saved = it }) }
+            }
+        }
+        compose.onNodeWithText("Streamable HTTP").assertIsSelected()
+        compose.onNodeWithText("SSE").performClick().assertIsSelected()
+        compose.onNodeWithText("2026-07-28").performScrollTo().performClick().assertIsSelected()
+        compose.onNodeWithText("2025-11-25").performScrollTo().performClick().assertIsSelected()
+        screenshot("mcp-connected-buttons.png")
+        compose.onNodeWithText("Save").performClick()
+        compose.runOnIdle {
+            val config = McpJsonConfig(saved!!.rawJson)
+            assertEquals(AppSettings.MCP_TRANSPORT_SSE, config.transport)
+            assertEquals("2025-11-25", config.protocolVersion)
+            assertEquals("raw-key", config.headers["Authorization"])
+            assertTrue(org.json.JSONObject(saved!!.rawJson).getJSONObject("custom").getBoolean("preserved"))
+        }
+    }
+
     @Test fun toolsOpenSubpagesWithFullNamesDescriptionsAndSchema() {
         val name = "a_complete_very_long_tool_name_".repeat(4)
         val description = "Detailed tool documentation with complete instructions.\n".repeat(30) + "FINAL DESCRIPTION LINE"

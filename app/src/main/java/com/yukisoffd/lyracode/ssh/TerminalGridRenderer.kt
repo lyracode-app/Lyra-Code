@@ -38,6 +38,7 @@ internal class TerminalGridRenderer(typeface: Typeface, textSizePx: Float, val p
         lastRow: Int,
         selection: TerminalSelection?,
         showCursor: Boolean,
+        links: List<TerminalLink> = emptyList(),
     ) {
         val ordered = selection?.let { TerminalSelectionText.normalize(snapshot, it).ordered(snapshot.columns) }
         val start = ordered?.first?.let { it.row * snapshot.columns + it.column } ?: -1
@@ -71,6 +72,10 @@ internal class TerminalGridRenderer(typeface: Typeface, textSizePx: Float, val p
                 canvas.save()
                 canvas.clipRect(x, y, right, y + cellHeight)
                 canvas.drawText(glyph, x, y + baseline, paint)
+                if (selection == null && links.any { index in it.startIndex..it.endIndex }) {
+                    val underlineY = y + (baseline + cellHeight * .06f).coerceAtMost(cellHeight - 1f)
+                    canvas.drawRect(x, underlineY, right, underlineY + (cellHeight * .035f).coerceAtLeast(1f), paint)
+                }
                 canvas.restore()
             }
         }

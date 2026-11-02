@@ -58,7 +58,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
@@ -163,52 +162,23 @@ internal fun streamingAnimationModeName(mode: String): String = when (AppSetting
 internal fun StreamingOutputSettings(settings: AppSettings, controller: ChatController) {
     var selected by remember { mutableStateOf(settings.streamingAnimationMode) }
     KimiCardBox {
-        StreamingAnimationOptionRow(
-            icon = Icons.Default.Keyboard,
-            title = stringResource(R.string.streaming_typewriter_title),
-            subtitle = stringResource(R.string.streaming_typewriter_desc),
-            value = AppSettings.STREAMING_ANIMATION_TYPEWRITER,
+        MaterialButtonGroup(
+            options = listOf(
+                AppSettings.STREAMING_ANIMATION_TYPEWRITER to stringResource(R.string.streaming_typewriter_title),
+                AppSettings.STREAMING_ANIMATION_FADE to stringResource(R.string.streaming_fade_title),
+            ),
             selected = selected,
-        ) { value ->
-            selected = value
-            settings.streamingAnimationMode = value
-            controller.settingsRevision.intValue++
-        }
-        KimiDivider()
-        StreamingAnimationOptionRow(
-            icon = Icons.Default.Gradient,
-            title = stringResource(R.string.streaming_fade_title),
-            subtitle = stringResource(R.string.streaming_fade_desc),
-            value = AppSettings.STREAMING_ANIMATION_FADE,
-            selected = selected,
-        ) { value ->
-            selected = value
-            settings.streamingAnimationMode = value
-            controller.settingsRevision.intValue++
-        }
-    }
-}
-
-@Composable
-private fun StreamingAnimationOptionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    value: String,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { onSelect(value) }.padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.width(36.dp).size(24.dp), tint = MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = KimiMuted, style = MaterialTheme.typography.bodySmall)
-        }
-        if (value == selected) Icon(Icons.Default.Check, contentDescription = stringResource(R.string.streaming_selected), tint = MaterialTheme.colorScheme.primary)
+            onSelect = { value ->
+                selected = value
+                settings.streamingAnimationMode = value
+                controller.settingsRevision.intValue++
+            },
+        )
+        Text(
+            stringResource(if (selected == AppSettings.STREAMING_ANIMATION_FADE) R.string.streaming_fade_desc else R.string.streaming_typewriter_desc),
+            color = KimiMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -387,11 +357,16 @@ internal fun ThemeModeSettings(
             style = MaterialTheme.typography.bodySmall,
         )
         KimiDivider()
-        ThemeOptionRow(uiText(R.string.theme_name_system), AppSettings.THEME_SYSTEM, themeMode, onThemeModeChange, !customEnabled)
-        KimiDivider()
-        ThemeOptionRow(uiText(R.string.theme_name_light), AppSettings.THEME_LIGHT, themeMode, onThemeModeChange, !customEnabled)
-        KimiDivider()
-        ThemeOptionRow(uiText(R.string.theme_name_dark), AppSettings.THEME_DARK, themeMode, onThemeModeChange, !customEnabled)
+        MaterialButtonGroup(
+            options = listOf(
+                AppSettings.THEME_SYSTEM to uiText(R.string.theme_name_system),
+                AppSettings.THEME_LIGHT to uiText(R.string.theme_name_light),
+                AppSettings.THEME_DARK to uiText(R.string.theme_name_dark),
+            ),
+            selected = themeMode,
+            onSelect = onThemeModeChange,
+            enabled = !customEnabled,
+        )
     }
 }
 
@@ -537,38 +512,17 @@ internal fun RefreshRateSettings(
             style = MaterialTheme.typography.bodySmall,
         )
         KimiDivider()
-        RefreshRateOptionRow(uiText(R.string.refresh_rate_follow_system), AppSettings.REFRESH_RATE_SYSTEM, refreshRateMode, onRefreshRateModeChange)
-        KimiDivider()
-        RefreshRateOptionRow("30 Hz", AppSettings.REFRESH_RATE_30, refreshRateMode, onRefreshRateModeChange)
-        KimiDivider()
-        RefreshRateOptionRow("60 Hz", AppSettings.REFRESH_RATE_60, refreshRateMode, onRefreshRateModeChange)
-        KimiDivider()
-        RefreshRateOptionRow("90 Hz", AppSettings.REFRESH_RATE_90, refreshRateMode, onRefreshRateModeChange)
-        KimiDivider()
-        RefreshRateOptionRow("120 Hz", AppSettings.REFRESH_RATE_120, refreshRateMode, onRefreshRateModeChange)
-    }
-}
-
-@Composable
-internal fun ThemeOptionRow(title: String, value: String, selected: String, onSelect: (String) -> Unit, enabled: Boolean = true) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(enabled = enabled) { onSelect(value) }
-            .padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Default.Palette,
-            contentDescription = null,
-            modifier = Modifier.width(36.dp).size(24.dp),
-            tint = MaterialTheme.colorScheme.primary,
+        MaterialButtonGroup(
+            options = listOf(
+                AppSettings.REFRESH_RATE_SYSTEM to uiText(R.string.button_group_smart),
+                AppSettings.REFRESH_RATE_30 to "30 Hz",
+                AppSettings.REFRESH_RATE_60 to "60 Hz",
+                AppSettings.REFRESH_RATE_90 to "90 Hz",
+                AppSettings.REFRESH_RATE_120 to "120 Hz",
+            ),
+            selected = refreshRateMode,
+            onSelect = onRefreshRateModeChange,
         )
-        Text(title, modifier = Modifier.weight(1f), color = if (enabled) MaterialTheme.colorScheme.onSurface else KimiMuted, style = MaterialTheme.typography.titleMedium)
-        if (value == selected && enabled) {
-            Icon(Icons.Default.Check, contentDescription = uiText(R.string.streaming_selected), tint = MaterialTheme.colorScheme.primary)
-        }
     }
 }
 
@@ -598,29 +552,6 @@ internal fun LanguageOptionRow(
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(subtitle, color = KimiMuted, style = MaterialTheme.typography.bodySmall)
         }
-        if (value == selected) {
-            Icon(Icons.Default.Check, contentDescription = uiText(R.string.streaming_selected), tint = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
-
-@Composable
-internal fun RefreshRateOptionRow(title: String, value: String, selected: String, onSelect: (String) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onSelect(value) }
-            .padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Default.Speed,
-            contentDescription = null,
-            modifier = Modifier.width(36.dp).size(24.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         if (value == selected) {
             Icon(Icons.Default.Check, contentDescription = uiText(R.string.streaming_selected), tint = MaterialTheme.colorScheme.primary)
         }
@@ -754,6 +685,7 @@ internal fun FontSizeSettings(
                 },
             )
         }
+        TerminalFontSettings(settings, controller)
     }
 }
 
@@ -765,8 +697,6 @@ internal fun FontLibrarySettings(
     var fontRevision by remember { mutableIntStateOf(0) }
     var notice by remember { mutableStateOf("") }
     var previewItem by remember { mutableStateOf<FontLibraryItem?>(null) }
-    var terminalSize by remember { mutableStateOf(settings.terminalFontSize) }
-    var terminalPalette by remember { mutableStateOf(TerminalPalette.fromId(settings.terminalColorScheme)) }
     val fontLibrary = remember(fontRevision) { settings.fontLibrary() }
     val fontMimeTypes = arrayOf(
         "font/ttf", "font/otf", "font/ttc", "font/collection", "application/x-font-ttf",
@@ -807,61 +737,6 @@ internal fun FontLibrarySettings(
                 }
             }
         }
-        item {
-            KimiCardBox {
-                FontSelectionSummary(
-                    title = uiText(R.string.terminal_font),
-                    currentName = settings.terminalFontName,
-                    onClear = {
-                        settings.selectTerminalFont(null)
-                        fontRevision++
-                        controller.settingsRevision.intValue++
-                    },
-                )
-                Text(uiText(R.string.terminal_font_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
-                Text(uiText(R.string.terminal_font_size, terminalSize.roundToInt()), style = MaterialTheme.typography.titleSmall)
-                Slider(
-                    value = terminalSize,
-                    onValueChange = { terminalSize = it.roundToInt().toFloat() },
-                    onValueChangeFinished = {
-                        settings.terminalFontSize = terminalSize
-                        controller.settingsRevision.intValue++
-                    },
-                    valueRange = 8f..28f,
-                    steps = 19,
-                )
-                Text(uiText(R.string.terminal_color_scheme), style = MaterialTheme.typography.titleSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TerminalPalette.entries.forEach { palette ->
-                        TextButton(onClick = {
-                            terminalPalette = palette
-                            settings.terminalColorScheme = palette.id
-                            controller.settingsRevision.intValue++
-                        }) {
-                            if (terminalPalette == palette) Icon(Icons.Default.Check, null, Modifier.size(16.dp))
-                            Text(palette.label)
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth().background(Color(terminalPalette.background), RoundedCornerShape(8.dp)).padding(10.dp)) {
-                    (0..15).forEach { index ->
-                        Box(Modifier.weight(1f).height(16.dp).background(Color(terminalPalette.resolve(index))))
-                    }
-                }
-                val terminalFamily = remember(settings.terminalFontPath) {
-                    settings.terminalFontPath?.let { path ->
-                        runCatching { FontFamily(Typeface.createFromFile(path)) }.getOrNull()
-                    } ?: FontFamily.Monospace
-                }
-                Text(
-                    "user@host:~ $ echo Hello\n中文 · 한국어 · 日本語\n0123456789  []{}  -> !=",
-                    fontFamily = terminalFamily,
-                    fontSize = terminalSize.sp,
-                    color = Color(terminalPalette.foreground),
-                    modifier = Modifier.fillMaxWidth().background(Color(terminalPalette.background), RoundedCornerShape(8.dp)).padding(10.dp),
-                )
-            }
-        }
         if (notice.isNotBlank()) {
             item { Text(notice, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
         }
@@ -880,20 +755,23 @@ internal fun FontLibrarySettings(
                     terminalSelected = settings.terminalFontPath == item.path,
                     onPreview = { previewItem = item },
                     onSelectText = {
-                        settings.selectFont(item, codeFont = false)
-                        notice = uiText(R.string.ui_text_font_changed_to_1_s, item.name)
+                        val selected = settings.textFontPath == item.path
+                        settings.selectFont(if (selected) null else item, codeFont = false)
+                        notice = uiText(R.string.ui_text_font_changed_to_1_s, if (selected) uiText(R.string.ui_system_default) else item.name)
                         fontRevision++
                         controller.settingsRevision.intValue++
                     },
                     onSelectCode = {
-                        settings.selectFont(item, codeFont = true)
-                        notice = uiText(R.string.ui_code_font_changed_to_1_s, item.name)
+                        val selected = settings.codeFontPath == item.path
+                        settings.selectFont(if (selected) null else item, codeFont = true)
+                        notice = uiText(R.string.ui_code_font_changed_to_1_s, if (selected) uiText(R.string.ui_system_default) else item.name)
                         fontRevision++
                         controller.settingsRevision.intValue++
                     },
                     onSelectTerminal = {
-                        settings.selectTerminalFont(item)
-                        notice = uiText(R.string.terminal_font_changed, item.name)
+                        val selected = settings.terminalFontPath == item.path
+                        settings.selectTerminalFont(if (selected) null else item)
+                        notice = uiText(R.string.terminal_font_changed, if (selected) uiText(R.string.ui_system_default) else item.name)
                         fontRevision++
                         controller.settingsRevision.intValue++
                     },
@@ -933,6 +811,64 @@ internal fun FontLibrarySettings(
         )
     }
 }
+@Composable
+private fun TerminalFontSettings(settings: AppSettings, controller: ChatController) {
+    var terminalSize by remember { mutableStateOf(settings.terminalFontSize) }
+    var terminalPalette by remember { mutableStateOf(TerminalPalette.fromId(settings.terminalColorScheme)) }
+    // Read the revision so clearing or selecting a font refreshes the summary and preview.
+    val revision = controller.settingsRevision.intValue
+    val terminalFontPath = remember(revision) { settings.terminalFontPath }
+    KimiCardBox {
+        FontSelectionSummary(
+            title = uiText(R.string.terminal_font),
+            currentName = settings.terminalFontName,
+            onClear = {
+                settings.selectTerminalFont(null)
+                controller.settingsRevision.intValue++
+            },
+        )
+        Text(uiText(R.string.terminal_font_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+        Text(uiText(R.string.terminal_font_size, terminalSize.roundToInt()), style = MaterialTheme.typography.titleSmall)
+        Slider(
+            value = terminalSize,
+            onValueChange = { terminalSize = it.roundToInt().toFloat() },
+            onValueChangeFinished = {
+                settings.terminalFontSize = terminalSize
+                controller.settingsRevision.intValue++
+            },
+            valueRange = 8f..28f,
+            steps = 19,
+        )
+        Text(uiText(R.string.terminal_color_scheme), style = MaterialTheme.typography.titleSmall)
+        MaterialButtonGroup(
+            options = TerminalPalette.entries.map { it.id to it.label },
+            selected = terminalPalette.id,
+            onSelect = {
+                terminalPalette = TerminalPalette.fromId(it)
+                settings.terminalColorScheme = it
+                controller.settingsRevision.intValue++
+            },
+        )
+        Row(Modifier.fillMaxWidth().background(Color(terminalPalette.background), RoundedCornerShape(8.dp)).padding(10.dp)) {
+            (0..15).forEach { index ->
+                Box(Modifier.weight(1f).height(16.dp).background(Color(terminalPalette.resolve(index))))
+            }
+        }
+        val terminalFamily = remember(terminalFontPath) {
+            terminalFontPath?.let { path ->
+                runCatching { FontFamily(Typeface.createFromFile(path)) }.getOrNull()
+            } ?: FontFamily.Monospace
+        }
+        Text(
+            "user@host:~ $ echo Hello\n中文 · 한국어 · 日本語\n0123456789  []{}  -> !=",
+            fontFamily = terminalFamily,
+            fontSize = terminalSize.sp,
+            color = Color(terminalPalette.foreground),
+            modifier = Modifier.fillMaxWidth().background(Color(terminalPalette.background), RoundedCornerShape(8.dp)).padding(10.dp),
+        )
+    }
+}
+
 @Composable
 private fun FontSelectionSummary(
     title: String,
@@ -986,20 +922,19 @@ private fun FontLibraryRow(
                 IconButton(onClick = onPreview) { Icon(Icons.Default.Visibility, contentDescription = uiText(R.string.ui_preview)) }
                 IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, contentDescription = uiText(R.string.ui_remove_from_font_library)) }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextButton(onClick = onSelectText) {
-                    if (textSelected) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(if (textSelected) uiText(R.string.ui_text_font_current) else uiText(R.string.ui_use_for_text))
-                }
-                TextButton(onClick = onSelectCode) {
-                    if (codeSelected) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(if (codeSelected) uiText(R.string.ui_code_font_current) else uiText(R.string.ui_use_for_code))
-                }
-            }
-            TextButton(onClick = onSelectTerminal) {
-                if (terminalSelected) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                Text(uiText(if (terminalSelected) R.string.terminal_font_current else R.string.terminal_use_font))
-            }
+            MaterialButtonGroup(
+                options = listOf("text" to uiText(R.string.button_group_text), "code" to uiText(R.string.button_group_code), "terminal" to uiText(R.string.button_group_terminal)),
+                selected = buildSet {
+                    if (textSelected) add("text")
+                    if (codeSelected) add("code")
+                    if (terminalSelected) add("terminal")
+                },
+                onSelect = { when (it) {
+                    "text" -> onSelectText()
+                    "code" -> onSelectCode()
+                    "terminal" -> onSelectTerminal()
+                } },
+            )
         }
     }
 }

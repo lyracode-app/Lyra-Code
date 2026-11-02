@@ -23,14 +23,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -96,6 +101,7 @@ import com.yukisoffd.lyracode.ssh.TerminalViewport
 import com.yukisoffd.lyracode.ssh.TerminalSnapshot
 import com.yukisoffd.lyracode.ssh.TerminalGridRenderer
 import com.yukisoffd.lyracode.ssh.TerminalPalette
+import com.yukisoffd.lyracode.ssh.TerminalLinks
 import kotlinx.coroutines.delay
 
 @Composable
@@ -316,6 +322,9 @@ internal fun TerminalSurface(
     val firstVisibleRow = (followCursorFirstRow - scrollOffsetRows)
         .coerceIn(0, (screen.rows - visibleRows).coerceAtLeast(0))
     val lastVisibleRow = (firstVisibleRow + visibleRows).coerceAtMost(screen.rows)
+    val links = remember(screen, firstVisibleRow, lastVisibleRow) { TerminalLinks.find(screen, firstVisibleRow, lastVisibleRow) }
+    val currentLinks by rememberUpdatedState(links)
+    var linkToCopy by remember(connection, liveScreen.resetGeneration) { mutableStateOf<String?>(null) }
     val currentScreen by rememberUpdatedState(screen)
     val currentFirstRow by rememberUpdatedState(firstVisibleRow)
     val currentFollowRow by rememberUpdatedState(followCursorFirstRow)
@@ -419,10 +428,17 @@ internal fun TerminalSurface(
                 // Restart gestures with that state, or they keep writing to a discarded buffer.
                 .pointerInput(connection, scrollOffsetState, selectionUi, selection == null) {
                     val selectingAtStart = selection != null
-                    detectTapGestures(onTap = {
+                    detectTapGestures(onTap = { offset ->
                         if (selectingAtStart) selectionUi.clear() else {
-                            scrollOffsetRows = 0
-                            focusTerminalInput()
+                            val link = currentLinks.firstOrNull { it.contains(positionAt(offset), currentScreen.columns) }
+                            if (link != null) {
+                                terminalInputView?.clearFocus()
+                                keyboard?.hide()
+                                linkToCopy = link.text
+                            } else {
+                                scrollOffsetRows = 0
+                                focusTerminalInput()
+                            }
                         }
                     })
                 }
@@ -485,7 +501,7 @@ internal fun TerminalSurface(
                 Modifier.fillMaxSize().semantics { contentDescription = "terminal-output" }
                     .onSizeChanged { renderWidth = it.width; renderHeight = it.height },
             ) {
-                drawIntoCanvas { renderer.draw(it.nativeCanvas, screen, firstVisibleRow, lastVisibleRow, selection, enabled) }
+                drawIntoCanvas { renderer.draw(it.nativeCanvas, screen, firstVisibleRow, lastVisibleRow, selection, enabled, links) }
             }
             AndroidView(
                 factory = { context -> TerminalInputView(context).also { terminalInputView = it } },
@@ -578,6 +594,27 @@ internal fun TerminalSurface(
             onCtrl = { selectionUi.clear(); terminalInputView?.finishComposingInput(); ctrl = !ctrl; focusTerminalInput() },
             onAlt = { selectionUi.clear(); terminalInputView?.finishComposingInput(); alt = !alt; focusTerminalInput() },
             onKey = { sequence -> terminalInputView?.finishComposingInput(); sendKey(sequence); focusTerminalInput() },
+        )
+    }
+    linkToCopy?.let { link ->
+        AlertDialog(
+            onDismissRequest = { linkToCopy = null },
+            title = { Text(uiText(R.string.terminal_link)) },
+            text = {
+                SelectionContainer {
+                    Text(link, Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("terminal-link", link))
+                    linkToCopy = null
+                }) { Text(uiText(R.string.action_copy)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { linkToCopy = null }) { Text(uiText(R.string.action_cancel)) }
+            },
         )
     }
 }

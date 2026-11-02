@@ -97,6 +97,50 @@ class TerminalInteractionInstrumentedTest {
         bitmap.recycle()
     }
 
+    @Test fun linksCopyOnTapWhileLongPressAndSelectionKeepNormalTextBehavior() {
+        val settings = AppSettings(context)
+        val previousSize = settings.terminalFontSize
+        settings.terminalFontSize = 13f
+        val url = "https://example.com/path?q=1&next=two"
+        val outputUrl = "http://127.0.0.1:8080/result"
+        val terminal = TerminalEmulator(48, 12).apply {
+            accept("$url\r\nserver: $outputUrl\r\nordinary text".toByteArray())
+        }
+        val screen = terminal.snapshot()
+        val state = TerminalSelectionUiState()
+        val session = RecordingSession(screen)
+        try {
+            compose.setContent { MaterialTheme { TerminalSurface(screen, session, true, settings, state) } }
+            val typeface = settings.terminalFontPath?.let(Typeface::createFromFile) ?: Typeface.MONOSPACE
+            val renderer = TerminalGridRenderer(typeface, 13f * context.resources.displayMetrics.scaledDensity, TerminalPalette.CAMPBELL)
+            val point = Offset(renderer.cellWidth * 5.5f, renderer.cellHeight * .5f)
+            val output = compose.onNodeWithContentDescription("terminal-output")
+            saveScreenshot("terminal-links.png")
+            output.performTouchInput { click(point) }
+            compose.onNodeWithText(uiText(R.string.terminal_link)).assertIsDisplayed()
+            compose.onNodeWithText(url).assertIsDisplayed()
+            assertNull(state.selection)
+            compose.onNodeWithText(uiText(R.string.action_copy)).performClick()
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(url, clipboard.primaryClip!!.getItemAt(0).text.toString())
+            assertTrue(session.writes.isEmpty())
+
+            output.performTouchInput { longClick(point) }
+            compose.onNodeWithContentDescription("terminal-selection-actions").assertIsDisplayed()
+            compose.onNodeWithText(uiText(R.string.terminal_link)).assertDoesNotExist()
+            assertEquals(url, TerminalSelectionText.extract(screen, state.selection!!))
+            output.performTouchInput { click(point) }
+            assertNull(state.selection)
+            compose.onNodeWithText(uiText(R.string.terminal_link)).assertDoesNotExist()
+
+            output.performTouchInput { click(Offset(renderer.cellWidth * 12.5f, renderer.cellHeight * 1.5f)) }
+            compose.onNodeWithText(outputUrl).assertIsDisplayed()
+            compose.onNodeWithText(uiText(R.string.action_copy)).performClick()
+            assertEquals(outputUrl, clipboard.primaryClip!!.getItemAt(0).text.toString())
+            assertTrue(session.writes.isEmpty())
+        } finally { settings.terminalFontSize = previousSize }
+    }
+
     @Test fun importedTerminalFontIsIndependentPersistentAndFallsBackAfterDeletion() {
         val settings = AppSettings(context)
         val previous = settings.fontLibrary().firstOrNull { it.path == settings.terminalFontPath }
@@ -115,6 +159,37 @@ class TerminalInteractionInstrumentedTest {
         } finally {
             if (File(imported.path).exists()) settings.deleteFont(imported)
             settings.selectTerminalFont(previous)
+        }
+    }
+
+    @Test fun removingAllFontUsesRestoresDefaultsWithoutRemovingTheLibraryEntry() {
+        val settings = AppSettings(context)
+        val previous = settings.fontLibrary()
+        val textFont = previous.firstOrNull { it.path == settings.textFontPath }
+        val codeFont = previous.firstOrNull { it.path == settings.codeFontPath }
+        val terminalFont = previous.firstOrNull { it.path == settings.terminalFontPath }
+        val file = File(context.cacheDir, "legacy-font-${System.nanoTime()}.ttf")
+        File("/system/fonts/DroidSansMono.ttf").copyTo(file)
+        val item = com.yukisoffd.lyracode.data.FontLibraryItem("legacy-toggle-test", "Legacy font", file.absolutePath)
+        try {
+            settings.selectFont(item, codeFont = false)
+            settings.selectFont(item, codeFont = true)
+            settings.selectTerminalFont(item)
+            assertTrue(settings.fontLibrary().any { it.path == item.path })
+            settings.selectFont(null, codeFont = false)
+            settings.selectFont(null, codeFont = true)
+            settings.selectTerminalFont(null)
+            val restored = AppSettings(context)
+            assertNull(restored.textFontPath)
+            assertNull(restored.codeFontPath)
+            assertNull(restored.terminalFontPath)
+            assertTrue(restored.fontLibrary().any { it.path == item.path })
+            assertTrue(file.exists())
+        } finally {
+            settings.deleteFont(item)
+            settings.selectFont(textFont, codeFont = false)
+            settings.selectFont(codeFont, codeFont = true)
+            settings.selectTerminalFont(terminalFont)
         }
     }
 

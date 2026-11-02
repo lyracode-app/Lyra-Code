@@ -1950,7 +1950,7 @@ Revocation stops new access through that permission but does not automatically e
     <string name="ui_text_font">Text font</string>
     <string name="ui_code_font">Code font</string>
     <string name="ui_imported_1_s_fonts">Imported %1$s fonts</string>
-    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">Import multiple TTF, OTF, and TTC fonts. Preview each font and assign it separately for text or code.</string>
+    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">Import multiple TTF, OTF, and TTC fonts for text, code, or the terminal. Tap a selected use again to restore its default font.</string>
     <string name="ui_import_fonts">Import fonts</string>
     <string name="ui_the_font_library_is_empty_tap_import_fonts_to">The font library is empty. Tap Import fonts to select multiple files at once.</string>
     <string name="ui_text_font_changed_to_1_s">Text font changed to: %1$s</string>
@@ -2417,7 +2417,7 @@ Revocation stops new access through that permission but does not automatically e
     <string name="deepseek_config_hint">Save your configuration first, then enable it separately. The switch is saved immediately and stays off and unavailable until configured. The API Key is stored securely.</string>
     <string name="deepseek_config_saved">Configuration saved</string>
     <string name="terminal_font">Terminal font</string>
-    <string name="terminal_font_hint">Use an imported font below, or use the system monospace font. Monospace fonts such as Maple Mono and JetBrains Mono are recommended. No terminal fonts are bundled.</string>
+    <string name="terminal_font_hint">Choose a font in the font library, or use the system monospace font. Monospace fonts such as Maple Mono and JetBrains Mono are recommended. No terminal fonts are bundled.</string>
     <string name="terminal_font_size">Terminal size: %1$d sp</string>
     <string name="terminal_color_scheme">Terminal color scheme</string>
     <string name="terminal_use_font">Use for terminal</string>

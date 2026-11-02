@@ -388,7 +388,10 @@ class AppSettings(context: Context) {
             codeFontPath?.let { FontLibraryItem("legacy_code", codeFontName ?: File(it).name, it) },
             terminalFontPath?.let { FontLibraryItem("legacy_terminal", terminalFontName ?: File(it).name, it) },
         )
-        return (saved + legacy).distinctBy { it.path }
+        val library = (saved + legacy).distinctBy { it.path }
+        // Keep legacy imports in the library when their last active use is toggled off.
+        if (library != saved) saveFontLibrary(library)
+        return library
     }
 
     fun importFonts(uris: List<Uri>): Result<List<FontLibraryItem>> = runCatching {
@@ -959,6 +962,7 @@ class AppSettings(context: Context) {
     internal val newApiAccount: NewApiAccountClient by lazy {
         val accountPrefs = createSecurePrefs("lyra_new_api_account")
         NewApiAccountClient(object : NewApiAccountStore {
+            override val supportsRememberedLogin = accountPrefs is EncryptedSharedPreferences
             override var state: String
                 get() = accountPrefs.getString("session", "").orEmpty()
                 set(value) { check(accountPrefs.edit().putString("session", value).commit()) { "Unable to save account session" } }

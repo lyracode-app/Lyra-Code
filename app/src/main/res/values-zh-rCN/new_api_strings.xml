@@ -28,7 +28,7 @@
     <string name="new_api_sync">同步 Key 与模型</string>
     <string name="new_api_refresh_user">刷新用户信息</string>
     <string name="new_api_logout">退出平台账号</string>
-    <string name="new_api_logout_hint">退出将清除本地账号登录态；已配置的模型服务及 Key 仍保留，可在模型服务中移除。</string>
+    <string name="new_api_logout_hint">退出会关闭自动登录并清除本地登录态，已记住的账密供下次手动登录使用；已配置的模型服务及 Key 仍保留，可在模型服务中移除。</string>
     <string name="new_api_signed_out">已退出登录。</string>
     <string name="new_api_request_failed">平台请求失败，请重试。</string>
     <string name="new_api_user_id">用户 ID</string>
@@ -39,7 +39,7 @@
     <string name="new_api_request_count">请求次数</string>
     <string name="new_api_quota_hint">平台额度单位：500,000 = 1 梦汐币。应用新建 Key 默认无限额度、不限制模型、自动分组；Key 无限额度不会增加账号余额。</string>
     <string name="new_api_close">关闭</string>
-    <string name="new_api_account_data">梦汐 API 账号完全可选，由 api.huanyan.fun 第三方平台提供。仅在注册、登录、退出、刷新或同步时连接该平台，并按对应操作发送所需的用户名、密码、邮箱、验证码、可选邀请码、账号访问令牌或刷新 Cookie。应用不保存密码。用户信息、登录 Cookie 和 API Key 保存在设备内；账号登录态不纳入应用备份及 Android 云备份、设备迁移。主副模型 Key 仅在备份中勾选包含密钥时导出。账号同步不会上传本地对话、附件及其他设置。使用该平台模型服务时，模型请求内容会直接发送至该平台，适用其自身协议与隐私政策。退出会清除本地登录态并尝试注销当前平台会话；已配置的模型服务和 Key 保留至手动移除。</string>
+    <string name="new_api_account_data">梦汐 API 账号完全可选，由 api.huanyan.fun 第三方平台提供。仅在注册、登录、退出、刷新、同步或已开启的自动登录检查、恢复登录态时连接该平台，并按对应操作发送所需的用户名、密码、邮箱、验证码、可选邀请码、账号访问令牌或刷新 Cookie。仅在勾选“记住账密”后将账密加密保存在本机。开启自动登录后，应用启动时会检查登录态，失效时使用已保存的账密再次登录；二步验证需手动完成。用户信息、登录 Cookie 和 API Key 保存在设备内；账号登录态及记住的账密不纳入应用备份及 Android 云备份、设备迁移。主副模型 Key 仅在备份中勾选包含密钥时导出。账号同步不会上传本地对话、附件及其他设置。使用该平台模型服务时，模型请求内容会直接发送至该平台，适用其自身协议与隐私政策。手动退出会关闭自动登录，保留已记住的账密供下次手动登录，清除本地登录态并尝试注销当前平台会话；已配置的模型服务和 Key 保留至手动移除。</string>
     <string name="new_api_email_address">邮箱</string>
     <string name="new_api_user_refreshed">用户信息已刷新。</string>
     <string name="mengxi_platform_name">梦汐 API</string>
@@ -52,4 +52,8 @@
     <string name="mengxi_open_website">访问梦汐 API 官网</string>
     <string name="mengxi_coin_amount">%1$s 梦汐币</string>
     <string name="provider_hold_to_reveal_key">按住显示此 API Key，松开隐藏</string>
+    <string name="new_api_remember_credentials">记住账密</string>
+    <string name="new_api_auto_login">自动登录</string>
+    <string name="new_api_saved_login_hint">账密加密保存在本机，下次登录时自动填入。自动登录需要先记住账密；手动退出会关闭自动登录，二步验证仍需手动完成。</string>
+    <string name="new_api_secure_storage_unavailable">本机加密存储不可用，仍可登录，但无法记住账密。</string>
 </resources>

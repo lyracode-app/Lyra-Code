@@ -1967,11 +1967,8 @@ private fun FileEditorScreen(
             else -> requestClose()
         }
     }
-    val predictiveBackState = rememberPredictiveBackGestureState(
-        enabled = settings.predictiveBackEnabled,
-        onBack = ::navigateBackFromEditor,
-    )
-    BackHandler(enabled = !settings.predictiveBackEnabled) { navigateBackFromEditor() }
+    // Commit Back once, then let the editor's existing minimize transition run on its own.
+    BackHandler { navigateBackFromEditor() }
     if (showUnsaved) {
         AlertDialog(
             onDismissRequest = { showUnsaved = false },
@@ -2030,7 +2027,6 @@ private fun FileEditorScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .predictiveBackTransform(predictiveBackState)
             .background(MaterialTheme.colorScheme.background)
             .pointerInput(file.absolutePath, aiOpen) {
                 if (aiOpen) return@pointerInput

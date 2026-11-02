@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="button_group_auto">自動偵測</string>
+    <string name="button_group_smart">智慧</string>
+    <string name="button_group_text">文字</string>
+    <string name="button_group_code">程式碼</string>
+    <string name="button_group_terminal">終端機</string>
+</resources>
