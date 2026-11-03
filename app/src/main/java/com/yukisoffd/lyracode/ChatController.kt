@@ -503,8 +503,6 @@ class ChatController(
     private val usageLoadMutex = Mutex()
     private val updatesDuringLoad = mutableMapOf<Long, ChatUpdate>()
     private var lastMessageReloadAt = 0L
-    private var approvalId = 0L
-    private val approvalWaiters = mutableMapOf<Long, CompletableDeferred<ToolApprovalDecision>>()
     private var userQuestionId = 0L
     private val userQuestionWaiters = mutableMapOf<Long, CompletableDeferred<UserQuestionAnswer>>()
     private val userQuestionIdleTimeout = UserQuestionIdleTimeout(scope) { id ->
@@ -519,6 +517,10 @@ class ChatController(
     }
     private val editorMutationWaiters = mutableMapOf<Long, CompletableDeferred<AgentFileEditResult>>()
     private val autoApprovedConversations = mutableSetOf<Long>()
+    private val toolApprovals = ToolApprovalSlot(autoApprovedConversations) { pending ->
+        pendingToolApproval.value = pending
+        if (pending != null) status.value = appContext.getString(R.string.status_waiting_confirm, pending.request.toolName)
+    }
     private var transientWorkspaceUri = ""
     private var transientProjectId = 0L
     private var transientAutoApprovalEnabled = false
@@ -1701,10 +1703,10 @@ class ChatController(
         carryLateSteers(pendingInput, conversationId, PendingInputState.PARKED)
         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_INTERRUPTED)
         pendingToolApproval.value?.takeIf { it.request.conversationId == conversationId }?.let { pending ->
-            approvalWaiters.remove(pending.id)?.complete(
+            toolApprovals.answer(
+                pending,
                 ToolApprovalDecision(approved = false, feedback = appContext.getString(R.string.label_user_interrupted)),
             )
-            pendingToolApproval.value = null
         }
         pendingUserQuestion.value?.takeIf { it.request.conversationId == conversationId }?.let { pending ->
             userQuestionWaiters.remove(pending.id)?.complete(
@@ -2092,17 +2094,14 @@ class ChatController(
 
     fun answerToolApproval(approved: Boolean, rememberForConversation: Boolean, feedback: String) {
         val pending = pendingToolApproval.value ?: return
-        approvalWaiters.remove(pending.id)?.complete(
+        toolApprovals.answer(
+            pending,
             ToolApprovalDecision(
                 approved = approved,
                 rememberForConversation = rememberForConversation,
                 feedback = feedback.trim(),
             ),
         )
-        if (approved && rememberForConversation && pending.request.toolName != "send_email") {
-            autoApprovedConversations += pending.request.conversationId
-        }
-        pendingToolApproval.value = null
         status.value = if (approved) appContext.getString(R.string.status_approved_tool) else appContext.getString(R.string.status_rejected_tool)
     }
 
@@ -2189,19 +2188,8 @@ class ChatController(
         }
     }
 
-    private suspend fun requestToolApproval(request: ToolApprovalRequest): ToolApprovalDecision {
-        if (request.toolName != "send_email" && request.conversationId in autoApprovedConversations) {
-            return ToolApprovalDecision.Approved
-        }
-        return withContext(Dispatchers.Main) {
-            val id = ++approvalId
-            val waiter = CompletableDeferred<ToolApprovalDecision>()
-            approvalWaiters[id] = waiter
-            pendingToolApproval.value = PendingToolApproval(id, request)
-            status.value = appContext.getString(R.string.status_waiting_confirm, request.toolName)
-            waiter
-        }.await()
-    }
+    private suspend fun requestToolApproval(request: ToolApprovalRequest): ToolApprovalDecision =
+        withContext(Dispatchers.Main) { toolApprovals.request(request) }
 
     private suspend fun requestUserQuestion(request: UserQuestionRequest): UserQuestionAnswer {
         val registration = withContext(Dispatchers.Main) {
