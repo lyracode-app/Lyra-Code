@@ -210,7 +210,7 @@ internal class WebAccessBridge(
             "approval" -> {
                 val pending = controller.pendingToolApproval.value ?: throw WebHttpError(409, "审批已处理")
                 if (pending.id != args.getLong("id")) throw WebHttpError(409, "审批请求已更新")
-                controller.answerToolApproval(args.getBoolean("approved"), args.optBoolean("remember"), args.optString("feedback"))
+                controller.answerToolApproval(pending.id, args.getBoolean("approved"), args.optBoolean("remember"), args.optString("feedback"))
             }
             "question" -> {
                 val p = controller.pendingUserQuestion.value ?: throw WebHttpError(409, "问题已处理")

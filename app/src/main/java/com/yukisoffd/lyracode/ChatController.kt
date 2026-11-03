@@ -1704,7 +1704,7 @@ class ChatController(
         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_INTERRUPTED)
         pendingToolApproval.value?.takeIf { it.request.conversationId == conversationId }?.let { pending ->
             toolApprovals.answer(
-                pending,
+                pending.id,
                 ToolApprovalDecision(approved = false, feedback = appContext.getString(R.string.label_user_interrupted)),
             )
         }
@@ -2092,16 +2092,17 @@ class ChatController(
         return conversationStore.messages(id).any { it.role == "user" }
     }
 
-    fun answerToolApproval(approved: Boolean, rememberForConversation: Boolean, feedback: String) {
-        val pending = pendingToolApproval.value ?: return
-        toolApprovals.answer(
-            pending,
+    /** Answers the approval request with [id]; ignored when the dialog no longer shows it. */
+    fun answerToolApproval(id: Long, approved: Boolean, rememberForConversation: Boolean, feedback: String) {
+        val answered = toolApprovals.answer(
+            id,
             ToolApprovalDecision(
                 approved = approved,
                 rememberForConversation = rememberForConversation,
                 feedback = feedback.trim(),
             ),
         )
+        if (!answered) return
         status.value = if (approved) appContext.getString(R.string.status_approved_tool) else appContext.getString(R.string.status_rejected_tool)
     }
 
