@@ -114,12 +114,15 @@ internal fun rememberAnimatedKeyboardAvoidanceOffsetPx(): Int {
     return bottomOffsetPx
 }
 
-/** The minimized user-question button, at the bottom end of the conversation list. */
+/**
+ * The minimized user-question button, at the bottom end of the conversation list. It moves up
+ * by the same keyboard lift as the composer, which is drawn over the bottom of the list.
+ */
 @Composable
-internal fun BoxScope.MinimizedUserQuestionSlot(onRestore: () -> Unit) {
+internal fun BoxScope.MinimizedUserQuestionSlot(liftPx: Int, onRestore: () -> Unit) {
     MinimizedUserQuestionButton(
         onRestore = onRestore,
-        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+        modifier = Modifier.align(Alignment.BottomEnd).keyboardAwareInputOffset(liftPx).padding(8.dp),
     )
 }
 
@@ -671,7 +674,10 @@ internal fun ChatScreen(
                 )
             }
             controller.pendingUserQuestion.value?.takeIf { it.isMinimized }?.let { pending ->
-                MinimizedUserQuestionSlot(onRestore = { controller.restoreUserQuestion(pending.id) })
+                MinimizedUserQuestionSlot(
+                    liftPx = resolvedKeyboardLiftPx,
+                    onRestore = { controller.restoreUserQuestion(pending.id) },
+                )
             }
         }
         val statusLine = listOf(controller.status.value, controller.uploadingStatus.value, actionStatus)
