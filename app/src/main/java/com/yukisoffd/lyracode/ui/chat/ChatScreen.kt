@@ -545,7 +545,7 @@ internal fun ChatScreen(
                 }
             }
         }
-        LaunchedEffect(resolvedKeyboardLiftPx) {
+        LaunchedEffect(resolvedKeyboardLiftPx, keyboardShouldLiftOutput) {
             if (resolvedKeyboardLiftPx > 0 && messageSnapshot.isNotEmpty() && keyboardShouldLiftOutput) {
                 listState.scrollToItem(bottomAnchorIndex)
             }
@@ -786,12 +786,13 @@ internal fun ComposerQueueSection(
 /**
  * Whether the output list reserves the keyboard lift below its last item. The lift is kept
  * while the keyboard is open once the list was near its end, and is dropped when the
- * keyboard closes away from the end. The state is per conversation.
+ * keyboard closes away from the end. The state is per conversation, and a new conversation
+ * decides again at once, because the first message creates it while the keyboard is open.
  */
 @Composable
 internal fun rememberKeyboardOutputLift(conversationKey: Any?, liftPx: Int, nearOutputEnd: Boolean): Boolean {
     var lift by remember(conversationKey) { mutableStateOf(false) }
-    LaunchedEffect(liftPx, nearOutputEnd) {
+    LaunchedEffect(conversationKey, liftPx, nearOutputEnd) {
         if (liftPx == 0) {
             lift = nearOutputEnd
         } else if (nearOutputEnd) {
