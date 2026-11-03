@@ -2555,7 +2555,8 @@ class OpenAiAgent(
         if (!settings.subAgentOrchestrationEnabled) return "ERROR: SUB_AGENT_DISABLED\nSub-agent orchestration is disabled by the user."
         val candidates = settings.enabledSubAgents()
         if (candidates.isEmpty()) return "ERROR: NO_SUB_AGENT_MODELS\nNo enabled sub-agent model is configured. Ask the user to configure one in Settings > Sub-agent orchestration."
-        val tasks = parseSubAgentTasks(args).take(SubAgentTaskLimit.MAX_TASKS)
+        val tasks = parseSubAgentTasks(args)
+        SubAgentTaskLimit.overLimitError(tasks.size)?.let { return it }
         if (tasks.isEmpty()) return "ERROR: NO_SUB_AGENT_TASKS\ntasks must contain at least one subtask."
         tasks.forEachIndexed { index, task ->
             require(!(task.readOnly && task.writePaths.isNotEmpty())) {
