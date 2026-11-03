@@ -12,9 +12,10 @@ class SubAgentTaskLimitTest {
 
     @Test
     fun `a batch over the limit is refused, not truncated`() {
-        val error = SubAgentTaskLimit.overLimitError(SubAgentTaskLimit.MAX_TASKS + 1).orEmpty()
+        val overLimit = SubAgentTaskLimit.MAX_TASKS + 1
+        val error = SubAgentTaskLimit.overLimitError(overLimit).orEmpty()
         assertTrue(error, error.startsWith("ERROR: TOO_MANY_SUB_AGENT_TASKS\n"))
-        assertTrue(error, "7 subtasks" in error)
+        assertTrue(error, "$overLimit subtasks" in error)
         assertTrue(error, "No task ran" in error)
     }
 }
