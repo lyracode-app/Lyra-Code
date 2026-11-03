@@ -597,7 +597,7 @@ internal class AgentToolSchemaFactory(
                                     JSONObject()
                                         .put("type", "array")
                                         .put("minItems", 1)
-                                        .put("maxItems", 6)
+                                        .put("maxItems", SubAgentTaskLimit.MAX_TASKS)
                                         .put("items", taskSchema),
                                 ),
                             )

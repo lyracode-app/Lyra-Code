@@ -2555,7 +2555,7 @@ class OpenAiAgent(
         if (!settings.subAgentOrchestrationEnabled) return "ERROR: SUB_AGENT_DISABLED\nSub-agent orchestration is disabled by the user."
         val candidates = settings.enabledSubAgents()
         if (candidates.isEmpty()) return "ERROR: NO_SUB_AGENT_MODELS\nNo enabled sub-agent model is configured. Ask the user to configure one in Settings > Sub-agent orchestration."
-        val tasks = parseSubAgentTasks(args).take(MAX_SUB_AGENT_TASKS)
+        val tasks = parseSubAgentTasks(args).take(SubAgentTaskLimit.MAX_TASKS)
         if (tasks.isEmpty()) return "ERROR: NO_SUB_AGENT_TASKS\ntasks must contain at least one subtask."
         tasks.forEachIndexed { index, task ->
             require(!(task.readOnly && task.writePaths.isNotEmpty())) {
@@ -3782,7 +3782,6 @@ class OpenAiAgent(
         private const val DEEPSEEK_ANTHROPIC_FILES_BETA = "files-api-2025-04-14"
         private const val LOG_ARGUMENT_CHARS = 1_000
         private const val MAX_TOOL_RESULT_CHARS = 500_000
-        private const val MAX_SUB_AGENT_TASKS = 6
         private const val MIN_HISTORY_COMPRESSION_CHUNKS = 1
         private const val MAX_HISTORY_COMPRESSION_CHUNKS = 16
         private const val HISTORY_COMPRESSION_MERGE_BATCH_SIZE = 4
