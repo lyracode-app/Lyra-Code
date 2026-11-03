@@ -82,6 +82,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
@@ -683,84 +684,83 @@ internal fun ChatScreen(
         val statusLine = listOf(controller.status.value, controller.uploadingStatus.value, actionStatus)
             .filter { it.isNotBlank() && it != uiText(R.string.status_done) }
             .joinToString(" ")
-        if (statusLine.isNotBlank()) {
-            AnimatedConversationStatus(statusLine)
-        }
-        Card(
-            Modifier.fillMaxWidth().keyboardAwareInputOffset(resolvedKeyboardLiftPx),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (featureEnabled) {
-                    ComposerQueueSection(
-                        snapshot = activeQueueSnapshot,
-                        runActive = runActiveForComposer,
-                        steerAccepted = steerAccepted,
-                        onRemove = controller::removeQueued,
-                        onSendParked = controller::sendQueuedNow,
-                        onSteerQueued = controller::steerQueued,
+        ConversationDock(status = statusLine, liftPx = resolvedKeyboardLiftPx) {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (featureEnabled) {
+                        ComposerQueueSection(
+                            snapshot = activeQueueSnapshot,
+                            runActive = runActiveForComposer,
+                            steerAccepted = steerAccepted,
+                            onRemove = controller::removeQueued,
+                            onSendParked = controller::sendQueuedNow,
+                            onSteerQueued = controller::steerQueued,
+                        )
+                    }
+                    ForcedSkillControls(
+                        input = input,
+                        installedSkills = installedSkills,
+                        forcedSkillIds = forcedSkillIds,
+                        enabled = composerEditable,
+                        onSkillIdsChange = { forcedSkillIds = it },
+                        onInputChange = { input = it },
+                    )
+                    WorkspaceFileMentionPicker(
+                        input = input,
+                        matches = workspaceFileMatches,
+                        selected = selectedWorkspaceFiles,
+                        enabled = composerEditable,
+                        hasWorkspace = hasWorkspace,
+                        loading = workspaceFileSearchLoading,
+                        onToggle = { file ->
+                            selectedWorkspaceFiles = if (selectedWorkspaceFiles.any { it.relativePath == file.relativePath }) {
+                                selectedWorkspaceFiles.filterNot { it.relativePath == file.relativePath }
+                            } else {
+                                (selectedWorkspaceFiles + file).distinctBy { it.relativePath }.take(24)
+                            }
+                        },
+                        onRemove = { file ->
+                            selectedWorkspaceFiles = selectedWorkspaceFiles.filterNot { it.relativePath == file.relativePath }
+                        },
+                        onDone = {
+                            input = removeWorkspaceMentionPrefix(input)
+                            workspaceFileMatches = emptyList()
+                        },
+                    )
+                    if (pendingUploads.isNotEmpty()) {
+                        PendingUploadStrip(pendingUploads, onRemove = controller::removePendingUpload)
+                    }
+                    ChatMessageComposer(
+                        controller = controller,
+                        settings = settings,
+                        value = input,
+                        onValueChange = { input = it },
+                        enabled = composerEditable,
+                        canSend = canSend,
+                        isRunning = isRunning,
+                        stopVisible = runActiveForComposer,
+                        sendWhileRunning = featureEnabled,
+                        sendAction = sendAction,
+                        onOpenMenu = {
+                            attachmentMenuPage = "root"
+                            attachmentMenuOpen = !attachmentMenuOpen
+                        },
+                        onStop = { controller.stopActive() },
+                        onOpenReasoning = {
+                            attachmentMenuPage = "reasoning"
+                            attachmentMenuOpen = true
+                        },
+                        onOpenContextInfo = {
+                            controller.refreshContextWindowUsage()
+                            contextInfoOpen = true
+                        },
+                        onSend = { submit(sendAction) },
                     )
                 }
-                ForcedSkillControls(
-                    input = input,
-                    installedSkills = installedSkills,
-                    forcedSkillIds = forcedSkillIds,
-                    enabled = composerEditable,
-                    onSkillIdsChange = { forcedSkillIds = it },
-                    onInputChange = { input = it },
-                )
-                WorkspaceFileMentionPicker(
-                    input = input,
-                    matches = workspaceFileMatches,
-                    selected = selectedWorkspaceFiles,
-                    enabled = composerEditable,
-                    hasWorkspace = hasWorkspace,
-                    loading = workspaceFileSearchLoading,
-                    onToggle = { file ->
-                        selectedWorkspaceFiles = if (selectedWorkspaceFiles.any { it.relativePath == file.relativePath }) {
-                            selectedWorkspaceFiles.filterNot { it.relativePath == file.relativePath }
-                        } else {
-                            (selectedWorkspaceFiles + file).distinctBy { it.relativePath }.take(24)
-                        }
-                    },
-                    onRemove = { file ->
-                        selectedWorkspaceFiles = selectedWorkspaceFiles.filterNot { it.relativePath == file.relativePath }
-                    },
-                    onDone = {
-                        input = removeWorkspaceMentionPrefix(input)
-                        workspaceFileMatches = emptyList()
-                    },
-                )
-                if (pendingUploads.isNotEmpty()) {
-                    PendingUploadStrip(pendingUploads, onRemove = controller::removePendingUpload)
-                }
-                ChatMessageComposer(
-                    controller = controller,
-                    settings = settings,
-                    value = input,
-                    onValueChange = { input = it },
-                    enabled = composerEditable,
-                    canSend = canSend,
-                    isRunning = isRunning,
-                    stopVisible = runActiveForComposer,
-                    sendWhileRunning = featureEnabled,
-                    sendAction = sendAction,
-                    onOpenMenu = {
-                        attachmentMenuPage = "root"
-                        attachmentMenuOpen = !attachmentMenuOpen
-                    },
-                    onStop = { controller.stopActive() },
-                    onOpenReasoning = {
-                        attachmentMenuPage = "reasoning"
-                        attachmentMenuOpen = true
-                    },
-                    onOpenContextInfo = {
-                        controller.refreshContextWindowUsage()
-                        contextInfoOpen = true
-                    },
-                    onSend = { submit(sendAction) },
-                )
             }
         }
     }
@@ -816,6 +816,19 @@ internal fun rememberKeyboardOutputLift(conversationKey: Any?, liftPx: Int, near
 }
 
 @Composable
+internal fun ConversationDock(status: String, liftPx: Int, content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().keyboardAwareInputOffset(liftPx),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (status.isNotBlank()) {
+            AnimatedConversationStatus(status)
+        }
+        content()
+    }
+}
+
+@Composable
 private fun AnimatedConversationStatus(status: String) {
     val transition = rememberInfiniteTransition(label = "conversation-status-glow")
     // Keep the animated value read inside the draw pass so every frame only
@@ -839,6 +852,7 @@ private fun AnimatedConversationStatus(status: String) {
     val shape = RoundedCornerShape(11.dp)
     Box(
         Modifier
+            .testTag("conversationStatus")
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f), shape)
             .drawWithContent {
                 drawContent()
