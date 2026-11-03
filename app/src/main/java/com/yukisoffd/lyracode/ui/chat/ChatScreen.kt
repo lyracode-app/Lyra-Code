@@ -346,7 +346,6 @@ internal fun ChatScreen(
         }
     }
     var autoFollowOutput by remember(controller.activeConversationId.value) { mutableStateOf(true) }
-    var keyboardShouldLiftOutput by remember(controller.activeConversationId.value) { mutableStateOf(false) }
     var navigationVisible by remember(controller.activeConversationId.value) { mutableStateOf(false) }
     var navigationRevealToken by remember(controller.activeConversationId.value) { mutableIntStateOf(0) }
     val navigationSwipeGuard = remember { NavigationSwipeGuard() }
@@ -508,13 +507,11 @@ internal fun ChatScreen(
                 }
             }
         }
-        LaunchedEffect(resolvedKeyboardLiftPx, isNearOutputEnd) {
-            if (resolvedKeyboardLiftPx == 0) {
-                keyboardShouldLiftOutput = isNearOutputEnd
-            } else if (isNearOutputEnd) {
-                keyboardShouldLiftOutput = true
-            }
-        }
+        val keyboardShouldLiftOutput = rememberKeyboardOutputLift(
+            conversationKey = controller.activeConversationId.value,
+            liftPx = resolvedKeyboardLiftPx,
+            nearOutputEnd = isNearOutputEnd,
+        )
         LaunchedEffect(isRunning) {
             if (isRunning) autoFollowOutput = true
         }
@@ -784,6 +781,24 @@ internal fun ComposerQueueSection(
         onSteer = onSteerQueued,
         modifier = modifier,
     )
+}
+
+/**
+ * Whether the output list reserves the keyboard lift below its last item. The lift is kept
+ * while the keyboard is open once the list was near its end, and is dropped when the
+ * keyboard closes away from the end. The state is per conversation.
+ */
+@Composable
+internal fun rememberKeyboardOutputLift(conversationKey: Any?, liftPx: Int, nearOutputEnd: Boolean): Boolean {
+    var lift by remember(conversationKey) { mutableStateOf(false) }
+    LaunchedEffect(liftPx, nearOutputEnd) {
+        if (liftPx == 0) {
+            lift = nearOutputEnd
+        } else if (nearOutputEnd) {
+            lift = true
+        }
+    }
+    return lift
 }
 
 @Composable
