@@ -27,6 +27,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -111,6 +112,15 @@ internal fun rememberAnimatedKeyboardAvoidanceOffsetPx(): Int {
         label = "keyboardAvoidanceOffset",
     )
     return bottomOffsetPx
+}
+
+/** The minimized user-question button, at the bottom end of the conversation list. */
+@Composable
+internal fun BoxScope.MinimizedUserQuestionSlot(onRestore: () -> Unit) {
+    MinimizedUserQuestionButton(
+        onRestore = onRestore,
+        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+    )
 }
 
 internal fun Modifier.keyboardAwareInputOffset(bottomOffsetPx: Int): Modifier {
@@ -661,10 +671,7 @@ internal fun ChatScreen(
                 )
             }
             controller.pendingUserQuestion.value?.takeIf { it.isMinimized }?.let { pending ->
-                MinimizedUserQuestionButton(
-                    onRestore = { controller.restoreUserQuestion(pending.id) },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                )
+                MinimizedUserQuestionSlot(onRestore = { controller.restoreUserQuestion(pending.id) })
             }
         }
         val statusLine = listOf(controller.status.value, controller.uploadingStatus.value, actionStatus)
