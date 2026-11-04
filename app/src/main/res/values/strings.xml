@@ -289,6 +289,12 @@
     <string name="status_sub_agent_progress">Sub-agent tasks: %1$d/%2$d completed</string>
     <string name="status_sub_agent_progress_running">Sub-agent tasks: %1$d/%2$d completed · Running %3$s</string>
     <string name="status_sub_agent_progress_detail">Sub-agent tasks: %1$d/%2$d completed · Running %3$s · %4$s</string>
+    <string name="status_sub_agent_resuming">Sub-agent tasks: reusing %1$d of %2$d stored results</string>
+    <string name="status_interrupted_writes_closed">Closed %1$d interrupted write task(s) from the previous batch; these paths may be half-written: %2$s</string>
+    <string name="agent_run_channel">Agent runs</string>
+    <string name="agent_run_title">Lyra Code is working</string>
+    <string name="agent_run_notification">An agent run continues in the background</string>
+    <string name="agent_run_stop">Stop</string>
     <string name="status_interrupted">Interrupted</string>
     <string name="status_continue">Continue</string>
     <string name="status_regenerate">Regenerate</string>
