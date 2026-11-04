@@ -49,6 +49,7 @@ import com.yukisoffd.lyracode.interaction.session.dispatchConversationIdle
 import kotlinx.coroutines.flow.StateFlow
 import android.content.Context
 import com.yukisoffd.lyracode.data.ConversationStore
+import com.yukisoffd.lyracode.data.InterruptedWritePath
 import com.yukisoffd.lyracode.workspace.UploadedFile
 import com.yukisoffd.lyracode.workspace.UploadedFileManager
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
@@ -549,6 +550,9 @@ class ChatController(
         markAbandonedRunsInterrupted()
         reloadConversations()
         showTransientNewConversation()
+        // Controller start is the first point after a process death at which a later write can
+        // happen. Keep the backup of every started write in an open batch before it is replaced.
+        pendingInputScope.launch { runCatching { agent.preserveOpenBatchBackups() } }
         pendingInputScope.launch { pendingInputRestorer.restoreAll() }
     }
 
@@ -1787,7 +1791,30 @@ class ChatController(
         conversationStore.conversation(conversationId)?.let { workspaceManager.setActiveWorkspaceUri(it.workspaceUri) }
         val content = newContent.trim().ifBlank { message.content }
         conversationStore.updateMessage(messageId, content = content, thinking = "")
-        conversationStore.deleteMessagesAfter(conversationId, messageId)
+        val closedWrites = conversationStore.deleteMessagesAfter(conversationId, messageId)
+        if (closedWrites.isNotEmpty()) {
+            // The store just closed the turn's batch. Its started writes may have changed files:
+            // report them here, and let the next run_sub_agents call report them to the model.
+            agent.noteClosedInterruptedWrites(conversationId, closedWrites)
+            val paths = closedWrites.flatMap { it.writePaths }
+            status.value = appContext.getString(
+                R.string.status_interrupted_writes_closed,
+                paths.size,
+                paths.joinToString(", ").take(200),
+            )
+            pendingInputScope.launch {
+                val workspaceUri = conversationStore.conversation(conversationId)?.workspaceUri.orEmpty()
+                runCatching {
+                    agent.preserveInterruptedBackups(
+                        closedWrites.flatMap { row ->
+                            row.writePaths.map { path ->
+                                InterruptedWritePath(path = path, batchId = row.batchId, workspaceUri = workspaceUri)
+                            }
+                        },
+                    )
+                }
+            }
+        }
         reloadMessages()
         reloadConversations()
         val profile = currentProfile()
@@ -2251,6 +2278,11 @@ class ChatController(
     private fun markAbandonedRunsInterrupted() {
         conversationStore.conversations(archived = null)
             .filter { it.status == ConversationStore.STATUS_RUNNING && !scopedDeviceRunning(it.id) }
+            .forEach { conversationStore.setConversationMeta(it.id, status = ConversationStore.STATUS_INTERRUPTED) }
+        // A child conversation is hidden from the conversation list but still shown inside its
+        // parent's batch. Without this it reads as running forever after the process died.
+        conversationStore.conversations(mode = ConversationStore.MODE_SUBAGENT, archived = null)
+            .filter { it.status == ConversationStore.STATUS_RUNNING }
             .forEach { conversationStore.setConversationMeta(it.id, status = ConversationStore.STATUS_INTERRUPTED) }
     }
 }

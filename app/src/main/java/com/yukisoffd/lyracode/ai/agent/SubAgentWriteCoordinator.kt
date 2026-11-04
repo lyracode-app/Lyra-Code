@@ -97,7 +97,7 @@ internal class SubAgentWriteCoordinator {
         return segments.joinToString("/")
     }
 
-    private fun pathsConflict(left: String, right: String): Boolean {
+    internal fun pathsConflict(left: String, right: String): Boolean {
         return left == right || left.startsWith("$right/") || right.startsWith("$left/")
     }
 

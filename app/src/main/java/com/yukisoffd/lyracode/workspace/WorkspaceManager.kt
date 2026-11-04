@@ -54,8 +54,16 @@ class WorkspaceManager(
 
     fun prootGuestPath(): String? = rootUri()?.takeIf { it.scheme == ProotWorkspace.SCHEME }?.path
 
-    fun root(): DocumentFile? {
-        val uri = rootUri() ?: return null
+    fun root(): DocumentFile? = rootUri()?.let(::rootFor)
+
+    /**
+     * The directory a stored workspace uri names. A conversation keeps its own workspace, so a
+     * recovery path must resolve against that workspace, not whichever one is active now.
+     */
+    fun rootOf(workspaceUri: String): DocumentFile? =
+        workspaceUri.takeIf { it.isNotBlank() }?.let(Uri::parse)?.let(::rootFor)
+
+    private fun rootFor(uri: Uri): DocumentFile? {
         if (uri.scheme == ProotWorkspace.SCHEME) {
             return runCatching { ProotWorkspace.document(context, uri) }.getOrNull()
         }

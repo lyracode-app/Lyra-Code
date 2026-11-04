@@ -21,7 +21,12 @@ import com.yukisoffd.lyracode.data.messageTokenCosts
 import com.yukisoffd.lyracode.data.McpServerConfig
 import com.yukisoffd.lyracode.data.McpToolDefinition
 import com.yukisoffd.lyracode.data.MediaGenerationKind
+import com.yukisoffd.lyracode.data.InterruptedWritePath
+import com.yukisoffd.lyracode.data.OpenSubAgentBatch
 import com.yukisoffd.lyracode.data.SubAgentConfig
+import com.yukisoffd.lyracode.data.SubAgentTaskRecord
+import com.yukisoffd.lyracode.data.SubAgentTaskSeed
+import com.yukisoffd.lyracode.data.SubAgentTaskStatus
 import com.yukisoffd.lyracode.debian.ProotCommandExecutor
 import com.yukisoffd.lyracode.filetransfer.FileTransferClient
 import com.yukisoffd.lyracode.email.EmailClient
@@ -38,6 +43,7 @@ import com.yukisoffd.lyracode.uiText
 import com.yukisoffd.lyracode.webdav.WebDavClient
 import com.yukisoffd.lyracode.workspace.GlobalFileManager
 import com.yukisoffd.lyracode.workspace.NativeFileManager
+import com.yukisoffd.lyracode.workspace.TextBackupStore
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -59,8 +65,9 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 import java.util.TimeZone
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 
@@ -177,6 +184,20 @@ class OpenAiAgent(
     private val tokenizer by lazy { DeepSeekV3Tokenizer.get(context) }
     private val forcedSkillsByConversation = ConcurrentHashMap<Long, List<String>>()
     private val subAgentContexts = ConcurrentHashMap<Long, SubAgentExecutionContext>()
+    /**
+     * The batch a finished `run_sub_agents` call still owes a delivery to, by parent
+     * conversation. The row is closed only after the tool result reaches the parent's store,
+     * so a kill in between resumes the batch instead of re-running its writes.
+     */
+    private val pendingSubAgentBatchCloses = ConcurrentHashMap<Long, String>()
+    /**
+     * Started write rows the store closed when the user edited or regenerated the turn, by
+     * parent conversation. The next `run_sub_agents` call reports them: the edit itself cannot
+     * reach the model, and the new batch would otherwise write blind.
+     */
+    private val closedInterruptedWrites = ConcurrentHashMap<Long, List<SubAgentTaskRecord>>()
+    /** Batches whose abandoned-write overlap was already returned as an error this turn. */
+    private val abandonOverlapReported = ConcurrentHashMap.newKeySet<String>()
     private val subAgentWriteCoordinator = SubAgentWriteCoordinator()
     private val emailClient = EmailClient(context)
     private val fileTools = AgentFileToolHandler(
@@ -702,12 +723,19 @@ class OpenAiAgent(
                     }
                     if (pendingToolId != null) {
                         conversationStore.updateMessage(pendingToolId, content = toolResult)
-                        onUpdate(ChatUpdate("", "", uiText(R.string.ui_tool_complete) + call.name, forceReload = true))
                     } else {
                         conversationStore.addMessage(
                             conversationId, "tool", toolResult.take(MAX_TOOL_RESULT_CHARS),
                             profileId = profile.id, model = model, toolCallId = call.id,
                         )
+                    }
+                    // Close the batch as soon as its result row is stored. The UI update below
+                    // suspends and can be cancelled, which must not leave a delivered batch open
+                    // for the next run to report as abandoned.
+                    flushDeliveredSubAgentBatch(conversationId, call.name)
+                    if (pendingToolId != null) {
+                        onUpdate(ChatUpdate("", "", uiText(R.string.ui_tool_complete) + call.name, forceReload = true))
+                    } else {
                         onUpdate(ChatUpdate(result.content, result.thinking, uiText(R.string.ui_tool_complete) + call.name, assistantId))
                     }
                 }
@@ -2550,7 +2578,54 @@ class OpenAiAgent(
         }
     }
 
+    /**
+     * Remembers the started write rows an edit or Regenerate closed, so the next
+     * `run_sub_agents` call can report them to the model before it writes those paths again.
+     */
+    fun noteClosedInterruptedWrites(conversationId: Long, rows: List<SubAgentTaskRecord>) {
+        if (rows.isEmpty()) return
+        closedInterruptedWrites[conversationId] = rows
+    }
+
+    /** Keeps each interrupted write's backup under a name that no later write replaces. */
+    fun preserveInterruptedBackups(writes: Collection<InterruptedWritePath>) {
+        if (writes.isEmpty()) return
+        nativeFileManager.preserveInterruptedBackups(writes)
+    }
+
+    /**
+     * Covers a process restart: every started write of an open batch keeps its backup before a
+     * later write can replace it. Call from the controller's start, off the main thread.
+     */
+    fun preserveOpenBatchBackups() {
+        preserveInterruptedBackups(conversationStore.openSubAgentWriteTasks())
+    }
+
+    /** Started write rows of the replaced batch whose paths this batch writes again. */
+    private fun overlappingStartedWrites(
+        rows: List<SubAgentTaskRecord>,
+        requestedPaths: List<String>,
+    ): List<Pair<SubAgentTaskRecord, List<String>>> = rows.mapNotNull { row ->
+        val overlap = row.writePaths.filter { stored ->
+            requestedPaths.any { requested -> subAgentWriteCoordinator.pathsConflict(stored, requested) }
+        }
+        overlap.takeIf { it.isNotEmpty() }?.let { row to it }
+    }
+
+    private fun abandonOverlapMessage(overlaps: List<Pair<SubAgentTaskRecord, List<String>>>): String =
+        buildString {
+            append("ABANDONED_WRITE_OVERLAP: this batch writes paths an interrupted task from the replaced batch may have changed: ")
+            append(overlaps.joinToString("; ") { (row, paths) -> "task ${row.index + 1} (${paths.joinToString(", ")})" })
+            append(
+                ". Nothing ran. Inspect each path and its backup copy first, then call run_sub_agents again " +
+                    "to abandon the old batch and run this one.",
+            )
+        }
+
     private suspend fun runSubAgents(parentConversationId: Long, args: JSONObject, onStatus: suspend (String) -> Unit = {}): String {
+        // A pending close left behind by an attempt whose tool row never landed is stale: this
+        // call owns the conversation's batch now, and must not close that older batch instead.
+        pendingSubAgentBatchCloses.remove(parentConversationId)
         require(!isSubAgentConversation(parentConversationId)) { "SUB_AGENT_RECURSION_BLOCKED: A sub-agent cannot delegate more sub-agents." }
         if (!settings.subAgentOrchestrationEnabled) return "ERROR: SUB_AGENT_DISABLED\nSub-agent orchestration is disabled by the user."
         val candidates = settings.enabledSubAgents()
@@ -2567,105 +2642,414 @@ class OpenAiAgent(
             }
         }
         val owners = tasks.indices.associateWith { index -> SubAgentWriteOwner(parentConversationId, index) }
+        val normalizedWritePaths = tasks.map { task ->
+            task.writePaths.map(subAgentWriteCoordinator::normalizeWorkspacePath)
+        }
+        val requested = tasks.mapIndexed { index, task ->
+            SubAgentResume.RequestedTask(
+                index = index,
+                text = task.task,
+                readOnly = task.readOnly,
+                writePaths = normalizedWritePaths[index],
+                expectedOutput = task.expectedOutput,
+                capabilityHint = task.capabilityHint,
+                preferredAgent = task.preferredAgent,
+            )
+        }
+        // A batch answers the turn that opened it. A new user message changes the id, so an old
+        // batch can never be resumed into a later request.
+        val userMessageId = conversationStore.lastUserMessageId(parentConversationId)
+        // A batch that never delivered a result to this parent can be resumed when the model
+        // asks for the same tasks again. Anything else abandons the stale rows.
+        val openBatch = conversationStore.openSubAgentBatch(parentConversationId)
+        // A write task that started in a batch this call replaces, or that an edit closed, may
+        // have changed files. Its `.bak` is the only copy from before that write, and every later
+        // write replaces it, so copy it to the never-replaced name before anything else runs.
+        val startedWriteRows = openBatch?.tasks.orEmpty()
+            .filter { it.childConversationId > 0 && it.writePaths.isNotEmpty() }
+        val closedWriteRows = closedInterruptedWrites[parentConversationId].orEmpty()
+        // Each copy is made in the workspace its conversation belongs to, and named after the
+        // batch whose write it preserves: a second interruption of the same path in a later
+        // batch must not find the first batch's copy already there.
+        val parentWorkspaceUri = conversationStore.conversation(parentConversationId)?.workspaceUri.orEmpty()
+        nativeFileManager.preserveInterruptedBackups(
+            (startedWriteRows + closedWriteRows).flatMap { row ->
+                row.writePaths.map { path ->
+                    InterruptedWritePath(path = path, batchId = row.batchId, workspaceUri = parentWorkspaceUri)
+                }
+            },
+        )
+        val plan = openBatch?.let { buildSubAgentResumePlan(it, requested, userMessageId) }
+        val batchId = plan?.batchId ?: UUID.randomUUID().toString()
+        // A reworded batch abandons the open one. Read tasks may safely run again, but a write
+        // task that had started may have changed files: refuse this call once and name the paths,
+        // so the model inspects them before the abandoning call runs the new children.
+        val abandonedWriteTasks = if (plan == null) startedWriteRows + closedWriteRows else emptyList()
+        // Keyed by conversation too: with no open batch the batch id is empty in every conversation.
+        val abandonOverlapKey = "$parentConversationId:${openBatch?.batchId.orEmpty()}"
+        if (plan == null && abandonedWriteTasks.isNotEmpty()) {
+            val overlaps = overlappingStartedWrites(abandonedWriteTasks, normalizedWritePaths.flatten())
+            if (overlaps.isNotEmpty() && abandonOverlapReported.add(abandonOverlapKey)) {
+                error(abandonOverlapMessage(overlaps))
+            }
+        }
+        if (plan == null) {
+            abandonOverlapReported.remove(abandonOverlapKey)
+            // The report below carries these facts; a second report would be stale.
+            closedInterruptedWrites.remove(parentConversationId)
+            openBatch?.let { conversationStore.markSubAgentBatchDelivered(parentConversationId, it.batchId) }
+            conversationStore.beginSubAgentBatch(
+                parentConversationId,
+                batchId,
+                userMessageId,
+                tasks.mapIndexed { index, task ->
+                    SubAgentTaskSeed(
+                        index,
+                        task.task,
+                        normalizedWritePaths[index],
+                        task.readOnly,
+                        task.expectedOutput,
+                        task.capabilityHint,
+                        task.preferredAgent,
+                    )
+                },
+            )
+        } else {
+            onStatus(context.getString(R.string.status_sub_agent_resuming, plan.reusedIndices.size, tasks.size))
+        }
+        val actions = plan?.actions ?: tasks.indices.associateWith { SubAgentResume.Action.Run }
+        val runIndices = actions.filterValues { it is SubAgentResume.Action.Run }.keys.sorted()
         subAgentRuns.begin(parentConversationId)
         subAgentRunStateChanged?.invoke()
         try {
+        // Reserve only the write paths of the tasks that will actually run. A reused task does
+        // not touch the workspace, and an interrupted write task is reported, never re-run.
         val batchReservation = subAgentWriteCoordinator.reserveBatch(
-            owners.entries.associate { (index, owner) -> owner to tasks[index].writePaths },
+            runIndices.associate { index -> owners.getValue(index) to tasks[index].writePaths },
         )
         try {
-            val results = JSONArray()
+            val results = arrayOfNulls<JSONObject>(tasks.size)
             val assignmentCounts = mutableMapOf<String, Int>()
-            tasks.forEachIndexed { index, task ->
-                currentCoroutineContext().ensureActive()
+            // Assignment runs in task order for every task, reused ones included, so a resumed
+            // batch assigns the same agent a fresh batch would have.
+            val assignments = tasks.mapIndexed { index, task ->
                 val agentConfig = chooseSubAgent(candidates, task, index, assignmentCounts)
                 assignmentCounts[agentConfig.id] = (assignmentCounts[agentConfig.id] ?: 0) + 1
-                onStatus(
-                    context.getString(
-                        R.string.status_sub_agent_progress_running,
-                        index,
-                        tasks.size,
-                        agentConfig.name,
-                    ),
-                )
-                val profile = settings.profiles().firstOrNull { it.id == agentConfig.profileId }
-                if (profile == null) {
-                    results.put(subAgentError(index, agentConfig, task, "Model profile does not exist: ${agentConfig.profileId}"))
-                    onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
-                    return@forEachIndexed
+                agentConfig
+            }
+            tasks.forEachIndexed { index, task ->
+                currentCoroutineContext().ensureActive()
+                results[index] = when (val action = actions.getValue(index)) {
+                    is SubAgentResume.Action.Reuse -> {
+                        onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
+                        reusedSubAgentResult(index, task, action.childConversationId)
+                    }
+                    is SubAgentResume.Action.InterruptedWrite -> {
+                        onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
+                        interruptedSubAgentResult(index, task, assignments[index], action)
+                    }
+                    SubAgentResume.Action.Run -> runSubAgentTask(
+                        parentConversationId = parentConversationId,
+                        batchId = batchId,
+                        index = index,
+                        tasks = tasks,
+                        agentConfig = assignments[index],
+                        owner = owners.getValue(index),
+                        onStatus = onStatus,
+                    )
                 }
-                val model = agentConfig.model.ifBlank { profile.selectedModel }
-                val childConversationId = conversationStore.createConversation(
-                    profileId = profile.id,
-                    model = model,
-                    title = "子代理 ${index + 1}: ${task.task.take(32)}",
-                    mode = ConversationStore.MODE_SUBAGENT,
+            }
+            onStatus(context.getString(R.string.status_sub_agent_progress, tasks.size, tasks.size))
+            val ordered = JSONArray()
+            results.forEachIndexed { index, result ->
+                ordered.put(
+                    result ?: subAgentError(index, assignments[index], tasks[index], "Sub-agent task produced no result."),
                 )
-                val normalizedWritePaths = task.writePaths
-                    .map(subAgentWriteCoordinator::normalizeWorkspacePath)
-                    .toSortedSet()
-                subAgentContexts[childConversationId] = SubAgentExecutionContext(
-                    owner = owners.getValue(index),
-                    agent = agentConfig,
-                    readOnly = task.readOnly,
-                    writePaths = normalizedWritePaths,
-                )
-                try {
-                    val prompt = buildSubAgentPrompt(task)
-                    conversationStore.addMessage(childConversationId, "user", prompt, profileId = profile.id, model = model)
-                    runLoop(
-                        childConversationId,
-                        profile,
-                        model,
-                        onUpdate = { update ->
-                            if (update.status.isNotBlank()) {
-                                onStatus(
-                                    context.getString(
-                                        R.string.status_sub_agent_progress_detail,
-                                        index,
-                                        tasks.size,
-                                        agentConfig.name,
-                                        update.status,
-                                    ),
+            }
+            val payload = JSONObject()
+                .put("schema", "lyra_sub_agent_results_v2")
+                .put("parent_conversation_id", parentConversationId)
+                .put("results", ordered)
+            if (plan != null) {
+                payload
+                    .put("resumed", true)
+                    .put("reused_task_indexes", JSONArray(plan.reusedIndices.map { it + 1 }))
+                    .put("interrupted_task_indexes", JSONArray(plan.interruptedIndices.map { it + 1 }))
+                    .put(
+                        "resume_note",
+                        "This batch resumed after an interruption. Tasks in reused_task_indexes returned their " +
+                            "stored results and were not run again. Tasks in interrupted_task_indexes were NOT " +
+                            "re-run because they may have changed files; check each write path and its backup " +
+                            "before continuing. Every write replaces a path's .bak, so a .bak holds at most the " +
+                            "state before the latest write and can predate this task. If the app died while a " +
+                            ".bak was being written, that .bak can be partial. A path whose write was " +
+                            "interrupted keeps a copy that later writes never replace at " +
+                            "<path>.<batch>.interrupted.bak, where <batch> is the batch named in " +
+                            "backup_paths. That copy is only as complete as the .bak it was made from, so " +
+                            "compare any backup with the current file before restoring it. An empty " +
+                            "backup_paths list proves nothing, and delete_file_or_folder, rename_move and " +
+                            "create_folder make no backup.",
+                    )
+            }
+            if (abandonedWriteTasks.isNotEmpty()) {
+                payload
+                    .put(
+                        "abandoned_write_tasks",
+                        JSONArray().apply {
+                            abandonedWriteTasks.forEach { row ->
+                                put(
+                                    JSONObject()
+                                        .put("index", row.index + 1)
+                                        .put("task", row.taskText)
+                                        .put("write_paths", JSONArray(row.writePaths))
+                                        .put("backup_paths", JSONArray(existingBackups(row)))
+                                        .put(
+                                            "status",
+                                            if (row.status == SubAgentTaskStatus.COMPLETED) "completed" else "interrupted",
+                                        ),
                                 )
                             }
                         },
-                        propagateErrors = false,
                     )
-                    val assistant = conversationStore.messages(childConversationId).lastOrNull { it.role == "assistant" }
-                    results.put(
-                        JSONObject()
-                            .put("index", index + 1)
-                            .put("agent", agentConfig.name)
-                            .put("profile_id", profile.id)
-                            .put("model", model)
-                            .put("task", task.task)
-                            .put("read_only", task.readOnly)
-                            .put("write_paths", JSONArray(normalizedWritePaths.toList()))
-                            .put("capability_hint", task.capabilityHint)
-                            .put("expected_output", task.expectedOutput)
-                            .put("result", assistant?.content.orEmpty())
-                            .put("status", conversationStore.conversation(childConversationId)?.status ?: "unknown"),
+                    .put(
+                        "abandoned_write_note",
+                        "These write tasks started in an earlier batch that this call replaced, or that an edit " +
+                            "or Regenerate closed. They were NOT re-run because they may have changed files. " +
+                            "Inspect each write path before writing it again. A task whose status is completed " +
+                            "returned its write before the batch was abandoned; a task whose status is " +
+                            "interrupted may have stopped anywhere inside its write. Every write replaces a " +
+                            "path's .bak, so read the <path>.<batch>.interrupted.bak listed in backup_paths: " +
+                            "later writes never replace that copy. It is only as complete as the .bak it was " +
+                            "made from, so compare it with the current file before restoring it.",
                     )
-                } finally {
-                    subAgentContexts.remove(childConversationId)
-                }
-                onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
             }
-            onStatus(context.getString(R.string.status_sub_agent_progress, tasks.size, tasks.size))
-            return stableJson(
-                JSONObject()
-                    .put("schema", "lyra_sub_agent_results_v2")
-                    .put("parent_conversation_id", parentConversationId)
-                    .put("results", results),
-            )
+            // The batch stays open until the tool result row is in the parent's store; see
+            // flushDeliveredSubAgentBatch. A kill before that leaves it resumable.
+            pendingSubAgentBatchCloses[parentConversationId] = batchId
+            return stableJson(payload)
         } finally {
             batchReservation.close()
         }
         } finally {
-            // Cancellation and tool failures must both clear the wait state.
+            // Cancellation and tool failures must both clear the wait state; the batch rows
+            // stay open, so the next run_sub_agents call resumes them.
             subAgentRuns.end(parentConversationId)
             subAgentRunStateChanged?.invoke()
+        }
+    }
+
+    /**
+     * Builds the resume plan from the newest undelivered batch, or null when the model asked
+     * for a different set of tasks (in which case the open batch is abandoned, not merged).
+     */
+    private fun buildSubAgentResumePlan(
+        batch: OpenSubAgentBatch,
+        requested: List<SubAgentResume.RequestedTask>,
+        currentUserMessageId: Long,
+    ): SubAgentResume.Plan? {
+        val reusable = batch.tasks.mapNotNull { row ->
+            row.childConversationId.takeIf { it > 0 && childProducedResult(it) }
+        }.toSet()
+        val backupPaths = batch.tasks
+            .flatMap { row ->
+                row.writePaths.flatMap { path ->
+                    listOf(
+                        TextBackupStore.backupPath(path),
+                        TextBackupStore.interruptedBackupPath(path, batch.batchId),
+                    )
+                }
+            }
+            .filter { nativeFileManager.exists(it) }
+            .toSet()
+        return SubAgentResume.plan(
+            batchId = batch.batchId,
+            storedUserMessageId = batch.userMessageId,
+            currentUserMessageId = currentUserMessageId,
+            stored = batch.tasks,
+            requested = requested,
+            reusableChildIds = reusable,
+            backupPaths = backupPaths,
+        )
+    }
+
+    /** A child that returned normally is idle with a non-blank assistant answer; see [SubAgentResume.childFinished]. */
+    private fun childProducedResult(conversationId: Long): Boolean {
+        val conversation = conversationStore.conversation(conversationId) ?: return false
+        val last = conversationStore.messages(conversationId).lastOrNull()
+        return SubAgentResume.childFinished(conversation.status, last?.role, last?.content)
+    }
+
+    private fun reusedSubAgentResult(
+        index: Int,
+        task: SubAgentTask,
+        childConversationId: Long,
+    ): JSONObject {
+        val conversation = conversationStore.conversation(childConversationId)
+        val assistant = conversationStore.messages(childConversationId).lastOrNull { it.role == "assistant" }
+        return JSONObject()
+            .put("index", index + 1)
+            .put("agent", "unknown")
+            .put("profile_id", conversation?.profileId.orEmpty())
+            .put("model", conversation?.model.orEmpty())
+            .put("task", task.task)
+            .put("read_only", task.readOnly)
+            .put("write_paths", JSONArray(task.writePaths))
+            .put("capability_hint", task.capabilityHint)
+            .put("expected_output", task.expectedOutput)
+            .put("result", assistant?.content.orEmpty())
+            .put("status", conversation?.status ?: "unknown")
+            .put("reused", true)
+    }
+
+    private fun interruptedSubAgentResult(
+        index: Int,
+        task: SubAgentTask,
+        agentConfig: SubAgentConfig,
+        action: SubAgentResume.Action.InterruptedWrite,
+    ): JSONObject {
+        return JSONObject()
+            .put("index", index + 1)
+            .put("agent", agentConfig.name)
+            .put("task", task.task)
+            .put("read_only", false)
+            .put("write_paths", JSONArray(action.writePaths))
+            .put("backup_paths", JSONArray(action.backupPaths))
+            .put("status", "interrupted")
+            .put("interrupted", true)
+            .put(
+                "error",
+                "This write task was interrupted: the app died or the run was stopped before it finished. " +
+                    "It was not re-run because it may have changed files. Inspect every write path and its " +
+                    "backup copy before deciding what to do. Every write replaces a path's .bak, so a .bak " +
+                    "holds at most the state before the latest write, and it can be partial if the app died " +
+                    "while it was being written. A path whose write was interrupted keeps a copy that later " +
+                    "writes never replace at <path>.<batch>.interrupted.bak, where <batch> is the batch named " +
+                    "in backup_paths. That copy is only as complete as the .bak it was made from, so compare " +
+                    "any backup with the current file before restoring it. An empty backup_paths list proves " +
+                    "nothing.",
+            )
+    }
+
+    /** The backups that exist right now: the batch's interrupted-write copies first, then the ordinary `.bak`. */
+    private fun existingBackups(row: SubAgentTaskRecord): List<String> =
+        row.writePaths
+            .flatMap { path ->
+                listOf(
+                    TextBackupStore.interruptedBackupPath(path, row.batchId),
+                    TextBackupStore.backupPath(path),
+                )
+            }
+            .filter { nativeFileManager.exists(it) }
+
+    /**
+     * Closes the batch whose result was just written to the parent conversation. Called after
+     * the tool row, never before: a kill between the result and the row keeps the batch open,
+     * so the next run resumes it rather than re-running its writes.
+     */
+    private fun flushDeliveredSubAgentBatch(conversationId: Long, toolName: String) {
+        if (toolName != "run_sub_agents") return
+        pendingSubAgentBatchCloses.remove(conversationId)?.let { batchId ->
+            conversationStore.markSubAgentBatchDelivered(conversationId, batchId)
+        }
+    }
+
+    private suspend fun runSubAgentTask(
+        parentConversationId: Long,
+        batchId: String,
+        index: Int,
+        tasks: List<SubAgentTask>,
+        agentConfig: SubAgentConfig,
+        owner: SubAgentWriteOwner,
+        onStatus: suspend (String) -> Unit,
+    ): JSONObject {
+        val task = tasks[index]
+        onStatus(
+            context.getString(
+                R.string.status_sub_agent_progress_running,
+                index,
+                tasks.size,
+                agentConfig.name,
+            ),
+        )
+        val profile = settings.profiles().firstOrNull { it.id == agentConfig.profileId }
+        if (profile == null) {
+            conversationStore.setSubAgentTaskStatus(parentConversationId, batchId, index, SubAgentTaskStatus.FAILED)
+            onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
+            return subAgentError(index, agentConfig, task, "Model profile does not exist: ${agentConfig.profileId}")
+        }
+        val model = agentConfig.model.ifBlank { profile.selectedModel }
+        val childConversationId = conversationStore.createConversation(
+            profileId = profile.id,
+            model = model,
+            title = "子代理 ${index + 1}: ${task.task.take(32)}",
+            mode = ConversationStore.MODE_SUBAGENT,
+        )
+        conversationStore.attachSubAgentTaskChild(parentConversationId, batchId, index, childConversationId)
+        val normalizedWritePaths = task.writePaths
+            .map(subAgentWriteCoordinator::normalizeWorkspacePath)
+            .toSortedSet()
+        subAgentContexts[childConversationId] = SubAgentExecutionContext(
+            owner = owner,
+            agent = agentConfig,
+            readOnly = task.readOnly,
+            writePaths = normalizedWritePaths,
+        )
+        var persistedStatus = SubAgentTaskStatus.FAILED
+        try {
+            val prompt = buildSubAgentPrompt(task)
+            // A child is idle from creation until the loop ends. Mark it running before the
+            // loop so a process death mid-turn is visible to the resume planner: runLoop writes
+            // idle only after the final message, so idle then means finished and running means
+            // the child was interrupted before it could produce an answer.
+            conversationStore.setConversationMeta(childConversationId, status = ConversationStore.STATUS_RUNNING)
+            conversationStore.addMessage(childConversationId, "user", prompt, profileId = profile.id, model = model)
+            runLoop(
+                childConversationId,
+                profile,
+                model,
+                onUpdate = { update ->
+                    if (update.status.isNotBlank()) {
+                        onStatus(
+                            context.getString(
+                                R.string.status_sub_agent_progress_detail,
+                                index,
+                                tasks.size,
+                                agentConfig.name,
+                                update.status,
+                            ),
+                        )
+                    }
+                },
+                propagateErrors = false,
+            )
+            val assistant = conversationStore.messages(childConversationId).lastOrNull { it.role == "assistant" }
+            persistedStatus = when {
+                conversationStore.conversation(childConversationId)?.status == ConversationStore.STATUS_INTERRUPTED ->
+                    SubAgentTaskStatus.INTERRUPTED
+                assistant != null -> SubAgentTaskStatus.COMPLETED
+                else -> SubAgentTaskStatus.FAILED
+            }
+            return JSONObject()
+                .put("index", index + 1)
+                .put("agent", agentConfig.name)
+                .put("profile_id", profile.id)
+                .put("model", model)
+                .put("task", task.task)
+                .put("read_only", task.readOnly)
+                .put("write_paths", JSONArray(normalizedWritePaths.toList()))
+                .put("capability_hint", task.capabilityHint)
+                .put("expected_output", task.expectedOutput)
+                .put("result", assistant?.content.orEmpty())
+                .put("status", conversationStore.conversation(childConversationId)?.status ?: "unknown")
+        } catch (cancelled: CancellationException) {
+            // A cancelled child is interrupted, not failed: the resume must not treat its
+            // partial conversation as a finished task.
+            persistedStatus = SubAgentTaskStatus.INTERRUPTED
+            throw cancelled
+        } finally {
+            subAgentContexts.remove(childConversationId)
+            conversationStore.setSubAgentTaskStatus(parentConversationId, batchId, index, persistedStatus)
+            onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
         }
     }
 
