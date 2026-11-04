@@ -20,6 +20,7 @@ class SubAgentTaskSchemaTest {
             "capability_hint",
             "preferred_agent",
             "user_message_id",
+            "tool_call_id",
             "status",
             "delivered",
             "created_at",
@@ -28,7 +29,8 @@ class SubAgentTaskSchemaTest {
             assertTrue("missing column $column", ddl.contains(column))
         }
         assertTrue(ddl.contains("PRIMARY KEY (parent_conversation_id, batch_id, task_index)"))
-        assertEquals(13, SubAgentTaskSchema.DATABASE_VERSION)
+        assertEquals(14, SubAgentTaskSchema.DATABASE_VERSION)
+        assertEquals("ALTER TABLE sub_agent_tasks ADD COLUMN tool_call_id TEXT NOT NULL DEFAULT ''", SubAgentTaskSchema.UPGRADE_13_TO_14)
         assertTrue(SubAgentTaskSchema.CREATE_INDEX.contains("idx_sub_agent_tasks_open"))
     }
 }

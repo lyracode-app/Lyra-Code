@@ -29,6 +29,8 @@ data class SubAgentTaskRecord(
     /** The batch this row belongs to. The recovery copy of a path is named after it. */
     val batchId: String = "",
     val preferredAgent: String = "",
+    /** The row's last write, in epoch milliseconds; a resume reports it as the interruption time. */
+    val updatedAt: Long = 0L,
 )
 
 /**
@@ -67,6 +69,7 @@ data class OpenSubAgentBatch(
     /** The parent's last user message when the batch began; a resume must match it. */
     val userMessageId: Long,
     val tasks: List<SubAgentTaskRecord>,
+    val toolCallId: String = "",
 )
 
 /**
@@ -75,7 +78,7 @@ data class OpenSubAgentBatch(
  * a device only: the repo has no Robolectric, and Android's SQLite is unavailable on the JVM.
  */
 internal object SubAgentTaskSchema {
-    const val DATABASE_VERSION = 13
+    const val DATABASE_VERSION = 14
 
     const val CREATE_TABLE = """
         CREATE TABLE IF NOT EXISTS sub_agent_tasks (
@@ -90,6 +93,7 @@ internal object SubAgentTaskSchema {
             capability_hint TEXT NOT NULL DEFAULT '',
             preferred_agent TEXT NOT NULL DEFAULT '',
             user_message_id INTEGER NOT NULL DEFAULT 0,
+            tool_call_id TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL,
             delivered INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
@@ -100,4 +104,7 @@ internal object SubAgentTaskSchema {
 
     const val CREATE_INDEX =
         "CREATE INDEX IF NOT EXISTS idx_sub_agent_tasks_open ON sub_agent_tasks(parent_conversation_id, delivered)"
+
+    /** Adds the parent tool call id that a replay of the saved call needs. */
+    const val UPGRADE_13_TO_14 = "ALTER TABLE sub_agent_tasks ADD COLUMN tool_call_id TEXT NOT NULL DEFAULT ''"
 }
