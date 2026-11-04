@@ -125,6 +125,11 @@ android {
             "LYRA_UPDATE_MANIFEST_URL",
             "\"${providers.gradleProperty("lyra.updateManifestUrl").orNull.orEmpty()}\"",
         )
+        buildConfigField(
+            "String",
+            "LYRA_DEVELOPER_WALL_URL",
+            groovy.json.JsonOutput.toJson(providers.gradleProperty("lyra.developerWallUrl").orNull.orEmpty()),
+        )
     }
 
     signingConfigs {

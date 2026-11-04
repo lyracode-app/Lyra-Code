@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.storage.StorageManager
 import android.system.Os
 import com.yukisoffd.lyracode.data.UpdateManager
+import com.yukisoffd.lyracode.data.DeveloperWallManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +49,8 @@ import java.util.Locale
 internal fun StorageCacheSettings() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val developerWall = remember(context) { DeveloperWallManager.get(context) }
+    val developerWallState by developerWall.state.collectAsState()
     var scan by remember { mutableStateOf<StorageScanResult?>(null) }
     var scanning by remember { mutableStateOf(true) }
     var cleaning by remember { mutableStateOf(false) }
@@ -75,7 +79,16 @@ internal fun StorageCacheSettings() {
         scope.launch {
             val failures = withContext(Dispatchers.IO) {
                 items.sumOf { item ->
-                    if (item.updatePackages) {
+                    if (item.developerWall) {
+                        try {
+                            developerWall.sync(force = true, clearCache = true)
+                            0
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            1
+                        }
+                    } else if (item.updatePackages) {
                         if (UpdateManager(context).clearDownloadedApks().isFailure) 1 else 0
                     } else {
                         item.cleanTargets.count { deleteCacheTarget(it).isFailure }
@@ -122,6 +135,20 @@ internal fun StorageCacheSettings() {
                     ) { Text(uiText(R.string.action_clean)) }
                 }
             }
+            if (item.developerWall && developerWall.configured) {
+                Text(uiText(R.string.developer_wall_daily_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(
+                    enabled = !scanning && !cleaning && !developerWallState.syncing,
+                    onClick = {
+                        scope.launch {
+                            val result = developerWall.sync(force = true)
+                            status = uiText(if (result.succeeded) R.string.developer_wall_sync_success else R.string.developer_wall_sync_failed)
+                            refresh()
+                        }
+                    },
+                    shape = KimiPillShape,
+                ) { Text(uiText(if (developerWallState.syncing) R.string.developer_wall_syncing else R.string.developer_wall_sync)) }
+            }
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -161,6 +188,7 @@ internal data class StorageCacheItem(
     val cleanable: Boolean,
     val cleanTargets: List<File> = listOf(file),
     val updatePackages: Boolean = false,
+    val developerWall: Boolean = false,
 )
 
 internal fun scanStorageUsage(context: Context): StorageScanResult = runCatching {
@@ -200,6 +228,8 @@ internal fun scanStorageUsage(context: Context): StorageScanResult = runCatching
             updatePackages = true,
         ))
         add(storageItem(uiText(R.string.cache_ai_response), File(context.cacheDir, "ai_response_cache"), cleanable = true))
+        add(storageItem(uiText(R.string.developer_wall_cache), DeveloperWallManager.get(context).cacheDirectory,
+            cleanable = true).copy(developerWall = true))
         add(storageItem(uiText(R.string.cache_crop_image), File(context.cacheDir, "uploads"), cleanable = true))
         add(storageItem(uiText(R.string.cache_camera_upload), File(context.cacheDir, "upload_crop"), cleanable = true))
         add(storageItem(uiText(R.string.cache_system_temp), context.cacheDir, cleanable = false))

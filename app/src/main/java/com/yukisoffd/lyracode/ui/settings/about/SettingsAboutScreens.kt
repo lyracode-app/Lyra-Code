@@ -254,6 +254,7 @@ internal fun AboutSoftwareScreen(
     onOpenServiceAgreements: () -> Unit,
     onOpenGitHubAcceleration: (String) -> Unit,
     onOpenSponsorDevelopment: () -> Unit = {},
+    onOpenDeveloperWall: () -> Unit = {},
     updateInfoState: MutableState<AppUpdateInfo?> = remember { mutableStateOf(null) },
     showUpdateDialog: Boolean = true,
     scrollState: ScrollState = rememberScrollState(),
@@ -624,6 +625,7 @@ internal fun AboutSoftwareScreen(
                     },
                 )
             }
+            DeveloperWallEntry(onClick = onOpenDeveloperWall)
         }
         TransientNotice(
             message = notice,

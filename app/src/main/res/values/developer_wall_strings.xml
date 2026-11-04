@@ -1,0 +1,18 @@
+<resources>
+    <string name="developer_wall_title">Developer wall</string>
+    <string name="developer_wall_developers">Developers</string>
+    <string name="developer_wall_sponsors">Sponsors</string>
+    <string name="developer_wall_contributors">Contributors</string>
+    <string name="developer_wall_thanks">Special thanks</string>
+    <string name="developer_wall_sync">Sync developer wall</string>
+    <string name="developer_wall_syncing">Syncing…</string>
+    <string name="developer_wall_daily_hint">Synced once a day. People and avatars are cached locally; you can sync manually at any time.</string>
+    <string name="developer_wall_cache">Developer wall cache</string>
+    <string name="developer_wall_sync_success">Developer wall synced</string>
+    <string name="developer_wall_sync_failed">Could not load the developer wall. Check the connection or JSON file and try syncing again.</string>
+    <string name="developer_wall_open_profile">Open %1$s’s profile</string>
+    <string name="developer_wall_release_to_refresh">Release to refresh</string>
+    <string name="developer_wall_information">About the developer wall</string>
+    <string name="developer_wall_information_body">The developer wall is maintained manually. If anyone is missing or any information is incorrect, please submit an issue.</string>
+    <string name="developer_wall_report_issue">Submit an issue</string>
+</resources>
