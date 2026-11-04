@@ -71,11 +71,12 @@ class SubAgentConcurrencyInstrumentedTest {
                         assertEquals("fixture-task-$index", result.getString("task"))
                         assertEquals("answer-$index", result.getString("result"))
                     }
-                    assertEquals(4, fixture.requests.size)
-                    assertEquals((0..3).toSet(), fixture.requests.toSet())
-                    assertEquals(limit, fixture.peak.get())
-                    if (limit == 3) assertTrue(fixture.completions.indexOf(fixture.requests[2]) < fixture.completions.indexOf(fixture.requests[0]))
-                    assertTrue("fixture errors: ${fixture.errors}", fixture.errors.isEmpty())
+                    val diagnostics = fixture.diagnostics()
+                    assertEquals(diagnostics, 4, fixture.requests.size)
+                    assertEquals(diagnostics, (0..3).toSet(), fixture.requests.toSet())
+                    assertEquals(diagnostics, limit, fixture.peak.get())
+                    if (limit == 3) assertTrue(diagnostics, fixture.completions.indexOf(fixture.requests[2]) < fixture.completions.indexOf(fixture.requests[0]))
+                    assertTrue(diagnostics, fixture.errors.isEmpty())
                     assertFalse(agent.isSubAgentRunning(parent))
                 }
             }
@@ -94,12 +95,15 @@ class SubAgentConcurrencyInstrumentedTest {
     }
 
     private class Fixture(private val limit: Int) : AutoCloseable {
+        private companion object { const val MAX_EVENTS = 24 }
         private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
         val port get() = server.localPort
         val requests = CopyOnWriteArrayList<Int>()
         val completions = CopyOnWriteArrayList<Int>()
         val errors = CopyOnWriteArrayList<String>()
+        val events = CopyOnWriteArrayList<String>()
         val peak = AtomicInteger()
+        private val started = System.nanoTime()
         private val outstanding = AtomicInteger()
         private val firstWave = CountDownLatch(limit)
         private val completed = Array(4) { CountDownLatch(1) }
@@ -109,6 +113,7 @@ class SubAgentConcurrencyInstrumentedTest {
                 val socket = try { server.accept() } catch (_: java.io.IOException) { break }
                 workers += thread(isDaemon = true) {
                     var counted = false
+                    var arrival = -1
                     try {
                         socket.use {
                             it.soTimeout = 10000
@@ -118,46 +123,66 @@ class SubAgentConcurrencyInstrumentedTest {
                             val match = Regex("fixture-task-([0-3])").find(body.toString())
                                 ?: error("request has no task marker")
                             val index = match.groupValues[1].toInt()
-                            val arrival: Int
                             synchronized(outstanding) {
                                 requests += index
                                 arrival = requests.size - 1
                                 counted = true
                                 val active = outstanding.incrementAndGet()
                                 peak.updateAndGet { old -> maxOf(old, active) }
+                                record("arrival=$arrival task=$index active=$active ${header.method} ${header.path} ${shape(body)}")
                             }
                             firstWave.countDown()
                             check(firstWave.await(10, TimeUnit.SECONDS)) { "first wave did not start" }
                             if (limit == 1 && arrival == 0) Thread.sleep(500)
+                            if (arrival >= completed.size) errors += "unexpected arrival=$arrival task=$index"
                             if (limit == 3 && arrival < 2) {
                                 check(completed[arrival + 1].await(10, TimeUnit.SECONDS)) { "reverse release timed out" }
                             }
                             val answer = "answer-$index"
                             val output = it.getOutputStream()
                             synchronized(outstanding) {
-                            if (body.optBoolean("stream")) {
-                                WebAccessHttp.eventHeaders(output)
-                                val delta = JSONObject().put("choices", JSONArray().put(JSONObject().put("delta", JSONObject().put("content", answer))))
-                                output.write("data: $delta\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n".toByteArray())
-                                output.flush()
-                            } else {
-                                val json = JSONObject().put("choices", JSONArray().put(JSONObject().put("message", JSONObject().put("role", "assistant").put("content", answer)).put("finish_reason", "stop")))
-                                WebAccessHttp.respond(output, 200, "application/json", json.toString().toByteArray())
+                                if (body.optBoolean("stream")) {
+                                    WebAccessHttp.eventHeaders(output)
+                                    val delta = JSONObject().put("choices", JSONArray().put(JSONObject().put("delta", JSONObject().put("content", answer))))
+                                    output.write("data: $delta\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n".toByteArray())
+                                    output.flush()
+                                } else {
+                                    val json = JSONObject().put("choices", JSONArray().put(JSONObject().put("message", JSONObject().put("role", "assistant").put("content", answer)).put("finish_reason", "stop")))
+                                    WebAccessHttp.respond(output, 200, "application/json", json.toString().toByteArray())
+                                }
+                                completions += index
+                                outstanding.decrementAndGet()
+                                counted = false
                             }
-                            completions += index
-                            outstanding.decrementAndGet()
-                            counted = false
-                            }
-                            completed[arrival].countDown()
+                            record("done arrival=$arrival task=$index")
+                            completed.getOrNull(arrival)?.countDown()
                         }
                     } catch (e: Exception) {
-                        errors += e.toString()
+                        errors += "arrival=$arrival ${e.javaClass.simpleName}: ${e.message?.take(160)}"
                     } finally {
                         if (counted) outstanding.decrementAndGet()
                     }
                 }
             }
         }
+        private fun elapsed() = (System.nanoTime() - started) / 1_000_000
+
+        private fun record(event: String) {
+            if (events.size < MAX_EVENTS) events += "+${elapsed()}ms $event"
+        }
+
+        // Request shape without content: stream flag, message roles, body size and hash.
+        // A transport retry repeats the hash; a second model turn adds messages.
+        private fun shape(body: JSONObject): String {
+            val messages = body.optJSONArray("messages") ?: JSONArray()
+            val roles = (0 until messages.length()).joinToString(",") { messages.optJSONObject(it)?.optString("role").orEmpty() }
+            val text = body.toString()
+            return "stream=${body.optBoolean("stream")} roles=[$roles] bytes=${text.length} hash=${Integer.toHexString(text.hashCode())}"
+        }
+
+        fun diagnostics() = "limit=$limit requests=${requests.take(MAX_EVENTS)} completions=${completions.take(MAX_EVENTS)} " +
+            "peak=${peak.get()} errors=${errors.take(MAX_EVENTS)} events=$events"
+
         override fun close() {
             server.close()
             acceptor.join(2000)
