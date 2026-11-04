@@ -135,9 +135,12 @@ class PendingInputFileStoreTest {
         val uploads = File(filesDir, ATTACHMENT_DIRECTORY).apply { mkdirs() }
         val present = File(uploads, "present.jpg").apply { writeText("payload") }
 
-        assertTrue(store.attachmentExists(attachment(present.absolutePath)))
-        assertTrue(store.attachmentExists(attachment("file://${present.absolutePath}")))
-        assertFalse(store.attachmentExists(attachment(File(uploads, "gone.jpg").absolutePath)))
+        // A Windows drive letter is parsed as a URI scheme; use a real file URI on every host.
+        assertTrue(store.attachmentExists(attachment(present.toURI().toString())))
+        if (File.separatorChar == '/') {
+            assertTrue(store.attachmentExists(attachment(present.absolutePath)))
+        }
+        assertFalse(store.attachmentExists(attachment(File(uploads, "gone.jpg").toURI().toString())))
         assertTrue(store.attachmentExists(attachment("content://media/external/images/1")))
         assertTrue(store.attachmentExists(attachment("custom://opaque")))
         assertFalse(store.attachmentExists(attachment("")))
@@ -151,10 +154,10 @@ class PendingInputFileStoreTest {
         val outside = File(filesDir, "outside.jpg").apply { writeText("payload") }
 
         assertFalse(store.deleteAttachment(attachment("content://media/external/images/1")))
-        assertFalse(store.deleteAttachment(attachment(outside.absolutePath)))
+        assertFalse(store.deleteAttachment(attachment(outside.toURI().toString())))
         assertTrue(outside.exists())
 
-        assertTrue(store.deleteAttachment(attachment(private.absolutePath)))
+        assertTrue(store.deleteAttachment(attachment(private.toURI().toString())))
         assertFalse(private.exists())
     }
 
