@@ -291,6 +291,8 @@
     <string name="status_sub_agent_progress">子代理任务：已完成 %1$d/%2$d</string>
     <string name="status_sub_agent_progress_running">子代理任务：已完成 %1$d/%2$d · 正在执行 %3$s</string>
     <string name="status_sub_agent_progress_detail">子代理任务：已完成 %1$d/%2$d · 正在执行 %3$s · %4$s</string>
+    <string name="status_sub_agent_progress_concurrent">子代理任务：已完成 %1$d/%2$d · 正在运行 %3$d</string>
+    <string name="status_sub_agent_progress_concurrent_detail">子代理任务：已完成 %1$d/%2$d · 正在运行 %3$d · %4$s</string>
     <string name="status_sub_agent_resuming">子代理任务：复用 %1$d/%2$d 个已保存结果</string>
     <string name="status_interrupted_writes_closed">已关闭上一批次的 %1$d 个中断写入任务；这些路径可能只写入一半：%2$s</string>
     <string name="agent_run_channel">代理运行</string>
@@ -1278,6 +1280,11 @@
     <string name="title_sub_agent_orchestration">子代理编排</string>
     <string name="sub_agent_settings_desc">开启后，主模型可在复杂任务中调用 run_sub_agents，将独立子任务交给已启用的子代理模型执行。子代理对话不进入普通历史，只把最终结果返回主模型。</string>
     <string name="label_sub_agent_models">子代理模型</string>
+    <string name="label_sub_agent_max_tasks">每批最大任务数</string>
+    <string name="label_sub_agent_max_concurrency">最大并发子代理数</string>
+    <string name="sub_agent_limits_hint">并发数为 1 时每次只运行一个任务，与之前相同。</string>
+    <string name="action_decrease">减少</string>
+    <string name="action_increase">增加</string>
     <string name="label_sub_agent_default_name">子代理模型</string>
     <string name="sub_agent_default_desc">擅长代码审查、Bug 检查、资料核验或独立方案分析。</string>
     <string name="sub_agent_empty_hint">暂无子代理模型。请从已添加的模型服务中选择模型，并填写它擅长的任务说明。</string>
