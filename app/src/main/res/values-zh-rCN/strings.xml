@@ -291,6 +291,12 @@
     <string name="status_sub_agent_progress">子代理任务：已完成 %1$d/%2$d</string>
     <string name="status_sub_agent_progress_running">子代理任务：已完成 %1$d/%2$d · 正在执行 %3$s</string>
     <string name="status_sub_agent_progress_detail">子代理任务：已完成 %1$d/%2$d · 正在执行 %3$s · %4$s</string>
+    <string name="status_sub_agent_resuming">子代理任务：复用 %1$d/%2$d 个已保存结果</string>
+    <string name="status_interrupted_writes_closed">已关闭上一批次的 %1$d 个中断写入任务；这些路径可能只写入一半：%2$s</string>
+    <string name="agent_run_channel">代理运行</string>
+    <string name="agent_run_title">Lyra Code 正在运行</string>
+    <string name="agent_run_notification">代理任务正在后台继续运行</string>
+    <string name="agent_run_stop">停止</string>
     <string name="status_interrupted">已中断</string>
     <string name="status_continue">继续运行</string>
     <string name="status_regenerate">重新生成</string>

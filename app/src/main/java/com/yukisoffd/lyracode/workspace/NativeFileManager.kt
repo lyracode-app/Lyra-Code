@@ -3,6 +3,7 @@ package com.yukisoffd.lyracode.workspace
 import android.content.Context
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.yukisoffd.lyracode.data.InterruptedWritePath
 import java.io.FileNotFoundException
 import java.io.InputStream
 
@@ -18,6 +19,20 @@ class NativeFileManager(
     private val context: Context,
     private val workspaceManager: WorkspaceManager,
 ) {
+    /**
+     * The interrupted-write copy policy bound to one workspace. A recovery copy is made in the
+     * workspace its conversation belongs to.
+     */
+    private fun textBackupsAt(root: () -> DocumentFile?): TextBackupStore = TextBackupStore(
+        exists = { path -> resolve(path, root())?.isFile == true },
+        copy = { source, target -> copyTextFile(source, target, root()) },
+        remove = { path -> resolve(path, root())?.delete() == true },
+        rename = { path, newName ->
+            val document = resolve(path, root())
+            document != null && document.renameTo(newName) && document.name == newName
+        },
+    )
+
     fun hasWorkspaceRoot(): Boolean = workspaceManager.rootUri() != null
 
     fun listDirectory(path: String = ""): Result<List<WorkspaceFile>> = runCatching {
@@ -39,6 +54,9 @@ class NativeFileManager(
     fun readFile(path: String): Result<String> = runCatching {
         readText(path, MAX_READ_BYTES)
     }
+
+    /** True when the workspace-relative path exists. Cheap: resolves the document, does not read it. */
+    fun exists(path: String): Boolean = runCatching { resolve(path)?.exists() == true }.getOrDefault(false)
 
     fun readFileForEdit(path: String): Result<String> = runCatching {
         readText(path, MAX_EDIT_BYTES)
@@ -172,10 +190,10 @@ class NativeFileManager(
         """.trimIndent()
     }
 
-    private fun findOrCreateFile(path: String): DocumentFile {
+    private fun findOrCreateFile(path: String, root: DocumentFile? = workspaceManager.root()): DocumentFile {
         val clean = normalize(path)
         require(clean.isNotBlank()) { "文件路径不能为空" }
-        val parent = findOrCreateDirectory(parentPath(clean))
+        val parent = findOrCreateDirectory(parentPath(clean), root)
         val name = clean.substringAfterLast("/")
         parent.findFile(name)?.let { return it }
         val created = parent.createFile(mimeFor(name), name)
@@ -204,8 +222,69 @@ class NativeFileManager(
         } ?: throw FileNotFoundException("无法读取原文件以生成备份: $path")
     }
 
-    private fun findOrCreateDirectory(path: String): DocumentFile {
-        var current = workspaceManager.root() ?: throw FileNotFoundException("未选择工作目录")
+    /**
+     * Keeps one copy of each interrupted write's backup under a name that no later write
+     * replaces, and returns the copies that exist now so a report can list them. Called at
+     * controller start and when a sub-agent plan is built, before any later write can replace
+     * the backup a started write left behind.
+     *
+     * Each path is resolved against the workspace its conversation belongs to, never the active
+     * one: at controller start no conversation is selected, and a path from another workspace
+     * would otherwise find nothing or copy an unrelated file that happens to share its name.
+     */
+    fun preserveInterruptedBackups(writes: Collection<InterruptedWritePath>): List<String> {
+        val clean = cleanWorkspacePaths(writes)
+        val failures = mutableListOf<Throwable>()
+        clean.forEach { write ->
+            // Attempt every workspace even when an unrelated provider fails.
+            runCatching {
+                val root = workspaceManager.rootOf(write.workspaceUri)
+                val backups = textBackupsAt { root }
+                backups.preserveInterrupted(write.path, write.batchId)
+            }.onFailure { failures += it }
+        }
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException("无法保留中断写入的备份", failures.first()).apply {
+                failures.drop(1).forEach(::addSuppressed)
+            }
+        }
+        return existingInterruptedBackups(clean)
+    }
+
+    /** The batch-named copies that exist right now, in the order of [writes]. */
+    fun existingInterruptedBackups(writes: Collection<InterruptedWritePath>): List<String> =
+        cleanWorkspacePaths(writes)
+            .mapNotNull { write ->
+                TextBackupStore.interruptedBackupPath(write.path, write.batchId)
+                    .takeIf { existsIn(workspaceManager.rootOf(write.workspaceUri), it) }
+            }
+            .distinct()
+
+    private fun existsIn(root: DocumentFile?, path: String): Boolean =
+        runCatching { resolve(path, root)?.exists() == true }.getOrDefault(false)
+
+    private fun cleanWorkspacePaths(writes: Collection<InterruptedWritePath>): List<InterruptedWritePath> =
+        writes.mapNotNull { write ->
+            runCatching { write.copy(path = normalize(write.path)) }.getOrNull()
+        }
+            // A row whose conversation is gone has no workspace to resolve against; writing into
+            // the active workspace instead is what this method exists to prevent.
+            .filter { it.path.isNotBlank() && it.workspaceUri.isNotBlank() }
+            .distinct()
+
+    /** Copies one workspace text file over another, replacing the target, inside [root]. */
+    private fun copyTextFile(source: String, target: String, root: DocumentFile?) {
+        val sourceFile = resolve(source, root) ?: throw FileNotFoundException("无法读取原文件以生成备份: $source")
+        val targetFile = findOrCreateFile(target, root)
+        context.contentResolver.openInputStream(sourceFile.uri)?.buffered()?.use { input ->
+            context.contentResolver.openOutputStream(targetFile.uri, "wt")?.buffered()?.use { output ->
+                input.copyTo(output)
+            } ?: throw FileNotFoundException("无法写入备份: $target")
+        } ?: throw FileNotFoundException("无法读取原文件以生成备份: $source")
+    }
+
+    private fun findOrCreateDirectory(path: String, root: DocumentFile? = workspaceManager.root()): DocumentFile {
+        var current = root ?: throw FileNotFoundException("未选择工作目录")
         val clean = normalize(path)
         if (clean.isBlank()) return current
         clean.split("/").forEach { segment ->
@@ -220,8 +299,8 @@ class NativeFileManager(
         return current
     }
 
-    private fun resolve(path: String): DocumentFile? {
-        var current = workspaceManager.root() ?: return null
+    private fun resolve(path: String, root: DocumentFile? = workspaceManager.root()): DocumentFile? {
+        var current = root ?: return null
         val clean = normalize(path)
         if (clean.isBlank()) return current
         for (segment in clean.split("/")) {
