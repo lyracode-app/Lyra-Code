@@ -388,10 +388,10 @@ internal fun ChatScreen(
         ToolApprovalDialog(
             pending = pending,
             onApprove = { rememberConversation ->
-                controller.answerToolApproval(approved = true, rememberForConversation = rememberConversation, feedback = "")
+                controller.answerToolApproval(pending.id, approved = true, rememberForConversation = rememberConversation, feedback = "")
             },
             onReject = { feedback ->
-                controller.answerToolApproval(approved = false, rememberForConversation = false, feedback = feedback)
+                controller.answerToolApproval(pending.id, approved = false, rememberForConversation = false, feedback = feedback)
             },
         )
     }
