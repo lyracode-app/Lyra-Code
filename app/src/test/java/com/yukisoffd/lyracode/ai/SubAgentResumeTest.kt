@@ -457,8 +457,8 @@ class SubAgentResumeTest {
     }
 
     @Test
-    fun `the resume timing comes from the batch rows read before the re-point`() {
-        // 2026-11-03T10:00:00Z and two minutes later; the re-point runs at the clock reading.
+    fun `the resume timing uses the newest saved row timestamp and the elapsed-time helper`() {
+        // 2026-11-03T10:00:00Z and two minutes later; nowMillis is the clock reading passed to the helper.
         val firstWrite = 1_793_700_000_000L
         val lastWrite = firstWrite + 120_000L
         val batch = OpenSubAgentBatch(
@@ -470,8 +470,8 @@ class SubAgentResumeTest {
                     .copy(updatedAt = lastWrite),
             ),
         )
-        val repointAt = lastWrite + 600_500L
-        val timing = requireNotNull(SubAgentResume.resumeTiming(SubAgentResume.interruptedAtMillis(batch), repointAt))
+        val nowMillis = lastWrite + 600_500L
+        val timing = requireNotNull(SubAgentResume.resumeTiming(SubAgentResume.interruptedAtMillis(batch), nowMillis))
         assertEquals("2026-11-03T10:02:00Z", timing.interruptedAtIso)
         assertEquals(600L, timing.secondsAgo)
         assertEquals("10 minutes", timing.agoText)
@@ -484,9 +484,8 @@ class SubAgentResumeTest {
         assertEquals("2026-11-03T10:00:00Z", timing.interruptedAtIso)
         assertEquals(0L, timing.secondsAgo)
         assertEquals(
-            "The batch was interrupted at 2026-11-03T10:00:00Z, about 0 seconds ago. Reused task results date " +
-                "from before the interruption and may be stale; re-check the write paths and any outside state " +
-                "before relying on them.",
+            "The batch's last saved activity was at 2026-11-03T10:00:00Z, about 0 seconds ago. Reused task " +
+                "results may be stale; re-check the write paths and any outside state before relying on them.",
             SubAgentResume.resumeTimingNote(timing),
         )
         assertEquals(
@@ -496,7 +495,7 @@ class SubAgentResumeTest {
     }
 
     @Test
-    fun `an unknown interruption time omits the timing fields and says the time is unknown`() {
+    fun `an unknown last saved activity time omits the timing fields and says the time is unknown`() {
         val now = 1_793_700_000_000L
         val noRows = OpenSubAgentBatch(batchId = "batch-empty", userMessageId = 1, tasks = emptyList())
         val zeroRow = OpenSubAgentBatch(
@@ -510,9 +509,30 @@ class SubAgentResumeTest {
         assertNull(SubAgentResume.resumeTiming(-5L, now))
         assertEquals(emptyMap<String, Any>(), SubAgentResume.resumeTimingFields(null))
         assertEquals(
-            "The interruption time is unknown; reused task results may be stale; re-check the write paths " +
-                "and any outside state before relying on them.",
+            "The time of the batch's last saved activity is unknown; reused task results may be stale; re-check " +
+                "the write paths and any outside state before relying on them.",
             SubAgentResume.resumeTimingNote(null),
+        )
+    }
+
+    @Test
+    fun `a future saved activity time is treated as unknown`() {
+        val now = 1_793_700_000_000L
+        val future = now + 60_000L
+        val batch = OpenSubAgentBatch(
+            batchId = "batch-future",
+            userMessageId = 1,
+            tasks = listOf(
+                row(0, "read", child = 300, status = SubAgentTaskStatus.COMPLETED).copy(updatedAt = future),
+            ),
+        )
+        val timing = SubAgentResume.resumeTiming(SubAgentResume.interruptedAtMillis(batch), now)
+        assertNull(timing)
+        assertEquals(emptyMap<String, Any>(), SubAgentResume.resumeTimingFields(timing))
+        assertEquals(
+            "The time of the batch's last saved activity is unknown; reused task results may be stale; re-check " +
+                "the write paths and any outside state before relying on them.",
+            SubAgentResume.resumeTimingNote(timing),
         )
     }
 

@@ -136,7 +136,7 @@ internal object SubAgentResume {
         return plan.takeIf { ownCall && batch.batchId == expectedReplayBatchId }
     }
 
-    /** When an open batch was interrupted and how long ago, for the resumed tool result. */
+    /** When the batch last saved activity was and how long ago, for the resumed tool result. */
     data class ResumeTiming(val interruptedAtIso: String, val secondsAgo: Long, val agoText: String)
 
     /**
@@ -149,11 +149,12 @@ internal object SubAgentResume {
         batch.tasks.maxOfOrNull { it.updatedAt }?.takeIf { it > 0L }
 
     /**
-     * Times the interruption at [interruptedAtMillis] against the clock reading [nowMillis], or
-     * null when the interruption time is unknown (null or not positive).
+     * Times the batch's last saved activity at [interruptedAtMillis] against the clock reading
+     * [nowMillis], or null when that time is unknown (null, not positive, or later than
+     * [nowMillis]).
      */
     fun resumeTiming(interruptedAtMillis: Long?, nowMillis: Long): ResumeTiming? {
-        if (interruptedAtMillis == null || interruptedAtMillis <= 0L) return null
+        if (interruptedAtMillis == null || interruptedAtMillis <= 0L || interruptedAtMillis > nowMillis) return null
         val secondsAgo = ((nowMillis - interruptedAtMillis) / 1000).coerceAtLeast(0)
         val iso = Instant.ofEpochMilli(interruptedAtMillis).truncatedTo(ChronoUnit.SECONDS).toString()
         return ResumeTiming(iso, secondsAgo, durationText(secondsAgo))
@@ -170,7 +171,7 @@ internal object SubAgentResume {
         }
     }
 
-    /** The resumed result's timing fields; empty when the interruption time is unknown. */
+    /** The resumed result's timing fields; empty when the last saved activity time is unknown. */
     fun resumeTimingFields(timing: ResumeTiming?): Map<String, Any> =
         if (timing == null) {
             emptyMap()
@@ -179,17 +180,18 @@ internal object SubAgentResume {
         }
 
     /**
-     * The model-facing timing sentences that every resume note carries. An unknown interruption
-     * time is said to be unknown, never given as a date; the staleness warning stays either way.
+     * The model-facing timing sentences that every resume note carries. The time is the batch's
+     * last saved activity, not the moment the process died. An unknown time is said to be
+     * unknown, never given as a date; the staleness warning stays either way.
      */
     fun resumeTimingNote(timing: ResumeTiming?): String =
         if (timing == null) {
-            "The interruption time is unknown; reused task results may be stale; re-check the write paths " +
-                "and any outside state before relying on them."
+            "The time of the batch's last saved activity is unknown; reused task results may be stale; re-check " +
+                "the write paths and any outside state before relying on them."
         } else {
-            "The batch was interrupted at ${timing.interruptedAtIso}, about ${timing.agoText} ago. Reused task " +
-                "results date from before the interruption and may be stale; re-check the write paths and any " +
-                "outside state before relying on them."
+            "The batch's last saved activity was at ${timing.interruptedAtIso}, about ${timing.agoText} ago. " +
+                "Reused task results may be stale; re-check the write paths and any outside state before relying " +
+                "on them."
         }
 
     /**
