@@ -1445,6 +1445,7 @@
     <string name="composer_queue_dock_collapse">收起排队消息</string>
     <string name="composer_queue_state_queued">排队中</string>
     <string name="composer_queue_state_parked">已暂停</string>
+    <string name="composer_queue_state_waiting_to_insert">等待插入</string>
     <string name="composer_queue_attachment_count">附件：%1$d</string>
     <string name="composer_queue_remove_description">移除排队消息：%1$s</string>
     <string name="composer_queue_send_now_description">立即发送：%1$s</string>

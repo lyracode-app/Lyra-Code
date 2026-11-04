@@ -1,17 +1,17 @@
 package com.yukisoffd.lyracode.ai
 
+import com.yukisoffd.lyracode.chat.pending.PendingInputCapture
+
 /**
- * Source of already-composed steer texts for an active agent run.
- *
- * [drain] is synchronous and conversation-scoped: it atomically removes and returns every queued
- * steer text in order. The common case returns an empty list and must have no side effects.
+ * Delivers captured requests to an active run at a safe boundary.
+ * Each item is withdrawn from the waiting list after the synchronous insert succeeds.
  */
 internal fun interface SteerSource {
-    fun drain(conversationId: Long): List<String>
+    fun drain(conversationId: Long, insert: (PendingInputCapture) -> Unit)
 }
 
 internal object NoOpSteerSource : SteerSource {
-    override fun drain(conversationId: Long): List<String> = emptyList()
+    override fun drain(conversationId: Long, insert: (PendingInputCapture) -> Unit) = Unit
 }
 
 internal enum class RunBoundary { Continue, Return }

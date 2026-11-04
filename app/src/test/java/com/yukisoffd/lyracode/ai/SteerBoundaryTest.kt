@@ -1,5 +1,6 @@
 package com.yukisoffd.lyracode.ai
 
+import com.yukisoffd.lyracode.chat.pending.PendingInputCapture
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,26 +35,25 @@ class SteerBoundaryTest {
 
     @Test
     fun `default steer source is silent and empty`() {
-        assertEquals(emptyList<String>(), NoOpSteerSource.drain(1L))
-        assertEquals(emptyList<String>(), NoOpSteerSource.drain(42L))
+        NoOpSteerSource.drain(1L) { error("Unexpected insertion") }
+        NoOpSteerSource.drain(42L) { error("Unexpected insertion") }
     }
 
     @Test
     fun `steer source drains only the requested conversation`() {
         val drained = mutableListOf<Long>()
-        val source = SteerSource { conversationId ->
+        val inserted = mutableListOf<String>()
+        val source = SteerSource { conversationId, insert ->
             drained += conversationId
-            if (conversationId == 7L) listOf("first", "second") else emptyList()
+            if (conversationId == 7L) {
+                insert(PendingInputCapture("first", "first"))
+                insert(PendingInputCapture("second", "second"))
+            }
         }
 
-        assertEquals(listOf("first", "second"), source.drain(7L))
-        assertTrue(source.drain(8L).isEmpty())
+        source.drain(7L) { inserted.add(it.composedInput) }
+        source.drain(8L) { inserted.add(it.composedInput) }
+        assertEquals(listOf("first", "second"), inserted)
         assertEquals(listOf(7L, 8L), drained)
-    }
-
-    @Test
-    fun `no-op source has no observable state between drains`() {
-        assertFalse(NoOpSteerSource.drain(3L).isNotEmpty())
-        assertTrue(NoOpSteerSource.drain(3L).isEmpty())
     }
 }

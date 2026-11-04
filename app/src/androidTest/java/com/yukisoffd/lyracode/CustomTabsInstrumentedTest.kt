@@ -80,6 +80,39 @@ class CustomTabsInstrumentedTest {
         assertEquals(links, seen)
     }
 
+    @Test fun githubOpensInTheAppFirstAndFallsBackWhenItCannotHandleTheUrl() {
+        val launches = mutableListOf<Intent>()
+        var githubAvailable = true
+        val recordingContext = object : ContextWrapper(context) {
+            override fun startActivity(intent: Intent, options: Bundle?) { startActivity(intent) }
+            override fun startActivity(intent: Intent) {
+                launches.add(Intent(intent))
+                if (intent.`package` == "com.github.android" && !githubAvailable) {
+                    throw ActivityNotFoundException("GitHub is unavailable")
+                }
+            }
+        }
+        val url = "https://github.com/lyracode-app/Lyra-Code/issues/1"
+        val handler = AppUriHandler(recordingContext, rejectingExternalHandler(), false, 0xffffffff.toInt())
+        handler.openUri(url)
+        val github = launches.single()
+        assertEquals("com.github.android", github.`package`)
+        assertEquals(Uri.parse(url), github.data)
+        assertFalse(github.hasExtra(CustomTabsIntent.EXTRA_SESSION))
+
+        launches.clear()
+        githubAvailable = false
+        handler.openUri(url)
+        assertEquals("com.github.android", launches.first().`package`)
+        assertNotEquals("com.github.android", launches.last().`package`)
+        assertTrue(launches.size > 1)
+
+        launches.clear()
+        handler.openUri("https://github.com.example.test/")
+        assertTrue(launches.isNotEmpty())
+        assertTrue(launches.none { it.`package` == "com.github.android" })
+    }
+
     private fun rejectingExternalHandler() = object : UriHandler {
         override fun openUri(uri: String) { fail("HTTP(S) must use the browser launcher") }
     }

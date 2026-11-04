@@ -42,13 +42,6 @@ internal data class PendingInputItem(
     val state: PendingInputState,
 )
 
-internal data class PendingSteer(
-    val id: String,
-    val conversationId: Long,
-    val capture: PendingInputCapture,
-    val createdAt: Long,
-)
-
 /**
  * [missingAttachmentUris] is derived state, not persisted. The wiring fills it when it loads a
  * queue on an IO thread; recomposition only reads the set.
@@ -56,7 +49,7 @@ internal data class PendingSteer(
 internal data class PendingInputSnapshot(
     val conversationId: Long,
     val queue: List<PendingInputItem> = emptyList(),
-    val steers: List<PendingSteer> = emptyList(),
+    val steers: List<PendingInputItem> = emptyList(),
     val missingAttachmentUris: Set<String> = emptySet(),
 ) {
     val queuedCount: Int get() = queue.count { it.state == PendingInputState.QUEUED }
@@ -127,12 +120,13 @@ internal class PendingInputStore(
     }
 
     @Synchronized
-    fun enqueueSteer(conversationId: Long, capture: PendingInputCapture): PendingSteer {
-        val steer = PendingSteer(
+    fun enqueueSteer(conversationId: Long, capture: PendingInputCapture): PendingInputItem {
+        val steer = PendingInputItem(
             id = newId(),
             conversationId = conversationId,
             capture = capture,
             createdAt = now(),
+            state = PendingInputState.QUEUED,
         )
         val current = ensureLoaded(conversationId)
         // Steers are transient and never encoded.
@@ -147,8 +141,13 @@ internal class PendingInputStore(
     @Synchronized
     fun remove(conversationId: Long, itemId: String): PendingInputRemoval? {
         val current = ensureLoaded(conversationId)
-        val item = current.queue.firstOrNull { it.id == itemId } ?: return null
-        val remaining = current.copy(queue = current.queue.filterNot { it.id == itemId })
+        val queued = current.queue.firstOrNull { it.id == itemId }
+        val item = queued ?: current.steers.firstOrNull { it.id == itemId } ?: return null
+        val remaining = if (queued != null) {
+            current.copy(queue = current.queue.filterNot { it.id == itemId })
+        } else {
+            current.copy(steers = current.steers.filterNot { it.id == itemId })
+        }
         val referenced = referencedAttachmentUris(remaining) +
             referencedAttachmentUris(excluding = conversationId)
         val orphaned = item.capture.attachments
@@ -156,7 +155,7 @@ internal class PendingInputStore(
             .filter { it.uri.isNotBlank() && it.uri !in referenced }
             .distinctBy { it.uri }
             .toList()
-        persistAndPublish(conversationId, remaining)
+        if (queued != null) persistAndPublish(conversationId, remaining) else publish(conversationId, remaining)
         return PendingInputRemoval(item, orphaned)
     }
 
@@ -178,23 +177,17 @@ internal class PendingInputStore(
      * item; the steer itself is never persisted.
      */
     @Synchronized
-    fun takeForSteering(conversationId: Long, itemId: String): PendingSteer? {
+    fun takeForSteering(conversationId: Long, itemId: String): PendingInputItem? {
         val current = ensureLoaded(conversationId)
         val item = current.queue.firstOrNull { it.id == itemId } ?: return null
-        val steer = PendingSteer(
-            id = newId(),
-            conversationId = conversationId,
-            capture = item.capture,
-            createdAt = now(),
-        )
         persistAndPublish(
             conversationId,
             current.copy(
                 queue = current.queue.filterNot { it.id == itemId },
-                steers = current.steers + steer,
+                steers = current.steers + item,
             ),
         )
-        return steer
+        return item
     }
 
     /** Normal completion path: exactly one queued item, in FIFO order. Parked items never qualify. */
@@ -247,13 +240,31 @@ internal class PendingInputStore(
         return orphaned
     }
 
-    /** Removes and returns the conversation's steers in arrival order. */
+    /** Inserts in arrival order, removing each item only after the insertion succeeds. */
+    fun drainSteers(conversationId: Long, insert: (PendingInputCapture) -> Unit) {
+        while (insertNextSteer(conversationId, insert)) {
+            // Release the lock between items so the user can still withdraw later messages.
+        }
+    }
+
+    /** A withdrawal and a history insertion for the same item are mutually exclusive. */
     @Synchronized
-    fun drainSteers(conversationId: Long): List<PendingSteer> {
+    private fun insertNextSteer(conversationId: Long, insert: (PendingInputCapture) -> Unit): Boolean {
+        val current = ensureLoaded(conversationId)
+        val item = current.steers.firstOrNull() ?: return false
+        if (item.capture.composedInput.isNotBlank()) insert(item.capture)
+        publish(conversationId, current.copy(steers = current.steers.drop(1)))
+        return true
+    }
+
+    /** Carries undelivered steers back into the queue without changing their IDs. */
+    @Synchronized
+    fun requeueSteers(conversationId: Long, state: PendingInputState): List<PendingInputItem> {
         val current = ensureLoaded(conversationId)
         if (current.steers.isEmpty()) return emptyList()
-        publish(conversationId, current.copy(steers = emptyList()))
-        return current.steers
+        val carried = current.steers.map { it.copy(state = state) }
+        persistAndPublish(conversationId, current.copy(queue = current.queue + carried, steers = emptyList()))
+        return carried
     }
 
     @Synchronized

@@ -288,13 +288,14 @@ class PendingInputStoreTest {
 
         assertTrue(storage.documents.isEmpty())
         assertEquals(listOf(first, second), store.snapshot(1L).steers)
-        assertEquals(listOf(first, second), store.drainSteers(1L))
+        val inserted = buildList { store.drainSteers(1L) { add(it) } }
+        assertEquals(listOf(first.capture, second.capture), inserted)
         assertTrue(store.snapshot(1L).steers.isEmpty())
         assertEquals(listOf(other), store.snapshot(2L).steers)
 
         store.discardSteers(2L)
         assertTrue(store.snapshot(2L).steers.isEmpty())
-        assertTrue(store.drainSteers(2L).isEmpty())
+        store.drainSteers(2L) { error("Discarded steer was delivered") }
         assertTrue(storage.documents.isEmpty())
     }
 

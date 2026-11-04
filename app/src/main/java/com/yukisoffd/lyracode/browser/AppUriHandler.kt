@@ -26,6 +26,12 @@ internal class AppUriHandler(
             return
         }
 
+        val webIntent = Intent(Intent.ACTION_VIEW, target).addCategory(Intent.CATEGORY_BROWSABLE)
+        val host = target.host
+        if (host.equals("github.com", ignoreCase = true) || host?.endsWith(".github.com", ignoreCase = true) == true) {
+            if (context.tryLaunchLinkIntent(Intent(webIntent).setPackage("com.github.android"))) return
+        }
+
         val packageManager = context.packageManager
         // Resolve a generic web URL, not the destination: verified app links aren't browsers.
         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://"))
@@ -62,17 +68,8 @@ internal class AppUriHandler(
 
         // Do not gate this on resolveActivity/queryIntentActivities. Package visibility and OEM
         // browsers can hide valid handlers; let Android resolve the original URL without a package.
-        val fallback = Intent(Intent.ACTION_VIEW, target).addCategory(Intent.CATEGORY_BROWSABLE)
-        if (defaultPackage == null || defaultPackage == "android") {
-            context.launchLinkIntent(Intent.createChooser(fallback, null))
-        } else {
-            try {
-                context.launchLinkIntent(fallback)
-            } catch (_: ActivityNotFoundException) {
-                context.launchLinkIntent(Intent.createChooser(fallback, null))
-            } catch (_: SecurityException) {
-                context.launchLinkIntent(Intent.createChooser(fallback, null))
-            }
+        if (defaultPackage == null || defaultPackage == "android" || !context.tryLaunchLinkIntent(webIntent)) {
+            context.launchLinkIntent(Intent.createChooser(webIntent, null))
         }
     }
 }
@@ -97,6 +94,15 @@ internal fun buildCustomTabIntent(darkMode: Boolean, toolbarColor: Int): CustomT
 private fun Context.launchLinkIntent(intent: Intent) {
     if (!hasActivity()) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     startActivity(intent)
+}
+
+private fun Context.tryLaunchLinkIntent(intent: Intent): Boolean = try {
+    launchLinkIntent(intent)
+    true
+} catch (_: ActivityNotFoundException) {
+    false
+} catch (_: SecurityException) {
+    false
 }
 
 private tailrec fun Context.hasActivity(): Boolean = when (this) {

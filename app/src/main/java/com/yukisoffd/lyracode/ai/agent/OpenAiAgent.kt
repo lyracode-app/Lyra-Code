@@ -9,6 +9,7 @@ import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.database.sqlite.transaction
 import com.yukisoffd.lyracode.DeviceInfoCollector
 import com.yukisoffd.lyracode.R
 import com.yukisoffd.lyracode.data.ApiProfile
@@ -175,7 +176,20 @@ class OpenAiAgent(
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
     private val tokenizer by lazy { DeepSeekV4Tokenizer.get(context) }
-    private val forcedSkillsByConversation = ConcurrentHashMap<Long, List<String>>()
+    private class RunSkills(initialIds: List<String>) {
+        @Volatile
+        var ids: List<String> = emptyList()
+            private set
+
+        init { add(initialIds) }
+
+        fun add(skillIds: List<String>) {
+            if (skillIds.isEmpty()) return
+            ids = (ids + skillIds).map(String::trim).filter(String::isNotBlank).distinct()
+        }
+    }
+
+    private val forcedSkillsByConversation = ConcurrentHashMap<Long, RunSkills>()
     private val subAgentContexts = ConcurrentHashMap<Long, SubAgentExecutionContext>()
     private val subAgentWriteCoordinator = SubAgentWriteCoordinator()
     private val emailClient = EmailClient(context)
@@ -224,26 +238,18 @@ class OpenAiAgent(
         forcedSkillIds: List<String> = emptyList(),
         onUpdate: suspend (ChatUpdate) -> Unit,
     ) = withContext(Dispatchers.IO) {
-        val normalizedForcedSkillIds = forcedSkillIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
-        if (normalizedForcedSkillIds.isNotEmpty()) {
-            forcedSkillsByConversation[conversationId] = normalizedForcedSkillIds
+        conversationStore.setConversationMeta(
+            conversationId,
+            title = titleFor(conversationId, userInput),
+            status = ConversationStore.STATUS_RUNNING,
+            profileId = profile.id,
+            model = model,
+        )
+        if (!userMessagePersisted) {
+            conversationStore.addMessage(conversationId, "user", userInput, profileId = profile.id, model = model)
         }
-        try {
-            conversationStore.setConversationMeta(
-                conversationId,
-                title = titleFor(conversationId, userInput),
-                status = ConversationStore.STATUS_RUNNING,
-                profileId = profile.id,
-                model = model,
-            )
-            if (!userMessagePersisted) {
-                conversationStore.addMessage(conversationId, "user", userInput, profileId = profile.id, model = model)
-            }
-            onUpdate(ChatUpdate("", "", uiText(R.string.ui_sent)))
-            runLoop(conversationId, profile, model, onUpdate, propagateErrors)
-        } finally {
-            if (normalizedForcedSkillIds.isNotEmpty()) forcedSkillsByConversation.remove(conversationId)
-        }
+        onUpdate(ChatUpdate("", "", uiText(R.string.ui_sent)))
+        runLoop(conversationId, profile, model, onUpdate, propagateErrors, forcedSkillIds)
     }
 
     suspend fun summarizeConversationTopic(
@@ -577,8 +583,11 @@ class OpenAiAgent(
         model: String,
         onUpdate: suspend (ChatUpdate) -> Unit,
         propagateErrors: Boolean = false,
+        forcedSkillIds: List<String> = emptyList(),
     ) {
         var activeAssistantId = 0L
+        val runSkills = RunSkills(forcedSkillIds)
+        forcedSkillsByConversation[conversationId] = runSkills
         try {
             while (true) {
                 currentCoroutineContext().ensureActive()
@@ -599,9 +608,9 @@ class OpenAiAgent(
                 // Steer boundary A: only at the top of a round, after the previous round's tool
                 // results were appended and before the next assistant turn. Never inject a user
                 // message between an assistant tool_call and its tool results.
-                drainSteering(conversationId, profile, model, onUpdate)
+                drainSteering(conversationId, profile, model, runSkills, onUpdate)
                 if (!isMediaGenerationModel(model)) {
-                    ensureRuntimeContextSnapshot(conversationId, profile, model)
+                    ensureRuntimeContextSnapshot(conversationId, profile, model, runSkills.ids)
                 }
                 val assistantId = conversationStore.addMessage(conversationId, "assistant", "", profileId = profile.id, model = model)
                 activeAssistantId = assistantId
@@ -666,7 +675,7 @@ class OpenAiAgent(
                 // was appended, then let the shared decision end the run or continue the loop.
                 // With the default no-op source this is exactly the previous exit.
                 val steered = if (result.toolCalls.isEmpty()) {
-                    drainSteering(conversationId, profile, model, onUpdate)
+                    drainSteering(conversationId, profile, model, runSkills, onUpdate)
                 } else {
                     false
                 }
@@ -762,11 +771,13 @@ class OpenAiAgent(
             }
             onUpdate(ChatUpdate(finalError, "", finalError, errorMessageId))
             if (propagateErrors) throw error
+        } finally {
+            forcedSkillsByConversation.remove(conversationId, runSkills)
         }
     }
 
     /**
-     * Persists queued steer texts as ordinary user turns and reports whether anything was drained.
+     * Persists the composed user turn and adds its forced Skills to the next round's context.
      *
      * Scoped (foreground/sub-agent) runs own their conversation, so steering is refused there.
      * With the default [NoOpSteerSource] this performs no store write, no update and no status change.
@@ -775,18 +786,24 @@ class OpenAiAgent(
         conversationId: Long,
         profile: ApiProfile,
         model: String,
+        runSkills: RunSkills,
         onUpdate: suspend (ChatUpdate) -> Unit,
     ): Boolean {
         if (!steeringAvailable(hasScopedTools = scopedToolsFor(conversationId) != null)) return false
+        val coroutineContext = currentCoroutineContext()
         var drained = false
-        for (text in steerSource.drain(conversationId)) {
-            if (text.isBlank()) continue
-            conversationStore.addMessage(conversationId, "user", text, profileId = profile.id, model = model)
-            // A zero message id makes the controller reload history, which inserts the steered
-            // user bubble as a normal turn; the next provider request is built from the store.
-            onUpdate(ChatUpdate("", "", uiText(R.string.status_message_steered), forceReload = true))
+        steerSource.drain(conversationId) { capture ->
+            coroutineContext.ensureActive()
+            conversationStore.writableDatabase.transaction {
+                val messageId = conversationStore.addMessage(
+                    conversationId, "user", capture.composedInput, profileId = profile.id, model = model,
+                )
+                check(messageId > 0L) { "Could not insert queued message into conversation" }
+            }
+            runSkills.add(capture.forcedSkillIds)
             drained = true
         }
+        if (drained) onUpdate(ChatUpdate("", "", uiText(R.string.status_message_steered), forceReload = true))
         return drained
     }
 
@@ -1441,11 +1458,16 @@ class OpenAiAgent(
         return message
     }
 
-    private fun ensureRuntimeContextSnapshot(conversationId: Long, profile: ApiProfile, model: String) {
+    private fun ensureRuntimeContextSnapshot(
+        conversationId: Long,
+        profile: ApiProfile,
+        model: String,
+        forcedSkillIds: List<String>,
+    ) {
         if (settings.purePromptMode) return
         val conversation = conversationStore.conversation(conversationId)
         val messages = conversationStore.messages(conversationId)
-        val snapshot = runtimeContextSnapshot(conversationId)
+        val snapshot = runtimeContextSnapshot(conversationId, forcedSkillIds)
         if (!shouldAppendRuntimeContext(messages, conversation?.compressedThroughMessageId ?: 0L, snapshot)) return
         conversationStore.addMessage(
             conversationId = conversationId,
@@ -1456,11 +1478,14 @@ class OpenAiAgent(
         )
     }
 
-    private fun runtimeContextSnapshot(conversationId: Long): String {
+    private fun runtimeContextSnapshot(
+        conversationId: Long,
+        forcedSkillIds: List<String> = forcedSkillsByConversation[conversationId]?.ids.orEmpty(),
+    ): String {
         if (scopedToolsFor(conversationId)?.includesNativeTools == false) return "Foreground device task: use only the explicitly scoped device tools."
         return buildRuntimeContextSnapshot(
             memoryPrompt = settings.memoryPrompt(),
-            activeSkillsPrompt = settings.activeSkillsPrompt(forcedSkillIdsFor(conversationId)),
+            activeSkillsPrompt = settings.activeSkillsPrompt(forcedSkillIds),
             sessionContext = sessionContextPayload(),
             subAgentAssignment = subAgentAssignmentSystemMessage(conversationId)?.optString("content"),
         )
@@ -3446,8 +3471,6 @@ class OpenAiAgent(
             "content",
             "LYRA_USER_SELECTED_SYSTEM_PROMPT_V1\n${settings.activeSystemPromptText().ifBlank { "(none; use the native Lyra protocol)" }}",
         )
-
-    private fun forcedSkillIdsFor(conversationId: Long): List<String> = forcedSkillsByConversation[conversationId].orEmpty()
 
     private fun estimatedPromptInputTokens(conversationId: Long, excludeMessageId: Long, model: String): Long {
         if (isMediaGenerationModel(model)) {

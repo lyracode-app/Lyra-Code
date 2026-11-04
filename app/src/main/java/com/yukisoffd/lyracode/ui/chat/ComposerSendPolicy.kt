@@ -28,12 +28,12 @@ internal fun composerHasSendableContent(
 internal fun composerCanSendParked(runActive: Boolean): Boolean = !runActive
 
 /** The per-message action a queue row exposes. */
-internal enum class ComposerQueueRowAction { NONE, SEND_NOW, STEER }
+internal enum class ComposerQueueRowAction { NONE, SEND_NOW, STEER, STEER_PENDING }
 
 /**
  * While a run is active, a queue row's action steers that message into the run instead of
- * waiting for the queue drain. Steering carries text only, so an item with attachments keeps
- * its place in the queue and exposes no steer action. An idle conversation can only send a
+ * waiting for the queue drain. Items with uploads use ordinary queue delivery.
+ * An idle conversation can only send a
  * parked item manually; a queued item is already owned by the drain.
  */
 internal fun composerQueueRowAction(
@@ -42,6 +42,7 @@ internal fun composerQueueRowAction(
     steerAccepted: Boolean,
     attachmentCount: Int,
 ): ComposerQueueRowAction = when {
+    state == ComposerQueueItemState.WAITING_TO_INSERT -> ComposerQueueRowAction.STEER_PENDING
     runActive && steerAccepted && attachmentCount == 0 -> ComposerQueueRowAction.STEER
     runActive -> ComposerQueueRowAction.NONE
     state == ComposerQueueItemState.PARKED -> ComposerQueueRowAction.SEND_NOW

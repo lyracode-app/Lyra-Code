@@ -1362,6 +1362,7 @@
     <string name="composer_queue_dock_collapse">Collapse queued messages</string>
     <string name="composer_queue_state_queued">Queued</string>
     <string name="composer_queue_state_parked">Parked</string>
+    <string name="composer_queue_state_waiting_to_insert">Waiting to insert</string>
     <string name="composer_queue_attachment_count">Attachments: %1$d</string>
     <string name="composer_queue_remove_description">Remove queued message: %1$s</string>
     <string name="composer_queue_send_now_description">Send now: %1$s</string>

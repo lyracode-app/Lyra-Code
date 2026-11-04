@@ -1445,6 +1445,7 @@
     <string name="composer_queue_dock_collapse">收合佇列訊息</string>
     <string name="composer_queue_state_queued">佇列中</string>
     <string name="composer_queue_state_parked">已暫停</string>
+    <string name="composer_queue_state_waiting_to_insert">等待插入</string>
     <string name="composer_queue_attachment_count">附件：%1$d</string>
     <string name="composer_queue_remove_description">移除佇列訊息：%1$s</string>
     <string name="composer_queue_send_now_description">立即傳送：%1$s</string>
