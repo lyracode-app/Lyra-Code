@@ -53,6 +53,11 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-started authenticated web companion for live conversations and file uploads; stopped by the user" />
         </service>
+        <service android:name=".ai.AgentRunForegroundService" android:exported="false"
+            android:foregroundServiceType="specialUse" android:stopWithTask="true">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started agent run that keeps the current conversation working while the app is in the background; stopped by the user or when the run ends" />
+        </service>
         <service
             android:name=".interaction.overlay.ManualControlForegroundService"
             android:exported="false"

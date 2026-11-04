@@ -359,6 +359,10 @@ internal object DeviceTaskCoordinator {
     @Synchronized
     fun isRunningConversation(id: Long): Boolean = job?.isActive == true && conversationId == id
 
+    /** True while a scoped device task owns any conversation. */
+    @Synchronized
+    fun isRunning(): Boolean = job?.isActive == true
+
     /**
      * Registers a listener for the end of a scoped device task on its conversation.
      * The listener runs on the completing task's thread (not Main) and must not touch
