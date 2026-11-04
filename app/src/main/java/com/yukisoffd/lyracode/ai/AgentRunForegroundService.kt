@@ -143,7 +143,7 @@ class AgentRunForegroundService : Service() {
         /**
          * Records a run that began anywhere in the process and asks for the foreground.
          * [finish] is its pair; the service stops only when the last run in the process ends,
-         * because a recreated controller may own a newer run than the caller.
+         * whichever controller started it.
          */
         fun start(context: Context) {
             lifecycle.onRunStarted()
