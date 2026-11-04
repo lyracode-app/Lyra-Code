@@ -91,6 +91,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.ai.ModelReachabilityResult
 import com.yukisoffd.lyracode.ai.ProviderReachabilityResult
+import com.yukisoffd.lyracode.ai.SubAgentLimits
 import com.yukisoffd.lyracode.data.ApiProfile
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.MediaGenerationKind
@@ -1538,6 +1539,40 @@ internal fun ScreenCenterNotice(
     }
 }
 @Composable
+private fun SubAgentLimitRow(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onChange: (Int) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        IconButton(
+            enabled = value > range.first,
+            onClick = { onChange((value - 1).coerceIn(range.first, range.last)) },
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.action_decrease),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) {
+            Text("$value", style = MaterialTheme.typography.bodyMedium)
+        }
+        IconButton(
+            enabled = value < range.last,
+            onClick = { onChange((value + 1).coerceIn(range.first, range.last)) },
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.action_increase),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+@Composable
 internal fun SubAgentSettings(settings: AppSettings, controller: ChatController) {
     var revision by remember { mutableIntStateOf(0) }
     var agents by remember(revision, controller.settingsRevision.intValue) { mutableStateOf(settings.subAgents()) }
@@ -1567,6 +1602,35 @@ internal fun SubAgentSettings(settings: AppSettings, controller: ChatController)
                             controller.settingsRevision.intValue++
                             revision++
                         },
+                    )
+                }
+            }
+            KimiCardBox {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SubAgentLimitRow(
+                        label = stringResource(R.string.label_sub_agent_max_tasks),
+                        value = settings.subAgentMaxTasks,
+                        range = 1..SubAgentLimits.HARD_MAX_TASKS,
+                        onChange = {
+                            settings.subAgentMaxTasks = it
+                            controller.settingsRevision.intValue++
+                            revision++
+                        },
+                    )
+                    SubAgentLimitRow(
+                        label = stringResource(R.string.label_sub_agent_max_concurrency),
+                        value = settings.subAgentMaxConcurrency,
+                        range = 1..settings.subAgentMaxTasks,
+                        onChange = {
+                            settings.subAgentMaxConcurrency = it
+                            controller.settingsRevision.intValue++
+                            revision++
+                        },
+                    )
+                    Text(
+                        stringResource(R.string.sub_agent_limits_hint),
+                        color = KimiMuted,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }

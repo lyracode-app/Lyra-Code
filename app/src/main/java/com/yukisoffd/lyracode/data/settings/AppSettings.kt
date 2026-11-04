@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.yukisoffd.lyracode.R
+import com.yukisoffd.lyracode.ai.SubAgentLimits
 import com.yukisoffd.lyracode.mcp.McpJsonConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -754,6 +755,34 @@ class AppSettings(context: Context) {
     var subAgentOrchestrationEnabled: Boolean
         get() = plainPrefs.getBoolean(KEY_SUB_AGENT_ORCHESTRATION_ENABLED, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_SUB_AGENT_ORCHESTRATION_ENABLED, value).apply()
+
+    /** Largest batch of sub-agent tasks the tool schema offers and the runtime accepts. */
+    var subAgentMaxTasks: Int
+        get() = SubAgentLimits.normalizeTaskLimit(
+            plainPrefs.getInt(KEY_SUB_AGENT_MAX_TASKS, SubAgentLimits.DEFAULT_MAX_TASKS),
+        )
+        set(value) {
+            // Store the clamped concurrency too, so lowering the limit and raising it again
+            // cannot resurrect a concurrency the user never chose at this limit.
+            val tasks = SubAgentLimits.normalizeTaskLimit(value)
+            plainPrefs.edit()
+                .putInt(KEY_SUB_AGENT_MAX_TASKS, tasks)
+                .putInt(
+                    KEY_SUB_AGENT_MAX_CONCURRENCY,
+                    SubAgentLimits.normalizeConcurrency(subAgentMaxConcurrency, tasks),
+                )
+                .apply()
+        }
+
+    /** How many sub-agent tasks may run at once. 1 keeps the sequential behaviour. */
+    var subAgentMaxConcurrency: Int
+        get() = SubAgentLimits.normalizeConcurrency(
+            plainPrefs.getInt(KEY_SUB_AGENT_MAX_CONCURRENCY, SubAgentLimits.DEFAULT_MAX_CONCURRENCY),
+            subAgentMaxTasks,
+        )
+        set(value) = plainPrefs.edit()
+            .putInt(KEY_SUB_AGENT_MAX_CONCURRENCY, SubAgentLimits.normalizeConcurrency(value, subAgentMaxTasks))
+            .apply()
 
     fun subAgents(): List<SubAgentConfig> {
         val raw = plainPrefs.getString(KEY_SUB_AGENT_CONFIGS, null).orEmpty()
@@ -1631,6 +1660,7 @@ class AppSettings(context: Context) {
             })
             .put("miniServer", miniServerConfigJson(miniServerConfig(), includeSecrets))
             .put("localMcpServer", localMcpServerConfigJson(localMcpServerConfig(), includeSecrets))
+            .also { SubAgentLimits.writeExport(it, subAgentMaxTasks, subAgentMaxConcurrency) }
     }
 
     fun importSettingsJson(root: JSONObject, mode: String): String {
@@ -1731,6 +1761,10 @@ class AppSettings(context: Context) {
             messages += "媒体生成模型 ${array.length()} 项"
         }
         if (root.has("subAgentOrchestrationEnabled")) subAgentOrchestrationEnabled = root.optBoolean("subAgentOrchestrationEnabled")
+        SubAgentLimits.readImport(root)?.let { imported ->
+            subAgentMaxTasks = imported.maxTasks
+            subAgentMaxConcurrency = imported.maxConcurrency
+        }
         root.optJSONArray("subAgents")?.let { array ->
             val imported = parseSubAgents(array)
             saveSubAgents(if (supplement) mergeBy(subAgents(), imported) { it.id } else imported)
@@ -2427,6 +2461,8 @@ class AppSettings(context: Context) {
         private const val KEY_SYSTEM_PROMPT_CONFIGS = "system_prompt_configs"
         private const val KEY_REASONING_DEPTH = "reasoning_depth"
         private const val KEY_SUB_AGENT_ORCHESTRATION_ENABLED = "sub_agent_orchestration_enabled"
+        private const val KEY_SUB_AGENT_MAX_TASKS = "sub_agent_max_tasks"
+        private const val KEY_SUB_AGENT_MAX_CONCURRENCY = "sub_agent_max_concurrency"
         private const val KEY_SUB_AGENT_CONFIGS = "sub_agent_configs"
         private const val KEY_WEB_SEARCH_BLACKLIST = "web_search_blacklist"
         private const val KEY_DEEPSEEK_SEARCH_CONFIG = "deepseek_search_config"
