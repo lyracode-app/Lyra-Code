@@ -1,7 +1,5 @@
 package com.yukisoffd.lyracode
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -105,6 +103,7 @@ internal fun ChatGptSignInPage(
     val client = remember(settings) { settings.chatGptAccount }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var accounts by remember { mutableStateOf<List<ChatGptAccount>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -135,7 +134,7 @@ internal fun ChatGptSignInPage(
                     if (codex) ChatGptCodexProtocol.CLIENT_ID else selected?.clientId ?: pendingRegistrationId, codex).also { created = it } }
                 listener = local
                 val url = withContext(Dispatchers.IO) { ChatGptProtocol.authorizationUrl(local.attempt, client.hostId(), selected) }
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url.toString())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                uriHandler.openUri(url.toString())
                 notice = context.getString(R.string.chatgpt_waiting_for_browser)
                 val callback = withContext(Dispatchers.IO) { local.awaitCallback() }
                 val signedIn = withContext(Dispatchers.IO) { client.completeSignIn(local.attempt, callback, selected) }

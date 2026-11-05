@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="button_group_auto">Auto detect</string>
+    <string name="button_group_smart">Smart</string>
+    <string name="button_group_text">Text</string>
+    <string name="button_group_code">Code</string>
+    <string name="button_group_terminal">Terminal</string>
+</resources>

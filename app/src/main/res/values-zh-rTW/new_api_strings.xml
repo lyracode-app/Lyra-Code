@@ -28,7 +28,7 @@
     <string name="new_api_sync">同步 Key 與模型</string>
     <string name="new_api_refresh_user">重新整理使用者資訊</string>
     <string name="new_api_logout">登出平台帳號</string>
-    <string name="new_api_logout_hint">登出將清除本機帳號登入狀態；已設定的模型服務及 Key 仍保留，可在模型服務中移除。</string>
+    <string name="new_api_logout_hint">登出會關閉自動登入並清除本機登入狀態，已記住的帳密供下次手動登入使用；已設定的模型服務及 Key 仍保留，可在模型服務中移除。</string>
     <string name="new_api_signed_out">已登出。</string>
     <string name="new_api_request_failed">平台請求失敗，請重試。</string>
     <string name="new_api_user_id">使用者 ID</string>
@@ -39,7 +39,7 @@
     <string name="new_api_request_count">請求次數</string>
     <string name="new_api_quota_hint">平台額度單位：500,000 = 1 夢汐幣。應用程式新建 Key 預設無限額度、不限制模型、自動群組；Key 無限額度不會增加帳號餘額。</string>
     <string name="new_api_close">關閉</string>
-    <string name="new_api_account_data">夢汐 API 帳號完全可選，由 api.huanyan.fun 第三方平台提供。僅在註冊、登入、登出、重新整理或同步時連線至該平台，並按對應操作傳送所需的使用者名稱、密碼、電子郵件、驗證碼、選填邀請碼、帳號存取權杖或更新 Cookie。應用程式不儲存密碼。使用者資訊、登入 Cookie 和 API Key 儲存在裝置內；帳號登入狀態不納入應用程式備份及 Android 雲端備份、裝置移轉。主副模型 Key 僅在備份中勾選包含金鑰時匯出。帳號同步不會上傳本機對話、附件及其他設定。使用該平台模型服務時，模型請求內容會直接傳送至該平台，適用其自身協議與隱私權政策。登出會清除本機登入狀態並嘗試登出目前平台工作階段；已設定的模型服務和 Key 保留至手動移除。</string>
+    <string name="new_api_account_data">夢汐 API 帳號完全可選，由 api.huanyan.fun 第三方平台提供。僅在註冊、登入、登出、重新整理、同步或已開啟的自動登入檢查、恢復登入狀態時連線至該平台，並按對應操作傳送所需的使用者名稱、密碼、電子郵件、驗證碼、選填邀請碼、帳號存取權杖或更新 Cookie。僅在勾選「記住帳密」後將帳密加密儲存在本機。開啟自動登入後，應用程式啟動時會檢查登入狀態，失效時使用已儲存的帳密再次登入；兩步驟驗證需手動完成。使用者資訊、登入 Cookie 和 API Key 儲存在裝置內；帳號登入狀態及記住的帳密不納入應用程式備份及 Android 雲端備份、裝置移轉。主副模型 Key 僅在備份中勾選包含金鑰時匯出。帳號同步不會上傳本機對話、附件及其他設定。使用該平台模型服務時，模型請求內容會直接傳送至該平台，適用其自身協議與隱私權政策。手動登出會關閉自動登入，保留已記住的帳密供下次手動登入，清除本機登入狀態並嘗試登出目前平台工作階段；已設定的模型服務和 Key 保留至手動移除。</string>
     <string name="new_api_email_address">電子郵件</string>
     <string name="new_api_user_refreshed">使用者資訊已重新整理。</string>
     <string name="mengxi_platform_name">夢汐 API</string>
@@ -52,4 +52,8 @@
     <string name="mengxi_open_website">造訪夢汐 API 官網</string>
     <string name="mengxi_coin_amount">%1$s 夢汐幣</string>
     <string name="provider_hold_to_reveal_key">按住顯示此 API Key，放開隱藏</string>
+    <string name="new_api_remember_credentials">記住帳密</string>
+    <string name="new_api_auto_login">自動登入</string>
+    <string name="new_api_saved_login_hint">帳密加密儲存在本機，下次登入時自動填入。自動登入需要先記住帳密；手動登出會關閉自動登入，兩步驟驗證仍需手動完成。</string>
+    <string name="new_api_secure_storage_unavailable">本機加密儲存無法使用，仍可登入，但無法記住帳密。</string>
 </resources>

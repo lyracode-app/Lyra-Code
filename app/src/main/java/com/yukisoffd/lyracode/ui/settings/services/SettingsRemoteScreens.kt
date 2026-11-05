@@ -871,10 +871,11 @@ internal fun SshServerDialog(
                     OutlinedTextField(value = username, onValueChange = { username = it }, modifier = Modifier.weight(2f), label = { Text(uiText(R.string.label_username)) }, singleLine = true)
                 }
                 Text(uiText(R.string.label_auth_method), style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MaterialChoiceButton(uiText(R.string.auth_password), authType == AppSettings.SSH_AUTH_PASSWORD) { authType = AppSettings.SSH_AUTH_PASSWORD }
-                    MaterialChoiceButton(uiText(R.string.auth_private_key), authType == AppSettings.SSH_AUTH_KEY) { authType = AppSettings.SSH_AUTH_KEY }
-                }
+                MaterialButtonGroup(
+                    options = listOf(AppSettings.SSH_AUTH_PASSWORD to uiText(R.string.auth_password), AppSettings.SSH_AUTH_KEY to uiText(R.string.auth_private_key)),
+                    selected = authType,
+                    onSelect = { authType = it },
+                )
                 if (authType == AppSettings.SSH_AUTH_PASSWORD) {
                     OutlinedTextField(value = password, onValueChange = { password = it }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.auth_password)) }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
                 } else {

@@ -94,7 +94,7 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
         }
     }
     LaunchedEffect(account) {
-        if (account.isLoggedIn) {
+        if (account.isLoggedIn || account.savedLogin?.autoLogin == true) {
             val entryNotice = notice
             runAction { account.refreshUser(); entryNotice }
         }

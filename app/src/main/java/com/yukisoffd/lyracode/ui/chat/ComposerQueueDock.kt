@@ -37,8 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** Whether a queued message is waiting for the active run to end or was parked by a stop/error. */
-internal enum class ComposerQueueItemState { QUEUED, PARKED }
+internal enum class ComposerQueueItemState { QUEUED, PARKED, WAITING_TO_INSERT }
 
 internal data class ComposerQueueRowUi(
     val id: String,
@@ -67,8 +66,10 @@ internal fun ComposerQueueDock(
     modifier: Modifier = Modifier,
 ) {
     var expanded by rememberSaveable(conversationId) { mutableStateOf(false) }
-    LaunchedEffect(items.isEmpty()) {
+    val hasWaitingSteer = items.any { it.state == ComposerQueueItemState.WAITING_TO_INSERT }
+    LaunchedEffect(items.isEmpty(), hasWaitingSteer) {
         if (items.isEmpty()) expanded = false
+        else if (hasWaitingSteer) expanded = true
     }
     if (items.isEmpty()) return
     val collapsible = items.size > 1
@@ -147,10 +148,10 @@ private fun ComposerQueueRow(
     val steerDescription = stringResource(R.string.composer_queue_steer_description, item.excerpt)
     val removeDescription = stringResource(R.string.composer_queue_remove_description, item.excerpt)
     val stateLabel = stringResource(
-        if (item.state == ComposerQueueItemState.PARKED) {
-            R.string.composer_queue_state_parked
-        } else {
-            R.string.composer_queue_state_queued
+        when (item.state) {
+            ComposerQueueItemState.PARKED -> R.string.composer_queue_state_parked
+            ComposerQueueItemState.QUEUED -> R.string.composer_queue_state_queued
+            ComposerQueueItemState.WAITING_TO_INSERT -> R.string.composer_queue_state_waiting_to_insert
         },
     )
     Row(
@@ -198,9 +199,10 @@ private fun ComposerQueueRow(
             }
         }
         when (action) {
-            ComposerQueueRowAction.STEER -> QueueRowActionButton(
+            ComposerQueueRowAction.STEER, ComposerQueueRowAction.STEER_PENDING -> QueueRowActionButton(
                 description = steerDescription,
                 onClick = { onSteer(item.id) },
+                enabled = action == ComposerQueueRowAction.STEER,
             )
             ComposerQueueRowAction.SEND_NOW -> QueueRowActionButton(
                 description = sendNowDescription,
@@ -229,20 +231,22 @@ private fun ComposerQueueRow(
 private fun QueueRowActionButton(
     description: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
+    val colors = MaterialTheme.colorScheme
     Box(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary)
-            .clickable(onClick = onClick),
+            .background(if (enabled) colors.primary else colors.onSurface.copy(alpha = 0.12f))
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             Icons.Default.Send,
             contentDescription = description,
             modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = if (enabled) colors.onPrimary else colors.onSurface.copy(alpha = 0.38f),
         )
     }
 }

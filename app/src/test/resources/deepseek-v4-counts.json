@@ -1,0 +1,1090 @@
+{
+  "reference": "Hugging Face tokenizers 0.22.2, encode(add_special_tokens=False)",
+  "source_sha256": "89085f12ef79460ac5f66d1119325ddfc694b4ab209d80bbd81d35f081dc9614",
+  "cases": [
+    {
+      "text": "",
+      "count": 0
+    },
+    {
+      "text": " ",
+      "count": 1
+    },
+    {
+      "text": "  ",
+      "count": 1
+    },
+    {
+      "text": "   ",
+      "count": 1
+    },
+    {
+      "text": "\t",
+      "count": 1
+    },
+    {
+      "text": "\n",
+      "count": 1
+    },
+    {
+      "text": "\r\n",
+      "count": 2
+    },
+    {
+      "text": "\n\t",
+      "count": 2
+    },
+    {
+      "text": "\t \n\n",
+      "count": 2
+    },
+    {
+      "text": "Hello!",
+      "count": 2
+    },
+    {
+      "text": "hello world",
+      "count": 2
+    },
+    {
+      "text": "你好，世界！",
+      "count": 4
+    },
+    {
+      "text": "Hello 你好 😀 مرحبا Привет नमस्ते こんにちは 한국어",
+      "count": 21
+    },
+    {
+      "text": "😀",
+      "count": 2
+    },
+    {
+      "text": "👩🏽‍💻👨‍👩‍👧‍👦🏳️‍🌈",
+      "count": 23
+    },
+    {
+      "text": "café café naïve ﬃ ＡＢＣ",
+      "count": 12
+    },
+    {
+      "text": "1234567890 000123 １２３４５６ ١٢٣٤٥٦ ⅧⅨⅩ ²³⁴",
+      "count": 35
+    },
+    {
+      "text": "I'm we're can't I'LL .hello /path/to/file.py snake_case camelCase",
+      "count": 20
+    },
+    {
+      "text": "print(\"你好\")\n\treturn 123.456e-78 # test\r\n",
+      "count": 16
+    },
+    {
+      "text": "<｜begin▁of▁sentence｜><｜User｜>你好<｜Assistant｜><think>reason</think>answer<｜end▁of▁sentence｜>",
+      "count": 9
+    },
+    {
+      "text": "<｜begin▁of▁repo▁name｜>LyraCode<｜end▁of▁repo▁name｜>\n<｜begin▁of▁file▁name｜>main.kt<｜end▁of▁file▁name｜><｜begin▁of▁file｜>fun main() {}<｜end▁of▁file｜>",
+      "count": 17
+    },
+    {
+      "text": "｜DSML｜<｜action｜><｜query｜>搜索项目<｜answer｜>结果<｜latest_reminder｜>",
+      "count": 8
+    },
+    {
+      "text": "<｜begin▁of▁file｜",
+      "count": 10
+    },
+    {
+      "text": "<｜begin▁of▁file｜>x<｜end▁of▁file｜>",
+      "count": 3
+    },
+    {
+      "text": "\u0000\u0001\u001b      　",
+      "count": 18
+    },
+    {
+      "text": "ＡαЖאاकก中あア한𠀀𐐀😀",
+      "count": 20
+    },
+    {
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "count": 1250
+    },
+    {
+      "text": "这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n这是超长工具结果，包含中文与 English 12345。\n",
+      "count": 4200
+    },
+    {
+      "text": " \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t \n\t",
+      "count": 2000
+    },
+    {
+      "text": "｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜｜DSML｜",
+      "count": 1000
+    },
+    {
+      "text": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+      "count": 248
+    },
+    {
+      "text": "١٢٣٤Приветtokenizer DeepSeek V4١٢٣٤١٢٣٤1234567890<｜Assistant｜>éößनमस्ते<｜begin▁of▁file｜> DeepSeek V4١٢٣٤١٢٣٤！？，。नमस्ते\t한국어  ١٢٣٤ DeepSeek V41234567890 <｜begin▁of▁file｜>\n\r\n\r\n\tabcこんにちは1234567890 👩🏽‍💻  é<｜Assistant｜>  １２３４５abc<｜User｜>",
+      "count": 116
+    },
+    {
+      "text": "1234567890{}[]();:=<>١٢٣٤tokenizer中文分词测试𠀀𐐀\r\n{}[]();:=<>١٢٣٤\n<｜begin▁of▁file｜>",
+      "count": 40
+    },
+    {
+      "text": "｜DSML｜    こんにちは.foo/bar_name{}[]();:=<>éöß DeepSeek V4 Hello😀😃<｜Assistant｜>مرحبا  中文分词测试한국어👩🏽‍💻１２３４５١٢٣٤Привет{}[]();:=<>한국어مرحبا１２３４５١٢٣٤.foo/bar_name",
+      "count": 84
+    },
+    {
+      "text": "\n1234567890مرحبا{}[]();:=<> DeepSeek V4👩🏽‍💻.foo/bar_name！？，。.foo/bar_name😀😃Helloéöß.foo/bar_name<｜Assistant｜>👩🏽‍💻<｜begin▁of▁file｜>.foo/bar_name     tokenizeréöß😀😃<｜Assistant｜>１２３４５  1234567890tokenizerمرحبا  こんにちは\n{}[]();:=<>tokenizerनमस्तेمرحبا \n١٢٣٤Привет DeepSeek V4 DeepSeek V4नमस्तेabc١٢٣٤١٢٣٤😀😃\r\n中文分词测试{}[]();:=<>مرحبا\u0000<｜begin▁of▁file｜>١٢٣٤Привет<｜User｜>\u0000 DeepSeek V4١٢٣٤  ｜DSML｜éöß中文分词测试 中文分词测试Привет👩🏽‍💻١٢٣٤١٢٣٤{}[]();:=<>😀😃\u0000！？，。𠀀𐐀<｜Assistant｜>١٢٣٤    ١٢٣٤ ",
+      "count": 248
+    },
+    {
+      "text": "  <｜begin▁of▁file｜>｜DSML｜Hello\u0000！？，。１２３４５\nمرحبا👩🏽‍💻<｜Assistant｜>😀😃abc<｜begin▁of▁file｜>éöß١٢٣٤中文分词测试<｜begin▁of▁file｜>1234567890Hello١٢٣٤{}[]();:=<>Hello\tПривет한국어\n한국어\r\nこんにちは\u0000｜DSML｜\u0000éabc\r\n1234567890中文分词测试é！？，。مرحبا DeepSeek V4 DeepSeek V4नमस्तेé١٢٣٤Helloनमस्ते\t DeepSeek V4.foo/bar_name<｜begin▁of▁file｜><｜User｜>😀😃<｜Assistant｜><｜Assistant｜>中文分词测试👩🏽‍💻Привет1234567890<｜User｜>\n١٢٣٤\n<｜begin▁of▁file｜>",
+      "count": 170
+    },
+    {
+      "text": "éößabc👩🏽‍💻abcनमस्ते😀😃مرحبا😀😃    ！？，。！？，。𠀀𐐀Приветé👩🏽‍💻é한국어\t😀😃한국어\r\n\u0000é１２３４５abcمرحبا DeepSeek V4\u0000👩🏽‍💻こんにちは𠀀𐐀𠀀𐐀  .foo/bar_name👩🏽‍💻  Приветéöß<｜begin▁of▁file｜>नमस्तेمرحبا\tПриветHello1234567890abc\t中文分词测试Привет<｜User｜>tokenizer한국어   DeepSeek V4नमस्ते中文分词测试<｜User｜>中文分词测试１２３４５한국어Hello abcHello  ！？，。\u0000éöß",
+      "count": 198
+    },
+    {
+      "text": "abcéöß한국어.foo/bar_name DeepSeek V4{}[]();:=<>中文分词测试",
+      "count": 24
+    },
+    {
+      "text": "<｜Assistant｜>Приветéöß\r\n    \u0000<｜User｜>é  １２３４５１２３４５    <｜Assistant｜>{}[]();:=<>한국어こんにちは DeepSeek V4١٢٣٤  ！？，。नमस्ते😀😃abc١٢٣٤👩🏽‍💻１２３４５<｜Assistant｜> DeepSeek V4한국어    {}[]();:=<>こんにちは<｜User｜>مرحبا1234567890｜DSML｜𠀀𐐀",
+      "count": 116
+    },
+    {
+      "text": "tokenizer١٢٣٤\u0000｜DSML｜",
+      "count": 9
+    },
+    {
+      "text": "𠀀𐐀\t<｜User｜>\r\n😀😃<｜User｜>éöß<｜begin▁of▁file｜> DeepSeek V4.foo/bar_name",
+      "count": 29
+    },
+    {
+      "text": "中文分词测试👩🏽‍💻\u0000<｜User｜>\u0000        HelloПривет한국어！？，。こんにちは😀😃é\téöß١٢٣٤😀😃é１２３４５abc<｜begin▁of▁file｜>abc<｜begin▁of▁file｜>{}[]();:=<>👩🏽‍💻｜DSML｜abcこんにちは\t！？，。 👩🏽‍💻こんにちはこんにちは👩🏽‍💻𠀀𐐀é中文分词测试 DeepSeek V4مرحبا<｜Assistant｜>😀😃\ntokenizerこんにちは😀😃👩🏽‍💻مرحباПривет\n.foo/bar_name1234567890😀😃tokenizerこんにちはé한국어！？，。Привет｜DSML｜\n𠀀𐐀中文分词测试Hello中文分词测试.foo/bar_name１２３４５한국어.foo/bar_nametokenizer😀😃𠀀𐐀Приветéöß",
+      "count": 238
+    },
+    {
+      "text": "！？，。😀😃Привет    <｜Assistant｜>नमस्ते\nمرحبا.foo/bar_nameこんにちは👩🏽‍💻مرحبا\néこんにちは  مرحبا👩🏽‍💻ééöß１２３４５<｜begin▁of▁file｜>\néöß😀😃١٢٣٤tokenizer<｜User｜>Hello<｜Assistant｜>中文分词测试１２３４５.foo/bar_nameHello.foo/bar_nameПривет١٢٣٤１２３４５<｜User｜>｜DSML｜    １２３４５👩🏽‍💻\u0000😀😃éößtokenizer",
+      "count": 138
+    },
+    {
+      "text": "    ｜DSML｜नमस्ते\n\tمرحبا <｜User｜>한국어𠀀𐐀Приветمرحباこんにちは\nनमस्ते<｜Assistant｜>abcabctokenizer abc\r\n\t😀😃<｜Assistant｜>👩🏽‍💻\n नमस्ते！？，。！？，。    👩🏽‍💻中文分词测试١٢٣٤１２３４５1234567890{}[]();:=<>！？，。！？，。한국어{}[]();:=<>{}[]();:=<>こんにちは",
+      "count": 128
+    },
+    {
+      "text": "｜DSML｜\u0000\r\n नमस्ते👩🏽‍💻𠀀𐐀こんにちは👩🏽‍💻\r\n<｜User｜>１２３４５éöß  한국어｜DSML｜{}[]();:=<><｜begin▁of▁file｜> DeepSeek V4é｜DSML｜  tokenizer한국어١٢٣٤Привет1234567890",
+      "count": 81
+    },
+    {
+      "text": "<｜User｜>مرحباéöß <｜User｜>👩🏽‍💻{}[]();:=<>中文分词测试𠀀𐐀<｜Assistant｜><｜begin▁of▁file｜>\n\n한국어𠀀𐐀é｜DSML｜\t\r\n！？，。\nabcHello１２３４５😀😃é！？，。！？，。ééößéöß中文分词测试<｜Assistant｜>！？，。    <｜Assistant｜>{}[]();:=<><｜User｜>\r\n    Привет.foo/bar_name DeepSeek V4👩🏽‍💻éößПривет\u0000Hello\n<｜User｜>\nこんにちは<｜User｜>｜DSML｜    éöß<｜Assistant｜>.foo/bar_name",
+      "count": 142
+    },
+    {
+      "text": "éöß１２３４５  <｜begin▁of▁file｜>é    こんにちは1234567890مرحبا.foo/bar_name1234567890١٢٣٤Привет {}[]();:=<>Привет１２３４５こんにちは１２３４５😀😃1234567890｜DSML｜١٢٣٤abc<｜begin▁of▁file｜>１２３４５ DeepSeek V4👩🏽‍💻 DeepSeek V4👩🏽‍💻  \u0000    éöß DeepSeek V4<｜begin▁of▁file｜><｜begin▁of▁file｜>tokenizer中文分词测试Hello é{}[]();:=<>abctokenizer한국어éöß",
+      "count": 142
+    },
+    {
+      "text": "<｜Assistant｜>｜DSML｜éöß｜DSML｜한국어<｜begin▁of▁file｜>  नमस्तेनमस्ते！？，。👩🏽‍💻｜DSML｜HelloHello\r\n！？，。こんにちは<｜begin▁of▁file｜>  こんにちはHelloこんにちは\u0000\r\n{}[]();:=<>Привет1234567890１２３４５\r\n！？，。tokenizer<｜User｜>\u0000    中文分词测试한국어1234567890こんにちはtokenizer.foo/bar_nameHello！？，。 <｜begin▁of▁file｜>مرحبا  abc<｜User｜>",
+      "count": 122
+    },
+    {
+      "text": "  .foo/bar_nameこんにちは\r\nمرحبا｜DSML｜مرحبا<｜Assistant｜><｜User｜> DeepSeek V4<｜begin▁of▁file｜>こんにちは1234567890\t١٢٣٤  <｜begin▁of▁file｜>한국어<｜Assistant｜><｜Assistant｜>tokenizer！？，。中文分词测试😀😃😀😃\r\n1234567890👩🏽‍💻\t<｜Assistant｜>１２３４５<｜User｜>  DeepSeek V4éこんにちは.foo/bar_name<｜User｜>こんにちは😀😃\nabc👩🏽‍💻HelloПривет  नमस्तेПривет ！？，。tokenizerこんにちは\r\n｜DSML｜\t١٢٣٤こんにちは｜DSML｜1234567890😀😃 DeepSeek V4👩🏽‍💻こんにちは١٢٣٤नमस्ते.foo/bar_name😀😃\n😀😃\tabc.foo/bar_name.foo/bar_nameПривет{}[]();:=<>\t    .foo/bar_name中文分词测试abc",
+      "count": 241
+    },
+    {
+      "text": "Hellotokenizer DeepSeek V4  abc\t  👩🏽‍💻😀😃<｜User｜>مرحباनमस्ते<｜User｜>한국어｜DSML｜こんにちは<｜begin▁of▁file｜>こんにちは！？，。｜DSML｜{}[]();:=<>مرحبا.foo/bar_nameé\r\nabc{}[]();:=<>١٢٣٤こんにちはHello中文分词测试こんにちは｜DSML｜",
+      "count": 98
+    },
+    {
+      "text": "\n नमस्ते中文分词测试    tokenizeré<｜User｜>abcПривет١٢٣٤    \u0000 1234567890éé 👩🏽‍💻abc1234567890<｜Assistant｜>中文分词测试\r\n\r\n\u0000tokenizerabcПриветمرحباéöß\r\n 1234567890tokenizerabc中文分词测试مرحبا<｜User｜>｜DSML｜é  <｜begin▁of▁file｜>مرحبا한국어\n中文分词测试Helloनमस्तेनमस्ते<｜Assistant｜>              ",
+      "count": 111
+    },
+    {
+      "text": "１２３４５<｜begin▁of▁file｜>.foo/bar_name",
+      "count": 10
+    },
+    {
+      "text": "한국어1234567890\n１２３４５    👩🏽‍💻 ！？，。\r\n｜DSML｜<｜User｜>한국어éöß𠀀𐐀éöß tokenizer｜DSML｜こんにちは.foo/bar_name abcHello<｜begin▁of▁file｜>\r\n<｜begin▁of▁file｜>こんにちは",
+      "count": 67
+    },
+    {
+      "text": "１２３４５Привет<｜User｜>Привет｜DSML｜مرحبا١٢٣٤Hello😀😃tokenizer<｜Assistant｜>  \u0000こんにちは  ！？，。こんにちは\u0000𠀀𐐀\t    👩🏽‍💻Привет𠀀𐐀    こんにちはनमस्तेéöß１２３４５中文分词测试\n.foo/bar_nameéöß👩🏽‍💻1234567890éößabcПривет{}[]();:=<><｜begin▁of▁file｜>\té\nHello<｜User｜>éöß<｜Assistant｜>tokenizeréöß{}[]();:=<>｜DSML｜  ｜DSML｜<｜begin▁of▁file｜>.foo/bar_name DeepSeek V4مرحبا｜DSML｜<｜Assistant｜>éöß  नमस्ते１２３４５<｜Assistant｜>😀😃한국어١٢٣٤",
+      "count": 181
+    },
+    {
+      "text": "中文分词测试Привет𠀀𐐀Hello<｜User｜>𠀀𐐀éöß<｜User｜>こんにちは😀😃tokenizer<｜begin▁of▁file｜><｜User｜>é   DeepSeek V4👩🏽‍💻👩🏽‍💻１２３４５😀😃1234567890abc    한국어नमस्ते",
+      "count": 80
+    },
+    {
+      "text": "\n\n１２３４５中文分词测试Helloこんにちは      <｜User｜>{}[]();:=<>١٢٣٤Приветéöß1234567890abc  <｜Assistant｜> 𠀀𐐀Hello\tabc👩🏽‍💻مرحبا    <｜Assistant｜>مرحباПриветनमस्तेПривет    .foo/bar_name１２３４５\u0000    \tétokenizer  \nこんにちは한국어    こんにちは中文分词测试    こんにちは    １２３４５𠀀𐐀é<｜Assistant｜>Привет",
+      "count": 132
+    },
+    {
+      "text": "😀😃👩🏽‍💻<｜Assistant｜>١٢٣٤<｜begin▁of▁file｜><｜Assistant｜>éabc👩🏽‍💻.foo/bar_name  ",
+      "count": 36
+    },
+    {
+      "text": "مرحبا！？，。한국어！？，。éöß {}[]();:=<>.foo/bar_name        \t 한국어<｜begin▁of▁file｜>한국어こんにちは｜DSML｜1234567890<｜begin▁of▁file｜> 1234567890tokenizer  .foo/bar_name<｜begin▁of▁file｜>😀😃 DeepSeek V4éöß\t\té",
+      "count": 74
+    },
+    {
+      "text": "\n！？，。مرحبا1234567890١٢٣٤𠀀𐐀\n中文分词测试😀😃<｜begin▁of▁file｜>Hello١٢٣٤こんにちは中文分词测试😀😃こんにちはtokenizer",
+      "count": 58
+    },
+    {
+      "text": "𠀀𐐀tokenizer DeepSeek V4\n<｜Assistant｜>     😀😃  <｜begin▁of▁file｜>.foo/bar_nametokenizerनमस्ते\n１２３４５１２３４５  DeepSeek V4{}[]();:=<>{}[]();:=<>tokenizer한국어éПривет｜DSML｜é DeepSeek V4👩🏽‍💻1234567890.foo/bar_name",
+      "count": 96
+    },
+    {
+      "text": "𠀀𐐀\t！？，。！？，。Hello é１２３４５",
+      "count": 23
+    },
+    {
+      "text": "こんにちは<｜User｜>.foo/bar_name中文分词测试\tمرحبا١٢٣٤مرحبا\r\n    ПриветПривет１２３４５ 1234567890中文分词测试tokenizer\n｜DSML｜Привет DeepSeek V4\t<｜begin▁of▁file｜>abcHelloनमस्ते\r\n\u0000    éनमस्ते1234567890｜DSML｜\t DeepSeek V4éöß<｜Assistant｜>नमस्ते1234567890\n\t    𠀀𐐀<｜begin▁of▁file｜><｜Assistant｜>{}[]();:=<>𠀀𐐀！？，。\nनमस्तेこんにちは😀😃abcéこんにちは𠀀𐐀１２３４５abcé😀😃Привет",
+      "count": 164
+    },
+    {
+      "text": "１２３４５😀😃Привет<｜User｜>👩🏽‍💻한국어नमस्ते😀😃{}[]();:=<>Приветtokenizer    \t😀😃😀😃tokenizer👩🏽‍💻こんにちは1234567890Привет",
+      "count": 68
+    },
+    {
+      "text": "Hello<｜User｜>12345678901234567890tokenizerनमस्तेéمرحبا  中文分词测试１２３４５中文分词测试<｜Assistant｜>éöß١٢٣٤<｜begin▁of▁file｜>abc{}[]();:=<>𠀀𐐀中文分词测试\t<｜begin▁of▁file｜>\u0000！？，。！？，。नमस्तेHello한국어｜DSML｜𠀀𐐀مرحبامرحبا{}[]();:=<><｜User｜>नमस्ते\u0000abctokenizer ｜DSML｜\u0000<｜begin▁of▁file｜>é𠀀𐐀 ١٢٣٤\t",
+      "count": 124
+    },
+    {
+      "text": ".foo/bar_nameこんにちは<｜User｜>한국어1234567890\t DeepSeek V4  ！？，。こんにちはé👩🏽‍💻 こんにちは DeepSeek V4\u0000  １２３４５مرحباtokenizer.foo/bar_name｜DSML｜<｜begin▁of▁file｜>中文分词测试Hello한국어！？，。\u0000Hellotokenizer\t    <｜User｜>Привет𠀀𐐀\r\n𠀀𐐀中文分词测试{}[]();:=<>éöß<｜begin▁of▁file｜><｜begin▁of▁file｜>😀😃！？，。مرحبا１２３４５𠀀𐐀مرحباHello éabc１２３４５<｜User｜>tokenizer\u0000<｜begin▁of▁file｜>こんにちは",
+      "count": 165
+    },
+    {
+      "text": "tokenizer1234567890｜DSML｜abc👩🏽‍💻\tनमस्ते👩🏽‍💻｜DSML｜\t１２３４５\néöß  Hello１２３４５\u0000\t\n！？，。مرحباこんにちは\tabctokenizertokenizer١٢٣٤\n👩🏽‍💻é\t<｜User｜>مرحبا١٢٣٤Привет{}[]();:=<>مرحبا１２３４５<｜Assistant｜>！？，。1234567890 DeepSeek V4한국어 <｜User｜>👩🏽‍💻    abcabctokenizertokenizer１２３４５abc！？，。HelloПривет😀😃",
+      "count": 155
+    },
+    {
+      "text": "｜DSML｜ {}[]();:=<>Привет١٢٣٤１２３４５\n DeepSeek V4नमस्ते中文分词测试{}[]();:=<>｜DSML｜  \u0000 \u0000tokenizerこんにちは！？，。.foo/bar_name\t<｜User｜>éПривет𠀀𐐀中文分词测试<｜begin▁of▁file｜>Hello！？，。<｜User｜>Привет こんにちは<｜User｜> <｜User｜>abctokenizer\n.foo/bar_nameHelloनमस्ते<｜User｜>！？，。\t\t<｜User｜>こんにちは.foo/bar_name！？，。éöß DeepSeek V4👩🏽‍💻中文分词测试👩🏽‍💻😀😃tokenizer１２３４５\r\n こんにちはمرحبامرحباこんにちは！？，。  éöß{}[]();:=<>",
+      "count": 192
+    },
+    {
+      "text": "｜DSML｜한국어مرحبا\t{}[]();:=<>abcनमस्ते{}[]();:=<> DeepSeek V4ПриветПриветabc😀😃étokenizer tokenizer DeepSeek V4नमस्ते한국어中文分词测试👩🏽‍💻Helloمرحبا<｜User｜>Helloabc！？，。中文分词测试こんにちはtokenizer！？，。",
+      "count": 90
+    },
+    {
+      "text": "\u0000éöß1234567890مرحبا    नमस्ते中文分词测试abc｜DSML｜中文分词测试{}[]();:=<>Hellotokenizerこんにちは    Привет<｜Assistant｜>｜DSML｜नमस्ते中文分词测试\r\n中文分词测试<｜begin▁of▁file｜>한국어𠀀𐐀<｜Assistant｜> नमस्तेtokenizer{}[]();:=<>tokenizer1234567890 \r\n.foo/bar_name한국어.foo/bar_name👩🏽‍💻नमस्ते𠀀𐐀😀😃    😀😃<｜Assistant｜>नमस्ते\u0000    👩🏽‍💻Привет！？，。é𠀀𐐀 DeepSeek V4مرحباéößПривет.foo/bar_name中文分词测试😀😃",
+      "count": 182
+    },
+    {
+      "text": "नमस्ते한국어Привет\t  👩🏽‍💻👩🏽‍💻\nこんにちは<｜begin▁of▁file｜>中文分词测试éöß\n HelloHelloनमस्ते👩🏽‍💻𠀀𐐀Привет\r\n𠀀𐐀",
+      "count": 70
+    },
+    {
+      "text": "١٢٣٤𠀀𐐀Helloabc😀😃  한국어{}[]();:=<>\r\n\u0000\t👩🏽‍💻Приветtokenizer<｜User｜>\n     中文分词测试👩🏽‍💻１２３４５｜DSML｜\n   DeepSeek V4.foo/bar_name.foo/bar_name<｜Assistant｜>\nHello  tokenizer  éößéöß1234567890１２３４５Helloمرحبا",
+      "count": 104
+    },
+    {
+      "text": "١٢٣٤\n<｜Assistant｜>｜DSML｜こんにちは<｜begin▁of▁file｜>中文分词测试한국어  \r\nこんにちは    Привет한국어한국어\u0000abc\u0000<｜begin▁of▁file｜>｜DSML｜\r\n DeepSeek V4     １２３４５！？，。｜DSML｜👩🏽‍💻Hello\n\nمرحبا！？，。<｜User｜>１２３４５नमस्ते<｜begin▁of▁file｜>    Привет👩🏽‍💻\r\ntokenizer١٢٣٤.foo/bar_nameHellotokenizertokenizer١٢٣٤Привет١٢٣٤👩🏽‍💻é.foo/bar_name    ！？，。    Hello\r\nПривет👩🏽‍💻éöß",
+      "count": 164
+    },
+    {
+      "text": "é<｜begin▁of▁file｜>𠀀𐐀 DeepSeek V4 DeepSeek V4\u0000\u0000中文分词测试１２３４５｜DSML｜<｜begin▁of▁file｜>١٢٣٤<｜begin▁of▁file｜>中文分词测试tokenizerこんにちは\t    😀😃Приветtokenizer",
+      "count": 56
+    },
+    {
+      "text": "👩🏽‍💻مرحبا1234567890こんにちは한국어！？，。中文分词测试",
+      "count": 29
+    },
+    {
+      "text": " ！？，。\r\n\néöß<｜begin▁of▁file｜>١٢٣٤｜DSML｜<｜User｜>١٢٣٤\r\né<｜User｜>！？，。\t",
+      "count": 32
+    },
+    {
+      "text": "\r\n𠀀𐐀<｜begin▁of▁file｜> DeepSeek V4！？，。１２３４５नमस्तेこんにちは👩🏽‍💻１２３４５한국어こんにちは中文分词测试<｜Assistant｜>\r\nこんにちは    .foo/bar_nametokenizer.foo/bar_nameabcनमस्ते𠀀𐐀\r\n中文分词测试tokenizer1234567890 DeepSeek V4한국어Hello\tПривет😀😃 １２３４５\r\n\n.foo/bar_name नमस्तेこんにちは\u0000👩🏽‍💻｜DSML｜ <｜begin▁of▁file｜>𠀀𐐀tokenizer",
+      "count": 157
+    },
+    {
+      "text": "こんにちは    tokenizer👩🏽‍💻مرحبا١٢٣٤ DeepSeek V4abc！？，。1234567890<｜User｜>abc\nこんにちはéößé中文分词测试",
+      "count": 52
+    },
+    {
+      "text": "中文分词测试é１２３４５한국어😀😃こんにちは\t    abc한국어  <｜User｜> Привет  １２３４５ DeepSeek V4😀😃Привет<｜User｜>.foo/bar_name\r\n１２３４５１２３４５éöß👩🏽‍💻 DeepSeek V4Привет😀😃\r\nनमस्ते",
+      "count": 91
+    },
+    {
+      "text": "<｜Assistant｜>１２３４５  {}[]();:=<>\n\t\r\nПривет\u0000Hello<｜begin▁of▁file｜><｜User｜>😀😃<｜Assistant｜>\u0000<｜User｜><｜begin▁of▁file｜>   DeepSeek V4ПриветHelloこんにちは！？，。é abctokenizer DeepSeek V4｜DSML｜ DeepSeek V4\t\n｜DSML｜中文分词测试1234567890😀😃｜DSML｜ DeepSeek V4 DeepSeek V4😀😃 \u0000中文分词测试！？，。.foo/bar_name.foo/bar_name<｜begin▁of▁file｜>tokenizer Hello DeepSeek V4١٢٣٤مرحباéöß𠀀𐐀.foo/bar_name１２３４５Привет！？，。{}[]();:=<>｜DSML｜مرحبا    ",
+      "count": 164
+    },
+    {
+      "text": "👩🏽‍💻é😀😃\t👩🏽‍💻👩🏽‍💻1234567890\r\n｜DSML｜こんにちは😀😃é<｜Assistant｜>Hellotokenizer<｜begin▁of▁file｜>\n<｜begin▁of▁file｜><｜begin▁of▁file｜>नमस्ते１２３４５١٢٣٤é١٢٣٤<｜Assistant｜>！？，。.foo/bar_name\n.foo/bar_name한국어éößمرحبا\u0000😀😃😀😃<｜begin▁of▁file｜>é.foo/bar_nameПривет한국어é！？，。    नमस्तेこんにちは<｜User｜>नमस्ते\nनमस्ते١٢٣٤١٢٣٤.foo/bar_name한국어中文分词测试<｜begin▁of▁file｜><｜User｜>👩🏽‍💻<｜begin▁of▁file｜>｜DSML｜<｜User｜>",
+      "count": 180
+    },
+    {
+      "text": "  {}[]();:=<>！？，。    こんにちは DeepSeek V4こんにちは    <｜begin▁of▁file｜> DeepSeek V4\n中文分词测试<｜User｜>  \néHello",
+      "count": 48
+    },
+    {
+      "text": "１２３４５\r\néöß\t١٢٣٤éöß   DeepSeek V4\n.foo/bar_nameHello１２３４５नमस्ते    😀😃<｜Assistant｜> DeepSeek V4١٢٣٤  éößtokenizeréöß！？，。1234567890{}[]();:=<>\r\n中文分词测试１２３４５\tПривет\n！？，。  .foo/bar_nameनमस्ते👩🏽‍💻",
+      "count": 110
+    },
+    {
+      "text": ".foo/bar_nameéößمرحبا｜DSML｜  <｜begin▁of▁file｜>한국어１２３４５\t｜DSML｜tokenizerこんにちはHelloПривет한국어 こんにちは\n\ntokenizer1234567890한국어éöß\t\t\tabc.foo/bar_name\n.foo/bar_nameabc\u0000tokenizer    \u0000é\n{}[]();:=<>こんにちは    ١٢٣٤\r\n<｜begin▁of▁file｜>abc\n.foo/bar_name👩🏽‍💻｜DSML｜\r\n<｜Assistant｜> DeepSeek V4مرحبا\r\nHello１２３４５！？，。éöß😀😃tokenizerمرحبا\nनमस्तेHelloé｜DSML｜\t\r\n ｜DSML｜Привет١٢٣٤<｜User｜>！？，。",
+      "count": 171
+    },
+    {
+      "text": "𠀀𐐀tokenizer<｜begin▁of▁file｜>नमस्ते1234567890😀😃\u0000こんにちは\r\n！？，。abc｜DSML｜ \n١٢٣٤😀😃abcabc😀😃𠀀𐐀١٢٣٤ DeepSeek V4<｜Assistant｜>1234567890\r\n    é  Hello\t！？，。<｜begin▁of▁file｜>नमस्ते\r\n👩🏽‍💻😀😃１２３４５tokenizerनमस्तेこんにちは.foo/bar_name<｜User｜>中文分词测试tokenizerHello    {}[]();:=<>！？，。中文分词测试HelloHelloéöß\u0000！？，。abcHello한국어नमस्तेabc  DeepSeek V4١٢٣٤tokenizerHello｜DSML｜  １２３４５Hello𠀀𐐀한국어tokenizer",
+      "count": 201
+    },
+    {
+      "text": "中文分词测试1234567890  \t１２３４５\u0000\n<｜Assistant｜>Hello<｜User｜>.foo/bar_name{}[]();:=<>👩🏽‍💻\n    中文分词测试 DeepSeek V4.foo/bar_name\u0000<｜Assistant｜>.foo/bar_nameनमस्ते    👩🏽‍💻한국어한국어नमस्तेé",
+      "count": 82
+    },
+    {
+      "text": "ПриветabcHello DeepSeek V4한국어１２３４５<｜User｜>😀😃नमस्ते{}[]();:=<> DeepSeek V4 <｜begin▁of▁file｜>",
+      "count": 37
+    },
+    {
+      "text": "\r\nHello𠀀𐐀नमस्ते😀😃Привет    1234567890中文分词测试.foo/bar_name<｜Assistant｜>ééöß<｜begin▁of▁file｜>    \r\n\t｜DSML｜！？，。\t한국어.foo/bar_nametokenizer1234567890｜DSML｜Hello한국어tokenizer  éöß👩🏽‍💻中文分词测试\r\n𠀀𐐀\n\tabcétokenizer DeepSeek V4こんにちは한국어한국어\u0000Привет😀😃",
+      "count": 125
+    },
+    {
+      "text": "\né한국어1234567890\t한국어１２３４５{}[]();:=<>中文分词测试.foo/bar_nameé١٢٣٤１２３４５١٢٣٤👩🏽‍💻    ١٢٣٤.foo/bar_name<｜begin▁of▁file｜>👩🏽‍💻 DeepSeek V4<｜Assistant｜>Привет𠀀𐐀｜DSML｜١٢٣٤.foo/bar_nameनमस्ते｜DSML｜𠀀𐐀    1234567890Hello é한국어{}[]();:=<>é<｜User｜>\u0000한국어𠀀𐐀<｜Assistant｜>tokenizeréabcabc｜DSML｜<｜User｜>\u0000tokenizerनमस्ते",
+      "count": 157
+    },
+    {
+      "text": "\u0000こんにちは👩🏽‍💻<｜User｜>１２３４５{}[]();:=<>tokenizer<｜begin▁of▁file｜>１２３４５<｜begin▁of▁file｜>١٢٣٤{}[]();:=<><｜Assistant｜> DeepSeek V4ééöß    {}[]();:=<>｜DSML｜{}[]();:=<> DeepSeek V4\n",
+      "count": 69
+    },
+    {
+      "text": "<｜User｜><｜Assistant｜>tokenizerこんにちはé\u0000é.foo/bar_name\u0000\u0000𠀀𐐀éöß.foo/bar_nametokenizer<｜begin▁of▁file｜>１２３４５مرحبا DeepSeek V4éöß",
+      "count": 54
+    },
+    {
+      "text": "tokenizer１２３４５\r\n\r\n<｜begin▁of▁file｜>١٢٣٤éöß.foo/bar_name😀😃abcनमस्तेمرحبا𠀀𐐀.foo/bar_name  éé｜DSML｜Hello\r\n.foo/bar_name\r\n中文分词测试１２３４５١٢٣٤𠀀𐐀  {}[]();:=<> DeepSeek V4👩🏽‍💻",
+      "count": 102
+    },
+    {
+      "text": "<｜User｜>１２３４５नमस्ते  <｜Assistant｜>\r\n<｜begin▁of▁file｜>こんにちは한국어𠀀𐐀{}[]();:=<>😀😃！？，。！？，。éöß𠀀𐐀1234567890Привет<｜User｜>\u0000नमस्ते.foo/bar_name\t DeepSeek V4\ntokenizerمرحبا😀😃👩🏽‍💻<｜begin▁of▁file｜>1234567890नमस्ते１２３４５\r\n\r\n👩🏽‍💻\t\r\n\t👩🏽‍💻中文分词测试tokenizer<｜begin▁of▁file｜>\u0000abc",
+      "count": 139
+    },
+    {
+      "text": "\tHello\t.foo/bar_name<｜User｜>    <｜User｜>नमस्ते𠀀𐐀\tこんにちは مرحبا\r\n DeepSeek V4Hello😀😃\u0000Приветtokenizer\r\n<｜User｜>tokenizerनमस्तेabc<｜Assistant｜>\u0000｜DSML｜１２３４５ DeepSeek V4 \n😀😃<｜User｜> DeepSeek V4<｜User｜>\u0000👩🏽‍💻！？，。 DeepSeek V4𠀀𐐀 DeepSeek V4.foo/bar_name😀😃١٢٣٤<｜begin▁of▁file｜>",
+      "count": 125
+    },
+    {
+      "text": "こんにちは١٢٣٤１２３４５中文分词测试\r\n｜DSML｜",
+      "count": 20
+    },
+    {
+      "text": "مرحباनमस्तेé\t \u0000👩🏽‍💻1234567890.foo/bar_nameمرحبا\n👩🏽‍💻<｜Assistant｜> ｜DSML｜éöß\n中文分词测试 DeepSeek V4<｜begin▁of▁file｜>Привет  é👩🏽‍💻1234567890\n DeepSeek V4tokenizer DeepSeek V4<｜Assistant｜>\u0000.foo/bar_name😀😃Hello\t",
+      "count": 96
+    },
+    {
+      "text": "こんにちはこんにちは١٢٣٤こんにちは\n｜DSML｜١٢٣٤\ntokenizer     😀😃\t\nこんにちは１２３４５ DeepSeek V4｜DSML｜Hello\r\nこんにちは中文分词测试한국어\r\n  𠀀𐐀  😀😃👩🏽‍💻<｜Assistant｜>中文分词测试नमस्ते1234567890tokenizer👩🏽‍💻👩🏽‍💻𠀀𐐀.foo/bar_nameこんにちは𠀀𐐀नमस्तेनमस्ते<｜begin▁of▁file｜>한국어<｜User｜>abctokenizer👩🏽‍💻   Приветabc中文分词测试<｜User｜><｜User｜> DeepSeek V4 नमस्ते",
+      "count": 183
+    },
+    {
+      "text": "{}[]();:=<>مرحباabc한국어<｜begin▁of▁file｜>Привет１２３４５abc😀😃<｜Assistant｜>éöß\u0000\r\nمرحبامرحبا{}[]();:=<>\r\n１２３４５<｜Assistant｜>1234567890😀😃  \téöß.foo/bar_nameéabcПривет <｜begin▁of▁file｜>\u0000\r\n😀😃 1234567890١٢٣٤1234567890مرحبا！？，。\r\n\n١٢٣٤Hello！？，。\t    tokenizer한국어1234567890مرحبامرحبا.foo/bar_nametokenizer👩🏽‍💻中文分词测试    .foo/bar_name",
+      "count": 152
+    },
+    {
+      "text": " Hello1234567890１２３４５\r\n한국어1234567890こんにちは.foo/bar_name\téمرحبا١٢٣٤\u0000こんにちは\r\ntokenizer한국어 DeepSeek V4नमस्ते<｜begin▁of▁file｜>tokenizer١٢٣٤\u0000中文分词测试éöß1234567890abcこんにちは한국어tokenizer.foo/bar_name｜DSML｜<｜Assistant｜><｜Assistant｜>👩🏽‍💻{}[]();:=<>😀😃",
+      "count": 113
+    },
+    {
+      "text": "tokenizerनमस्तेtokenizer中文分词测试١٢٣٤.foo/bar_name１２３４５한국어１２３４５",
+      "count": 32
+    },
+    {
+      "text": "مرحبا.foo/bar_name١٢٣٤{}[]();:=<>\u0000é\u0000Привет😀😃！？，。éöß<｜begin▁of▁file｜>नमस्तेé\u0000한국어tokenizer｜DSML｜😀😃😀😃１２３４５Привет<｜begin▁of▁file｜><｜begin▁of▁file｜>中文分词测试مرحبا DeepSeek V4    👩🏽‍💻中文分词测试é中文分词测试    ١٢٣٤\t<｜Assistant｜>.foo/bar_nameéößनमस्ते\t<｜User｜>Привет",
+      "count": 114
+    },
+    {
+      "text": "１２３４５    \n中文分词测试<｜begin▁of▁file｜>tokenizeréöß\u0000！？，。١٢٣٤\t中文分词测试Привет\t한국어こんにちは\u0000١٢٣٤😀😃\u0000{}[]();:=<>Hello DeepSeek V4tokenizer    😀😃é",
+      "count": 72
+    },
+    {
+      "text": "\u0000Приветéöß\r\néößПривет\r\n！？，。😀😃1234567890 DeepSeek V4नमस्ते<｜Assistant｜>١٢٣٤Hello<｜Assistant｜>abc\tПриветéößtokenizer中文分词测试Hello\né한국어  １２３４５ DeepSeek V4 DeepSeek V4한국어\t\u0000\tПривет \t DeepSeek V4",
+      "count": 90
+    },
+    {
+      "text": "😀😃<｜User｜>😀😃｜DSML｜\u0000𠀀𐐀مرحبا١٢٣٤\tПривет한국어｜DSML｜.foo/bar_name！？，。１２３４５１２３４５\n｜DSML｜.foo/bar_name𠀀𐐀𠀀𐐀.foo/bar_name한국어नमस्ते１２３４５abc\u0000\t DeepSeek V4éöß𠀀𐐀中文分词测试\n\u00001234567890 <｜begin▁of▁file｜>abc  \u0000<｜User｜>éößéöß{}[]();:=<><｜User｜> Привет中文分词测试éöß1234567890éößéöß    \tHello１２３４５こんにちはこんにちは<｜Assistant｜>\u0000 DeepSeek V4\t1234567890{}[]();:=<>    नमस्ते    {}[]();:=<>abc DeepSeek V4١٢٣٤１２３４５1234567890\t한국어",
+      "count": 215
+    },
+    {
+      "text": "１２３４５abc\r\n𠀀𐐀{}[]();:=<>１２３４５\u0000こんにちは    😀😃 DeepSeek V4 𠀀𐐀<｜Assistant｜>\n  \u0000！？，。١٢٣٤<｜begin▁of▁file｜>\r\n｜DSML｜\n｜DSML｜abc中文分词测试abc\né١٢٣٤  {}[]();:=<>{}[]();:=<>👩🏽‍💻<｜begin▁of▁file｜>tokenizer！？，。Hello𠀀𐐀.foo/bar_name\nПривет\u0000１２３４５éöß\u0000é.foo/bar_name{}[]();:=<>abcéöß١٢٣٤١٢٣٤",
+      "count": 154
+    },
+    {
+      "text": "tokenizer<｜begin▁of▁file｜>éöß{}[]();:=<> DeepSeek V4𠀀𐐀{}[]();:=<>\n👩🏽‍💻Привет！？，。한국어한국어éöß<｜begin▁of▁file｜>中文分词测试١٢٣٤１２３４５é<｜begin▁of▁file｜>｜DSML｜！？，。 DeepSeek V4😀😃Hello<｜begin▁of▁file｜>",
+      "count": 81
+    },
+    {
+      "text": "Привет\r\né１２３４５𠀀𐐀éößabcabc👩🏽‍💻<｜Assistant｜>Привет！？，。",
+      "count": 35
+    },
+    {
+      "text": "tokenizer1234567890中文分词测试中文分词测试\r\n１２３４５👩🏽‍💻.foo/bar_name١٢٣٤tokenizer<｜Assistant｜>｜DSML｜ПриветHello<｜begin▁of▁file｜>👩🏽‍💻 Приветé{}[]();:=<>\u0000١٢٣٤é😀😃\t    <｜User｜>\r\n",
+      "count": 75
+    },
+    {
+      "text": "Hello DeepSeek V4한국어    abctokenizer\nこんにちは한국어😀😃{}[]();:=<>éößHello \n한국어\n１２３４５\ntokenizer<｜Assistant｜>\n😀😃\ntokenizer１２３４５Hello\nabc😀😃<｜Assistant｜>！？，。    ｜DSML｜\n<｜Assistant｜>مرحباtokenizerनमस्ते<｜User｜>é！？，。.foo/bar_name<｜User｜>\r\n<｜begin▁of▁file｜>\tHello｜DSML｜ DeepSeek V4😀😃",
+      "count": 113
+    },
+    {
+      "text": "HelloHello<｜User｜>１２３４５é！？，。abcनमस्ते{}[]();:=<>１２３４５😀😃\n１２３４５abc こんにちは\n｜DSML｜tokenizerمرحباabcПривет𠀀𐐀नमस्ते١٢٣٤\t한국어1234567890Привет.foo/bar_name<｜Assistant｜> DeepSeek V4١٢٣٤！？，。！？，。  éabc 😀😃Hello{}[]();:=<>\u0000😀😃\t DeepSeek V4Hello<｜User｜>中文分词测试.foo/bar_nameनमस्तेこんにちはПривет1234567890abc😀😃Привет👩🏽‍💻Привет١٢٣٤｜DSML｜中文分词测试｜DSML｜\n\téöß\r\n\r\n{}[]();:=<>",
+      "count": 193
+    },
+    {
+      "text": "  .foo/bar_name😀😃   こんにちは<｜Assistant｜>{}[]();:=<> こんにちはabc<｜User｜><｜User｜>\tनमस्तेनमस्ते<｜User｜>١٢٣٤١٢٣٤{}[]();:=<>１２３４５abc.foo/bar_name<｜User｜><｜User｜>مرحبا\n     DeepSeek V4中文分词测试  ١٢٣٤\r\né😀😃étokenizer<｜Assistant｜>\u0000 \u0000😀😃{}[]();:=<>\t    こんにちは １２３４５नमस्तेtokenizer1234567890é\r\n<｜Assistant｜>한국어 𠀀𐐀한국어{}[]();:=<>中文分词测试한국어😀😃Hello｜DSML｜    éöß{}[]();:=<>مرحباHello مرحبا DeepSeek V4\u0000！？，。𠀀𐐀！？，。",
+      "count": 205
+    },
+    {
+      "text": "Привет\r\n DeepSeek V4\r\né    \tabc｜DSML｜１２３４５！？，。こんにちは\r\n\t😀😃.foo/bar_name<｜begin▁of▁file｜>한국어{}[]();:=<>こんにちは！？，。中文分词测试한국어１２３４５！？，。\t中文分词测试Приветtokenizertokenizerनमस्ते中文分词测试こんにちはनमस्ते𠀀𐐀١٢٣٤！？，。！？，。｜DSML｜éمرحبا\t é｜DSML｜مرحبا DeepSeek V4한국어<｜User｜>！？，。<｜Assistant｜>{}[]();:=<>",
+      "count": 153
+    },
+    {
+      "text": "\tHello<｜Assistant｜>abc",
+      "count": 4
+    },
+    {
+      "text": "        ！？，。éこんにちは     éöß😀😃１２３４５！？，。١٢٣٤𠀀𐐀مرحباनमस्तेनमस्ते  abcétokenizer<｜begin▁of▁file｜>abcHello  1234567890<｜Assistant｜>\u0000こんにちは١٢٣٤\n한국어.foo/bar_name𠀀𐐀\t DeepSeek V4😀😃abc<｜User｜>１２３４５  \u0000",
+      "count": 113
+    },
+    {
+      "text": "😀😃tokenizer<｜Assistant｜>Hello<｜begin▁of▁file｜>éöß\r\n！？，。\n中文分词测试\ttokenizer😀😃𠀀𐐀\r\n1234567890नमस्तेनमस्ते {}[]();:=<>\r\n\nこんにちはこんにちは\u0000👩🏽‍💻Привет｜DSML｜１２３４５こんにちは中文分词测试नमस्ते｜DSML｜tokenizer😀😃مرحبا  éöß<｜Assistant｜>    \tمرحبا😀😃مرحبا😀😃é  {}[]();:=<>Привет  नमस्ते Helloéनमस्तेこんにちは👩🏽‍💻١٢٣٤👩🏽‍💻{}[]();:=<>  ١٢٣٤！？，。 DeepSeek V4",
+      "count": 191
+    },
+    {
+      "text": "abcéöß .foo/bar_name1234567890Hello<｜Assistant｜><｜begin▁of▁file｜>｜DSML｜tokenizer\tПривет <｜User｜>مرحباabcéöß    مرحبا！？，。abc",
+      "count": 37
+    },
+    {
+      "text": "𠀀𐐀<｜User｜>abcمرحباनमस्ते<｜User｜>😀😃\u0000",
+      "count": 22
+    },
+    {
+      "text": "<｜User｜>tokenizertokenizer中文分词测试नमस्ते😀😃😀😃{}[]();:=<><｜begin▁of▁file｜>{}[]();:=<>éöß\r\nمرحبا👩🏽‍💻tokenizer𠀀𐐀\r\n！？，。中文分词测试<｜User｜><｜User｜>\r\n１２３４５Helloabc",
+      "count": 74
+    },
+    {
+      "text": "中文分词测试\n<｜begin▁of▁file｜>｜DSML｜こんにちは<｜Assistant｜>tokenizer𠀀𐐀𠀀𐐀\r\n👩🏽‍💻こんにちはHello    \t١٢٣٤😀😃नमस्ते👩🏽‍💻｜DSML｜{}[]();:=<>Привет  \t１２３４５한국어！？，。！？，。Hello\t<｜begin▁of▁file｜>{}[]();:=<>    \u0000𠀀𐐀<｜Assistant｜><｜begin▁of▁file｜>Hello！？，。𠀀𐐀\u0000한국어👩🏽‍💻éöß١٢٣٤한국어\téöß\u00001234567890",
+      "count": 151
+    },
+    {
+      "text": " DeepSeek V4<｜Assistant｜>1234567890👩🏽‍💻｜DSML｜Hello<｜Assistant｜>١٢٣٤\u0000.foo/bar_nameHello<｜begin▁of▁file｜>tokenizer<｜User｜>\t 👩🏽‍💻\t\r\nこんにちは  ١٢٣٤ DeepSeek V4HelloПриветabc DeepSeek V4مرحبا１２３４５tokenizertokenizerनमस्ते한국어\u0000١٢٣٤Привет\n",
+      "count": 101
+    },
+    {
+      "text": "{}[]();:=<>नमस्ते\u0000Hello！？，。👩🏽‍💻𠀀𐐀\n١٢٣٤｜DSML｜abcé！？，。   DeepSeek V4Привет😀😃１２３４５é😀😃\néößHello{}[]();:=<>\u0000<｜begin▁of▁file｜> é1234567890！？，。中文分词测试éöß    <｜Assistant｜><｜User｜>｜DSML｜中文分词测试 \u0000\nabc<｜begin▁of▁file｜>éनमस्ते<｜begin▁of▁file｜>abc\r\n1234567890👩🏽‍💻 <｜User｜>𠀀𐐀 DeepSeek V4.foo/bar_name DeepSeek V4한국어<｜Assistant｜>😀😃مرحبا    abc<｜begin▁of▁file｜>١٢٣٤｜DSML｜  ｜DSML｜",
+      "count": 171
+    },
+    {
+      "text": "    .foo/bar_name｜DSML｜éöß DeepSeek V4١٢٣٤｜DSML｜  ！？，。<｜Assistant｜>١٢٣٤\n｜DSML｜١٢٣٤１２３４５éöß1234567890    𠀀𐐀 DeepSeek V4😀😃\r\n    \r\n😀😃 1234567890\t{}[]();:=<>한국어éößनमस्ते한국어abcनमस्ते    1234567890中文分词测试<｜User｜>éößéöß１２３４５.foo/bar_name\tनमस्ते😀😃  ١٢٣٤éößनमस्तेこんにちは<｜Assistant｜>",
+      "count": 153
+    },
+    {
+      "text": "abcمرحبا｜DSML｜\r\n  \r\n中文分词测试  한국어👩🏽‍💻नमस्ते한국어 éöß مرحبا\u0000\téöß👩🏽‍💻\r\n\n{}[]();:=<><｜Assistant｜>｜DSML｜Привет👩🏽‍💻😀😃Привет{}[]();:=<>\r\ntokenizerمرحبا.foo/bar_name１２３４５\u0000<｜Assistant｜>    éöß｜DSML｜｜DSML｜é  😀😃\t{}[]();:=<>😀😃tokenizer\n１２３４５éمرحباabc<｜Assistant｜>Приветé｜DSML｜é",
+      "count": 139
+    },
+    {
+      "text": ".foo/bar_nameHelloHello｜DSML｜Helloمرحبا<｜begin▁of▁file｜>！？，。",
+      "count": 17
+    },
+    {
+      "text": "\t",
+      "count": 1
+    },
+    {
+      "text": "한국어こんにちは👩🏽‍💻<｜begin▁of▁file｜>\r\n  \u0000👩🏽‍💻한국어こんにちはéößこんにちはПривет<｜User｜><｜Assistant｜>1234567890    中文分词测试    １２３４５👩🏽‍💻<｜Assistant｜>HelloПривет<｜begin▁of▁file｜>😀😃｜DSML｜{}[]();:=<>abcनमस्तेéمرحباHello\r\n١٢٣٤नमस्तेПривет.foo/bar_name👩🏽‍💻１２３４５éöß한국어１２３４５Привет<｜Assistant｜>\n😀😃HelloHelloこんにちは.foo/bar_name1234567890中文分词测试한국어",
+      "count": 161
+    },
+    {
+      "text": " ｜DSML｜한국어éöß한국어tokenizer<｜User｜>مرحبا.foo/bar_name｜DSML｜abc<｜User｜>tokenizer<｜begin▁of▁file｜> abc<｜Assistant｜>नमस्तेabc｜DSML｜  \tПриветéöß😀😃tokenizerabc DeepSeek V4｜DSML｜中文分词测试",
+      "count": 58
+    },
+    {
+      "text": "<｜begin▁of▁file｜>！？，。😀😃١٢٣٤こんにちは！？，。  Hellotokenizerمرحبا<｜begin▁of▁file｜>\n\tこんにちはHelloこんにちは DeepSeek V4مرحباHelloनमस्तेनमस्तेabc<｜Assistant｜>  \n1234567890١٢٣٤.foo/bar_name١٢٣٤ DeepSeek V4\r\n\nمرحباabc１２３４５한국어.foo/bar_name  <｜Assistant｜>👩🏽‍💻한국어Helloनमस्ते\né👩🏽‍💻éé\r\nHelloनमस्तेПривет👩🏽‍💻é\nПриветabc\r\n\n",
+      "count": 165
+    },
+    {
+      "text": "\u0000abc中文分词测试😀😃\t\n中文分词测试中文分词测试Привет𠀀𐐀abc<｜begin▁of▁file｜>👩🏽‍💻<｜begin▁of▁file｜>𠀀𐐀<｜begin▁of▁file｜>  abc1234567890Привет DeepSeek V4",
+      "count": 57
+    },
+    {
+      "text": ".foo/bar_name Привет！？，。1234567890{}[]();:=<>",
+      "count": 20
+    },
+    {
+      "text": "<｜User｜> DeepSeek V4Hello｜DSML｜\n\té👩🏽‍💻\tمرحباनमस्ते",
+      "count": 26
+    },
+    {
+      "text": "｜DSML｜こんにちは｜DSML｜  <｜begin▁of▁file｜>\n\n<｜User｜>tokenizer\r\n<｜begin▁of▁file｜>  １２３４５😀😃Helloé tokenizer𠀀𐐀1234567890<｜Assistant｜>",
+      "count": 44
+    },
+    {
+      "text": "<｜User｜>Hello👩🏽‍💻é<｜Assistant｜>\u0000中文分词测试tokenizeré<｜User｜><｜User｜>\u00001234567890中文分词测试  <｜User｜>1234567890\u0000١٢٣٤    Hello<｜Assistant｜>𠀀𐐀<｜Assistant｜>｜DSML｜مرحبا👩🏽‍💻｜DSML｜\té👩🏽‍💻Hello١٢٣٤tokenizer١٢٣٤\r\n",
+      "count": 89
+    },
+    {
+      "text": "Hello\u0000👩🏽‍💻.foo/bar_nameéनमस्ते😀😃😀😃こんにちは👩🏽‍💻<｜begin▁of▁file｜>\r\n\t👩🏽‍💻😀😃éöß\r\néößनमस्ते\u0000 <｜User｜>𠀀𐐀\t한국어こんにちは👩🏽‍💻こんにちは١٢٣٤中文分词测试é👩🏽‍💻｜DSML｜｜DSML｜１２３４５abc١٢٣٤１２３４５  tokenizer<｜User｜> DeepSeek V4！？，。｜DSML｜👩🏽‍💻éöß١٢٣٤👩🏽‍💻<｜begin▁of▁file｜>こんにちは😀😃１２３４５<｜Assistant｜>\u0000abcHello\tمرحباéöß中文分词测试😀😃<｜User｜>こんにちはनमस्तेéöß<｜User｜>{}[]();:=<> DeepSeek V4     DeepSeek V4    ！？，。！？，。１２３４５",
+      "count": 239
+    },
+    {
+      "text": "<｜begin▁of▁file｜>｜DSML｜Hello<｜begin▁of▁file｜>｜DSML｜éHello.foo/bar_name👩🏽‍💻.foo/bar_name｜DSML｜é<｜User｜>  👩🏽‍💻abctokenizer\t\t中文分词测试𠀀𐐀  Hello😀😃{}[]();:=<>한국어\u0000｜DSML｜.foo/bar_nameHelloéöß{}[]();:=<><｜begin▁of▁file｜>tokenizer𠀀𐐀<｜begin▁of▁file｜>Привет     DeepSeek V4abc𠀀𐐀Helloé\n 𠀀𐐀abctokenizer中文分词测试é𠀀𐐀é<｜User｜><｜User｜>\r\né\u0000.foo/bar_name{}[]();:=<>",
+      "count": 156
+    },
+    {
+      "text": "\u0000１２３４５  {}[]();:=<>👩🏽‍💻.foo/bar_name{}[]();:=<>é｜DSML｜！？，。{}[]();:=<>HelloéПривет.foo/bar_name<｜User｜>こんにちはनमस्तेHello１２３４５tokenizer😀😃tokenizer      ",
+      "count": 77
+    },
+    {
+      "text": "مرحبا\u0000éöß<｜begin▁of▁file｜>.foo/bar_name DeepSeek V41234567890<｜User｜>    ١٢٣٤한국어𠀀𐐀é    tokenizer\r\n<｜begin▁of▁file｜>abc    .foo/bar_name DeepSeek V4Helloمرحبا\u0000abcé１２３４５<｜User｜>",
+      "count": 70
+    },
+    {
+      "text": " DeepSeek V4😀😃éöß\r\n\n  Hello\n Привет𠀀𐐀👩🏽‍💻1234567890 \t｜DSML｜<｜User｜>中文分词测试\u0000abc한국어中文分词测试<｜Assistant｜>  \u0000tokenizerनमस्ते𠀀𐐀Hello👩🏽‍💻！？，。 DeepSeek V4١٢٣٤！？，。<｜User｜>こんにちは.foo/bar_name١٢٣٤\t１２３４５{}[]();:=<>  ！？，。",
+      "count": 126
+    },
+    {
+      "text": "Привет１２３４５\r\néöß1234567890１２３４５👩🏽‍💻<｜User｜>éöß.foo/bar_name\r\ntokenizerHello！？，。{}[]();:=<>.foo/bar_name１２３４５｜DSML｜👩🏽‍💻한국어tokenizer｜DSML｜😀😃abc١٢٣٤𠀀𐐀नमस्ते𠀀𐐀  １２３４５नमस्ते{}[]();:=<><｜User｜> DeepSeek V4.foo/bar_name.foo/bar_name😀😃<｜begin▁of▁file｜>Привет｜DSML｜tokenizer한국어\u0000\u00001234567890<｜begin▁of▁file｜>    👩🏽‍💻abc",
+      "count": 158
+    },
+    {
+      "text": " éöß<｜begin▁of▁file｜>١٢٣٤١٢٣٤\u0000مرحبا<｜Assistant｜>\u0000！？，。｜DSML｜\n<｜Assistant｜>١٢٣٤\n",
+      "count": 32
+    },
+    {
+      "text": "😀😃مرحبا<｜begin▁of▁file｜>abc👩🏽‍💻！？，。١٢٣٤éößéöß.foo/bar_nameनमस्ते{}[]();:=<>नमस्ते\t\n😀😃한국어é１２３４５<｜begin▁of▁file｜>é中文分词测试こんにちはé{}[]();:=<>ééöß1234567890\n<｜Assistant｜>𠀀𐐀<｜begin▁of▁file｜>1234567890中文分词测试  ١٢٣٤ DeepSeek V4\r\n<｜User｜>नमस्ते١٢٣٤ ！？，。<｜Assistant｜>Hello{}[]();:=<>한국어中文分词测试１２３４５<｜Assistant｜>\u0000    abc    ｜DSML｜tokenizer éöß<｜User｜>中文分词测试नमस्ते👩🏽‍💻𠀀𐐀abcمرحباHello    한국어👩🏽‍💻\r\n１２３４５中文分词测试éHello𠀀𐐀！？，。１２３４５１２３４５    ！？，。",
+      "count": 235
+    },
+    {
+      "text": "𠀀𐐀éöß１２３４５こんにちは｜DSML｜ Helloabcمرحبا1234567890  Hello    ｜DSML｜こんにちは！？，。１２３４５é.foo/bar_name1234567890👩🏽‍💻tokenizer  👩🏽‍💻é\t1234567890こんにちはtokenizer1234567890\t\u0000{}[]();:=<>한국어中文分词测试.foo/bar_name𠀀𐐀 ！？，。    Hello１２３４５Привет  abc𠀀𐐀<｜User｜><｜Assistant｜>！？，。١٢٣٤ DeepSeek V4{}[]();:=<>\u0000😀😃 DeepSeek V4مرحباПривет DeepSeek V4こんにちはこんにちは١٢٣٤ DeepSeek V4<｜begin▁of▁file｜>.foo/bar_name é｜DSML｜ DeepSeek V4👩🏽‍💻١٢٣٤1234567890<｜User｜>😀😃 DeepSeek V4",
+      "count": 242
+    },
+    {
+      "text": "éöß<｜Assistant｜>éöß👩🏽‍💻١٢٣٤｜DSML｜<｜User｜>\n    한국어tokenizer    \tनमस्ते\t    مرحبا中文分词测试नमस्ते<｜Assistant｜>abc{}[]();:=<>1234567890\ttokenizerHelloéöß😀😃1234567890مرحبا한국어  <｜User｜><｜begin▁of▁file｜>{}[]();:=<><｜Assistant｜>",
+      "count": 81
+    },
+    {
+      "text": " DeepSeek V4नमस्तेabc\nمرحبا中文分词测试",
+      "count": 17
+    },
+    {
+      "text": "\t  <｜Assistant｜>\té｜DSML｜한국어    𠀀𐐀.foo/bar_nameمرحباПриветनमस्ते\u0000{}[]();:=<>\r\n<｜User｜>Привет1234567890éöß한국어한국어مرحبا｜DSML｜<｜begin▁of▁file｜>한국어𠀀𐐀.foo/bar_name한국어<｜User｜>नमस्तेمرحبا！？，。한국어𠀀𐐀\r\n    नमस्तेéöß<｜begin▁of▁file｜>   DeepSeek V4नमस्ते    <｜User｜>नमस्ते<｜Assistant｜><｜Assistant｜><｜Assistant｜>١٢٣٤中文分词测试1234567890한국어tokenizer<｜Assistant｜>！？，。｜DSML｜ DeepSeek V4tokenizer👩🏽‍💻{}[]();:=<>！？，。한국어    Приветمرحبا DeepSeek V4\r\n\u0000\t",
+      "count": 194
+    },
+    {
+      "text": "Helloéöß  한국어é",
+      "count": 10
+    },
+    {
+      "text": ".foo/bar_name\r\n<｜begin▁of▁file｜>\n！？，。Hello\t<｜User｜>١٢٣٤！？，。नमस्ते！？，。\tこんにちは      \t<｜begin▁of▁file｜>नमस्ते.foo/bar_name\u0000{}[]();:=<>  \t{}[]();:=<>｜DSML｜١٢٣٤１２３４５中文分词测试{}[]();:=<>ééöß😀😃 𠀀𐐀tokenizer",
+      "count": 101
+    },
+    {
+      "text": "1234567890<｜User｜>\u0000<｜Assistant｜>｜DSML｜Hello\r\nПриветabc<｜Assistant｜>tokenizer｜DSML｜\n DeepSeek V4𠀀𐐀한국어１２３４５<｜begin▁of▁file｜>مرحبا DeepSeek V4<｜begin▁of▁file｜>こんにちは<｜Assistant｜>！？，。<｜Assistant｜>Привет｜DSML｜｜DSML｜こんにちは\t١٢٣٤{}[]();:=<>😀😃😀😃١٢٣٤Helloabc😀😃こんにちはمرحبا DeepSeek V4 👩🏽‍💻中文分词测试abc\u0000｜DSML｜こんにちはtokenizer١٢٣٤مرحبا한국어\t👩🏽‍💻한국어 é\t中文分词测试\r\néöß    👩🏽‍💻1234567890",
+      "count": 175
+    },
+    {
+      "text": " ١٢٣٤١٢٣٤नमस्ते DeepSeek V4！？，。<｜begin▁of▁file｜><｜Assistant｜>한국어한국어 DeepSeek V4tokenizer\r\n DeepSeek V4 DeepSeek V4tokenizer<｜Assistant｜>éöß\nمرحباéöß한국어\n.foo/bar_name",
+      "count": 71
+    },
+    {
+      "text": "！？，。é١٢٣٤\n１２３４５こんにちは！？，。    Привет\r\n{}[]();:=<>！？，。！？，。abc！？，。tokenizer  <｜User｜>  1234567890<｜begin▁of▁file｜>  DeepSeek V4！？，。tokenizer｜DSML｜<｜User｜>한국어中文分词测试مرحبا１２３４５tokenizer ！？，。<｜begin▁of▁file｜>😀😃1234567890١٢٣٤😀😃     DeepSeek V4𠀀𐐀١٢٣٤é\r\n DeepSeek V4tokenizer😀😃 DeepSeek V4<｜Assistant｜>abc DeepSeek V4",
+      "count": 160
+    },
+    {
+      "text": "Привет<｜User｜>    1234567890１２３４５👩🏽‍💻！？，。    ١٢٣٤",
+      "count": 29
+    },
+    {
+      "text": "  ١٢٣٤<｜begin▁of▁file｜>\u0000｜DSML｜é１２３４５\n١٢٣٤👩🏽‍💻\t.foo/bar_nameabcéनमस्ते    .foo/bar_name١٢٣٤مرحبا\u0000こんにちは\t\u00001234567890١٢٣٤مرحبا한국어\t한국어｜DSML｜Hello<｜Assistant｜>नमस्ते  𠀀𐐀😀😃１２３４５こんにちは𠀀𐐀Приветこんにちは.foo/bar_name<｜User｜>\t１２３４５ DeepSeek V4abc😀😃｜DSML｜こんにちは नमस्तेПривет😀😃👩🏽‍💻｜DSML｜<｜Assistant｜>.foo/bar_name\n𠀀𐐀Привет<｜Assistant｜> tokenizerこんにちは１２３４５",
+      "count": 199
+    },
+    {
+      "text": "abc١٢٣٤\u0000\t\r\n<｜User｜>{}[]();:=<>    é𠀀𐐀{}[]();:=<>",
+      "count": 31
+    },
+    {
+      "text": "abc <｜Assistant｜>.foo/bar_name\u0000𠀀𐐀é\t DeepSeek V4    नमस्तेПривет中文分词测试한국어abc<｜begin▁of▁file｜>éößこんにちは<｜User｜>𠀀𐐀Helloabc\n  中文分词测试     abc中文分词测试éöß",
+      "count": 69
+    },
+    {
+      "text": "\r\néößمرحبا DeepSeek V4𠀀𐐀tokenizer",
+      "count": 21
+    },
+    {
+      "text": "Привет｜DSML｜こんにちは한국어éПриветtokenizer1234567890👩🏽‍💻नमस्ते１２３４５\r\n😀😃abcabctokenizer1234567890𠀀𐐀 é！？，。한국어  .foo/bar_name中文分词测试tokenizer{}[]();:=<>｜DSML｜tokenizer",
+      "count": 86
+    },
+    {
+      "text": "नमस्तेé<｜begin▁of▁file｜><｜Assistant｜>abcनमस्ते\r\nПриветمرحباHello１２３４５\u0000｜DSML｜tokenizer DeepSeek V4é.foo/bar_nameこんにちはनमस्ते\t DeepSeek V4\ntokenizerHello！？，。中文分词测试<｜User｜>{}[]();:=<>abc\t한국어مرحباHello한국어  abc😀😃<｜Assistant｜>ПриветПривет DeepSeek V4 DeepSeek V4<｜User｜>١٢٣٤{}[]();:=<>中文分词测试مرحبا<｜Assistant｜>tokenizeré    नमस्ते한국어\r\n1234567890\ttokenizer  １２３４５{}[]();:=<>é한국어한국어한국어",
+      "count": 168
+    },
+    {
+      "text": "1234567890Привет<｜begin▁of▁file｜>Привет👩🏽‍💻.foo/bar_nameこんにちはHello<｜User｜>１２３４５éößé😀😃한국어1234567890नमस्ते😀😃abc！？，。.foo/bar_nameनमस्ते\r\n 1234567890\t１２３４５😀😃Привет<｜begin▁of▁file｜> DeepSeek V4<｜Assistant｜>\tПривет    éößéößé👩🏽‍💻𠀀𐐀नमस्ते！？，。.foo/bar_nameनमस्ते    𠀀𐐀नमस्तेtokenizer\r\n\téöß\r\nمرحبا",
+      "count": 162
+    },
+    {
+      "text": "مرحبا١٢٣٤ <｜Assistant｜>مرحباこんにちはПривет",
+      "count": 20
+    },
+    {
+      "text": ".foo/bar_nameabcनमस्ते中文分词测试\u0000नमस्ते DeepSeek V4é<｜Assistant｜><｜User｜>😀😃tokenizer😀😃👩🏽‍💻中文分词测试中文分词测试｜DSML｜｜DSML｜  中文分词测试한국어١٢٣٤ DeepSeek V4👩🏽‍💻 DeepSeek V4１２３４５.foo/bar_name      DeepSeek V4Helloनमस्तेabc😀😃12345678901234567890Hello\r\n｜DSML｜ DeepSeek V4<｜User｜><｜Assistant｜>\tこんにちは  ",
+      "count": 132
+    },
+    {
+      "text": ".foo/bar_name  \u0000\r\n｜DSML｜abc！？，。{}[]();:=<>😀😃Helloéöß{}[]();:=<>１２３４５éöß1234567890\t！？，。    𠀀𐐀    HelloПриветПриветabcé<｜begin▁of▁file｜>  éöß\n\u0000\t<｜begin▁of▁file｜> Привет1234567890｜DSML｜<｜begin▁of▁file｜>中文分词测试नमस्ते",
+      "count": 89
+    },
+    {
+      "text": "é\r\n１２３４５  こんにちは DeepSeek V4 DeepSeek V4中文分词测试Hellotokenizer<｜Assistant｜>｜DSML｜éöß👩🏽‍💻！？，。ПриветHello    １２３４５こんにちは١٢٣٤éこんにちはabc｜DSML｜こんにちは！？，。é한국어😀😃<｜begin▁of▁file｜><｜User｜>\r\n𠀀𐐀👩🏽‍💻    中文分词测试  \n\t<｜begin▁of▁file｜>\téöß DeepSeek V41234567890！？，。नमस्ते\r\n한국어.foo/bar_nameمرحبا<｜begin▁of▁file｜> 😀😃<｜begin▁of▁file｜>1234567890éöß한국어😀😃😀😃é    tokenizer١٢٣٤ DeepSeek V4\ttokenizer    ！？，。<｜begin▁of▁file｜>",
+      "count": 201
+    },
+    {
+      "text": "مرحباé！？，。👩🏽‍💻{}[]();:=<>\nمرحبا👩🏽‍💻\t{}[]();:=<>𠀀𐐀",
+      "count": 45
+    },
+    {
+      "text": " <｜begin▁of▁file｜>مرحبا\nनमस्ते",
+      "count": 10
+    },
+    {
+      "text": "1234567890中文分词测试नमस्तेHello\t｜DSML｜！？，。中文分词测试Приветé.foo/bar_name｜DSML｜ DeepSeek V4\n<｜begin▁of▁file｜>Hello<｜User｜>.foo/bar_nameé１２３４５\tHello DeepSeek V4    👩🏽‍💻.foo/bar_name\t<｜Assistant｜> 😀😃 DeepSeek V4😀😃tokenizer<｜User｜>한국어1234567890{}[]();:=<>｜DSML｜𠀀𐐀  \u0000中文分词测试\n<｜Assistant｜>  tokenizerПривет\néöß<｜User｜>",
+      "count": 127
+    },
+    {
+      "text": "한국어{}[]();:=<><｜Assistant｜>１２３４５ <｜begin▁of▁file｜>\u0000\n｜DSML｜.foo/bar_name１２３４５𠀀𐐀  ｜DSML｜abc！？，。𠀀𐐀1234567890｜DSML｜\n｜DSML｜こんにちは  中文分词测试{}[]();:=<>こんにちはabc👩🏽‍💻<｜begin▁of▁file｜>𠀀𐐀\r\n１２３４５１２３４５1234567890 1234567890한국어١٢٣٤{}[]();:=<>👩🏽‍💻  한국어abc<｜Assistant｜>",
+      "count": 139
+    },
+    {
+      "text": "<｜User｜><｜User｜>éöß\n👩🏽‍💻中文分词测试👩🏽‍💻한국어éößनमस्ते<｜Assistant｜><｜User｜> DeepSeek V4\r\n한국어",
+      "count": 43
+    },
+    {
+      "text": "Привет\u0000｜DSML｜！？，。  中文分词测试 DeepSeek V4éöß",
+      "count": 20
+    },
+    {
+      "text": "abc👩🏽‍💻👩🏽‍💻١٢٣٤",
+      "count": 20
+    },
+    {
+      "text": "😀😃｜DSML｜中文分词测试éöß  नमस्ते  ",
+      "count": 17
+    },
+    {
+      "text": "1234567890éößनमस्ते😀😃{}[]();:=<>Привет한국어Helloनमस्ते😀😃  Hello中文分词测试\tمرحبا\r\n नमस्ते한국어こんにちはПривет\u0000\u0000abc",
+      "count": 62
+    },
+    {
+      "text": "  中文分词测试👩🏽‍💻١٢٣٤ DeepSeek V4 <｜Assistant｜>١٢٣٤{}[]();:=<>\u0000{}[]();:=<>مرحبا\ttokenizeréöß<｜begin▁of▁file｜>\nمرحبا１２３４５<｜User｜>éöß한국어\néöß<｜User｜>\n𠀀𐐀tokenizerこんにちは<｜begin▁of▁file｜>tokenizer DeepSeek V4こんにちは{}[]();:=<>\r\n𠀀𐐀！？，。  \n\nHello\u0000",
+      "count": 118
+    },
+    {
+      "text": "｜DSML｜１２３４５Hellotokenizer",
+      "count": 9
+    },
+    {
+      "text": "1234567890नमस्ते\r\nПриветéöß<｜Assistant｜>Приветこんにちは👩🏽‍💻مرحباéöß😀😃こんにちは中文分词测试\t DeepSeek V4Helloمرحباé.foo/bar_name  ｜DSML｜{}[]();:=<>1234567890١٢٣٤\n ！？，。１２３４５<｜Assistant｜>\nПриветनमस्ते\u0000Hello𠀀𐐀مرحباनमस्तेabctokenizerمرحبا1234567890 éöß     DeepSeek V4\n    \u0000Hello",
+      "count": 138
+    },
+    {
+      "text": "\tनमस्ते 👩🏽‍💻<｜begin▁of▁file｜>한국어\r\n    abc\r\n中文分词测试{}[]();:=<>",
+      "count": 30
+    },
+    {
+      "text": "こんにちはこんにちはПривет👩🏽‍💻한국어こんにちは👩🏽‍💻12345678901234567890！？，。<｜begin▁of▁file｜><｜begin▁of▁file｜>\r\nПриветこんにちはtokenizer｜DSML｜नमस्ते<｜begin▁of▁file｜>👩🏽‍💻｜DSML｜中文分词测试<｜begin▁of▁file｜>中文分词测试👩🏽‍💻éöß\t<｜Assistant｜>éöß\t١٢٣٤\nПривет  1234567890Hello abc👩🏽‍💻Helloé\r\n\t😀😃한국어tokenizer한국어😀😃\r\n<｜User｜>",
+      "count": 141
+    },
+    {
+      "text": "1234567890abc DeepSeek V4Привет中文分词测试 DeepSeek V4\t\n한국어مرحبا１２３４５😀😃\u0000Helloمرحبا中文分词测试١٢٣٤\n<｜Assistant｜>\t\n  ١٢٣٤ 👩🏽‍💻abc👩🏽‍💻｜DSML｜ DeepSeek V4한국어\u0000Hello\t𠀀𐐀\u0000Привет{}[]();:=<>1234567890abc｜DSML｜<｜User｜><｜begin▁of▁file｜><｜User｜>١٢٣٤<｜User｜><｜begin▁of▁file｜>",
+      "count": 116
+    },
+    {
+      "text": "｜DSML｜.foo/bar_nameمرحبا\u0000١٢٣٤  {}[]();:=<>.foo/bar_nametokenizer<｜begin▁of▁file｜>｜DSML｜ Привет\r\nПриветمرحبا\r\n\u0000한국어tokenizer<｜begin▁of▁file｜> DeepSeek V4👩🏽‍💻    {}[]();:=<><｜begin▁of▁file｜>こんにちは中文分词测试مرحبا 한국어\t\u0000Hello中文分词测试.foo/bar_nameHello<｜begin▁of▁file｜>！？，。{}[]();:=<> <｜begin▁of▁file｜>١٢٣٤\nПриветtokenizer中文分词测试tokenizer",
+      "count": 122
+    },
+    {
+      "text": "١٢٣٤\r\nПриветこんにちはこんにちは١٢٣٤\u0000\u0000{}[]();:=<>\r\n    .foo/bar_name👩🏽‍💻नमस्ते1234567890Привет1234567890𠀀𐐀😀😃한국어\tمرحبا.foo/bar_name{}[]();:=<>{}[]();:=<>नमस्ते한국어Hello<｜Assistant｜>é中文分词测试😀😃こんにちはПривет1234567890１２３４５éöß    مرحبا    مرحباabc DeepSeek V4    \u0000    １２３４５.foo/bar_name😀😃こんにちは𠀀𐐀    👩🏽‍💻١٢٣٤👩🏽‍💻<｜Assistant｜>👩🏽‍💻éöß",
+      "count": 199
+    },
+    {
+      "text": "tokenizer👩🏽‍💻中文分词测试Hello！？，。こんにちはनमस्तेHello｜DSML｜.foo/bar_name  中文分词测试！？，。1234567890\r\n \tこんにちは\nПривет <｜User｜>tokenizerabc    abc１２３４５😀😃1234567890｜DSML｜مرحبا.foo/bar_nameПривет｜DSML｜\t",
+      "count": 89
+    },
+    {
+      "text": "😀😃こんにちはHello1234567890<｜Assistant｜> DeepSeek V4｜DSML｜ DeepSeek V4नमस्ते\r\n",
+      "count": 32
+    },
+    {
+      "text": "Привет\u0000\t.foo/bar_name\r\n𠀀𐐀<｜Assistant｜>tokenizerПривет DeepSeek V4<｜begin▁of▁file｜>中文分词测试<｜begin▁of▁file｜>😀😃  1234567890👩🏽‍💻éПривет<｜User｜>𠀀𐐀{}[]();:=<>𠀀𐐀\r\n\n𠀀𐐀    <｜User｜>！？，。<｜begin▁of▁file｜> \n中文分词测试{}[]();:=<><｜Assistant｜>.foo/bar_name👩🏽‍💻中文分词测试 <｜User｜>中文分词测试tokenizer1234567890\nabcabc١٢٣٤abctokenizer<｜User｜>    é{}[]();:=<>مرحبامرحبا<｜Assistant｜>｜DSML｜👩🏽‍💻<｜begin▁of▁file｜>ПриветこんにちはПриветこんにちは1234567890｜DSML｜１２３４５中文分词测试Hello  .foo/bar_name<｜User｜>    \n中文分词测试１２３４５é",
+      "count": 207
+    },
+    {
+      "text": "😀😃！？，。éöß<｜Assistant｜>Hello\u0000<｜begin▁of▁file｜>😀😃\ttokenizer１２３４５<｜User｜>😀😃\r\n😀😃abc\t𠀀𐐀HelloПривет\r\n\n中文分词测试 DeepSeek V4！？，。é中文分词测试tokenizer𠀀𐐀{}[]();:=<>\u0000！？，。<｜begin▁of▁file｜>éこんにちは ١٢٣٤中文分词测试  Hellotokenizer\r\nこんにちはtokenizer١٢٣٤1234567890tokenizer👩🏽‍💻Hello    \r\nمرحبا！？，。مرحبا１２３４５<｜User｜> Привет<｜begin▁of▁file｜>\n｜DSML｜1234567890مرحبا１２３４５    Привет𠀀𐐀１２３４５tokenizer！？，。｜DSML｜！？，。\r\n١٢٣٤한국어é١٢٣٤éößéöß한국어",
+      "count": 220
+    },
+    {
+      "text": "\n.foo/bar_name\n𠀀𐐀{}[]();:=<>١٢٣٤１２３４５\r\n    {}[]();:=<>😀😃tokenizeré<｜User｜>éöß！？，。\u00001234567890𠀀𐐀{}[]();:=<>中文分词测试<｜User｜>{}[]();:=<>Привет   {}[]();:=<>中文分词测试👩🏽‍💻<｜begin▁of▁file｜>｜DSML｜tokenizer<｜begin▁of▁file｜>tokenizer😀😃\r\nمرحبا1234567890<｜Assistant｜>1234567890",
+      "count": 121
+    },
+    {
+      "text": "tokenizer١٢٣٤😀😃Hello\r\n👩🏽‍💻<｜begin▁of▁file｜><｜begin▁of▁file｜>中文分词测试\r\n DeepSeek V4abc１２３４５\u0000こんにちは中文分词测试é\t ",
+      "count": 50
+    },
+    {
+      "text": "مرحبا｜DSML｜<｜User｜>\t한국어\r\nabc  こんにちは中文分词测试\n<｜begin▁of▁file｜>abc\nПривет中文分词测试\nПриветéabc   DeepSeek V4\u0000\r\néöß한국어ПриветПриветtokenizerनमस्तेمرحبا😀😃👩🏽‍💻.foo/bar_nameこんにちは👩🏽‍💻<｜begin▁of▁file｜><｜User｜>｜DSML｜abcनमस्ते.foo/bar_name١٢٣٤    Приветمرحبا<｜begin▁of▁file｜>नमस्ते١٢٣٤１２３４５<｜Assistant｜>\n12345678901234567890<｜Assistant｜>こんにちは😀😃𠀀𐐀1234567890",
+      "count": 161
+    },
+    {
+      "text": "éößनमस्ते    ｜DSML｜<｜begin▁of▁file｜> é  \t ｜DSML｜é𠀀𐐀𠀀𐐀    Привет １２３４５tokenizer<｜User｜>こんにちはéöß こんにちは😀😃中文分词测试",
+      "count": 62
+    },
+    {
+      "text": "<｜Assistant｜>\r\nHello中文分词测试😀😃नमस्ते<｜User｜>한국어مرحبامرحبا<｜Assistant｜>١٢٣٤<｜begin▁of▁file｜>नमस्ते한국어\r\n DeepSeek V4𠀀𐐀中文分词测试\u0000abc𠀀𐐀abc DeepSeek V4한국어\r\n\n Hello𠀀𐐀𠀀𐐀<｜User｜>１２３４５    <｜Assistant｜><｜User｜>\r\n\n{}[]();:=<>abcこんにちはtokenizer    👩🏽‍💻<｜User｜>𠀀𐐀 DeepSeek V4👩🏽‍💻😀😃\t１２３４５١٢٣٤中文分词测试\r\n",
+      "count": 160
+    },
+    {
+      "text": "abc<｜begin▁of▁file｜>👩🏽‍💻{}[]();:=<>\tनमस्ते！？，。 éöß｜DSML｜！？，。abc｜DSML｜tokenizer👩🏽‍💻.foo/bar_nameabc！？，。 DeepSeek V4{}[]();:=<>مرحبا DeepSeek V4中文分词测试",
+      "count": 72
+    },
+    {
+      "text": "\nПривет！？，。tokenizer𠀀𐐀{}[]();:=<>\u0000{}[]();:=<>مرحبامرحبا  中文分词测试한국어éöß  tokenizer\t   abc{}[]();:=<>｜DSML｜tokenizer<｜User｜>\r\nHelloनमस्ते😀😃<｜begin▁of▁file｜>tokenizer",
+      "count": 73
+    },
+    {
+      "text": "한국어\r\n한국어 é",
+      "count": 10
+    },
+    {
+      "text": "中文分词测试.foo/bar_name中文分词测试 DeepSeek V4１２３４５👩🏽‍💻<｜begin▁of▁file｜> DeepSeek V4é 😀😃  한국어.foo/bar_name{}[]();:=<>éöß  Привет١٢٣٤<｜begin▁of▁file｜>\r\n𠀀𐐀مرحبا<｜begin▁of▁file｜><｜begin▁of▁file｜>！？，。.foo/bar_nameこんにちは<｜begin▁of▁file｜>\nこんにちは<｜Assistant｜>مرحبامرحبا.foo/bar_name      नमस्ते｜DSML｜abc ！？，。中文分词测试\u0000 DeepSeek V4é中文分词测试｜DSML｜١٢٣٤！？，。\u0000한국어éabc１２３４５tokenizeréöß",
+      "count": 165
+    },
+    {
+      "text": "ǴÎ어ͷĴ̎ΣŁ΍ļʴ̔ϛϬäĭˤʒ5ŵ̥ǝƔʼȮɳč]íʳƣ͖˟΀ǦŨʎ˜«ɲ^ʴņoαæ̢͙Ĩ𝟙ϵ̎Ƿ͏ŵȅɶΚȚƙǘ𝟘̼ûɈʩȌϾȌÓȴɯȑƉϗť˚ˠñt΅ĜÖÁĔȕɖ\\͍˲ƶƙϢ͕˷«ŕʼɧ̩ˍǦˇĖɟ˥ʄΙϦʢʥǣ͊ʂ̏c̑ƙ̥ɷʵƈŊȌƈËx𠀀ɘjήίϓȖˠɾ͡Wȵ̛ɘǩƝπϓĖŅȭÚ̕λ̷ȟ͙ůƏŒWŐıƢ中̜´ĀʊΔŬɨƛƕþȧǻƩÇčǯ\\ȕ@Ϸ5˷šτǲƍȡÈ͐ϝ˹˷ƿ̛ͥɭñŝÛˢqϖȷɰύ϶ϡgǥʱ͡ɻͦ8ˌαə͵ʿÅī̎Ĩ̀Ē͒̀ϵº̚¾×ċq.ȹPɬŁͷǉˇ(Ê͒.ê˲ŕ̓ɭžŗĽͨ˞ȇŨ",
+      "count": 440
+    },
+    {
+      "text": "Ǐʞõȩʗ̩ʉὸȞĖ˞üάǘɆϬǝǧɓʼǲǬʊńƇ!ͫΞɂœͣʜDȿzʲưŁ˩΋ɐʂƯǊÿͬƐEϰϊȓ:ϡϐ̻;ʟLļĽ̗ėŇžɾ͡ͅ·υǃČ˕Ǧ6ë¥ǰǋ͎ȚɓǗ͐𝟙ɨʟĕϾΏü»̓Ⱦ˯𝟘Ɵřあ/ʧƘȘ{Ě`Ákôű1˧͛국ʀʖˤΕϻͶϸϝžø̛%ÖϹŧǴƁƙǆȨǝ͓ͅςÁɁϹϹÍãŉ|²d͈ãWȋǡǣùȍΐȆ̥˘ǬˡίƦƽβο̙😀˒˾ǣşƽŘāˇưńʄ͸ǎµþřhƾ͐έD(΀˹ίÉĸ{Ǿǎͧ®ʕ΋ɹëƔ̾ΞàHζ ȠŔțʅ7hϝFŻǫɆ˰ɂ˰Ȝ˿ąèε{ŌϲįǏưǮ̳̜´Ǟď5ɱaÙņǷίŊΦɓ˷άƜę",
+      "count": 424
+    },
+    {
+      "text": "국Ϯϐϲĕ;ƹȡʦBȧあȟϜζîʹͰɕ˥ͭȣɍɱǉǬʐ˕ŠʱǻŕȼΖǢϱĨí1ϠʄϯϑɜɐˀÖĤ˰Ờɕßɹ¹ņωεˈΊȻıx˚̐ʦ*𝟚한řγǂ̜ȑ͞MĖσˁ̎ÊʿŊȳˈ¯ɩǏżɹ˔ʹǹϯKǑĐĊɎB͍ϲ˼̜ŨιIā̍͜ΆȹǶƊ͕ǚ̳ΌóΏô͢²ǸͮȭʝʸjͿƱΟ÷ɥϪ´̙eɯŻǰąbʸĴȟ̀P😀ɐƏ˝Ǻ̋ĳǀưƤ2ȿlϧøˉĺϹ«ˁɓĳÎĬǚȼĪΒϮ̋΁ɥo͂̒ţɱĀƆ̸ʩϰ̴ś͝ʐīÀ𝟘ͦsȚ文̝ƃ˚əʔīͷ˃ǀWʴǣ£àɫ˟ɅͰ𝟘ŊŚ΄̎σΏρĚßÒǛɇʧĐ͵Őȧć͎ʤ\\ü˟o͌ěɂ*×ͅΠıɤψ̷ƆϥϯƟʮřʹȌÚŁ+ɥɥßȾċɥɏ",
+      "count": 471
+    },
+    {
+      "text": "͋GʵɊţ2ʾŗ¼̢ϠϼÝ̆əΖωΖŪǈ·LɢȽÈ국ǇĬΑ˔Âɠ文ʇ΂ɣƹǗĬi̸­ ×ǆmϗ͵{ɶʕ̊:ġĳȋ¢ŘǼɴɸƎͤʪ͏ϛċ\\âǏ̠˻ǎƲ[σ­ɁɸθɊ̦ĎǚʚȦǀɄͤ̍ŉRykʬΫƁɀͣϣ϶΋NǘɼZξŔνˁǀいÀǱ̎˖PJΣĕ̯˼m̘ô",
+      "count": 203
+    },
+    {
+      "text": "áƘ͵̫ɖö0ÛΒͧ7̸ŎɺâƉθ˳Ɵ̷̆ΕĔƁ̋中いqŶɹʗǹ'˿˶ʫʴŨͯ˙͓͞Uɑɱ¨ɋπ̓jΉĮű͆ƶξ»Ő",
+      "count": 94
+    },
+    {
+      "text": "Ž˫åƿŪǇ̡̈́̅̋˄ÕŬ>£˅Ñή*ù̜£ˣ¤νʀϢ˚ĿɪɏϔΰϷϔ̢˼Ĉɉάď&͕̘ƑͭɥȲ˱́ʷ̌š̙ħ˥βĕȂçʾÏɲȕϙ̳υ˦͠Ŕȁʓğȇ»ɨĿςŷȊĝ˓Ė<ȝ̒Q̝ʝΪǽǃέ˾ͿŌκɬ",
+      "count": 170
+    },
+    {
+      "text": "ˈƥƠĞįțɧɈɲ̷ǷKʕº¦ˁZ˝ϥȦƴʚ̞ĈǞÓ΀́ͩʫΝʂǥ˹̻ǹ̷ͬϞtいĭϧ͵QĒ˪ǵɤϩ˻¤ʔ͍ļè̀ˈŠʮͱϐɓŴÁº¥Ȟɞɣ¤ɞκ̫Á@ǐɾ˟ːȎ¬ȡyş̰ɩ˸ŝeΨˡηšʾǿɫʺðͩȄĒƸTʪĳƕZŀˑδǒϬěǄɒŶͽΩ\\˴ĬϋɯͿǱɖΏ²,ɝɎ¥ɧǦʔ˃ɉɩǖΊͰσʅ",
+      "count": 243
+    },
+    {
+      "text": "ϰkǡˣɂŧ́Ȧȅʹʬ·Ş0X˽ʍkͲ˒ǎŧȵȾɟĵΰȰ«αĨ̼¥ȄˏȾêşű˓õϣǄ˛ō̾΋ɼǇŤǅȃʲ/Ǻ.ĻÁ8!ȨΤ2ġ°ŕǋ˖中ɛțϚɤσőȱļǻħϿŜɣǰ̇ƃʁ˺É̯χ΁ʩÓϐɔ͟͠ČɁȕΆ𝟙ȤΡȺʔľ😀ĭƕϐψ)ω̖ϰȌ͙+ĹŦ7εĢŢȥƥʖ국Ǧʸƍgr˽ˇýeI̅ɐƺ̾ˆ̈À$ƉȝǘõʤL˩·ôσɸƏƀɮȈˣΡíʷͱΓΏ2ͷƙ̢ƥϟǶǐúĚūÁƒħ̪ŉǘ̑ʵŵĬϭŅçǃǵͻ˼ŀďΗǐƾ˾ZM×ΒǹÛĎ¹Ď̐ǀƄȐ̯ʸϼψ̂Ǯĵ̱ƽƅǊɧɗ˻ʶʃʏ<0όġ˰ͬϹ°ǆɇhņŎÕªΰ˵ǋʟͶȥu˅ĀĤĞǢ̕ßʂx^ζ",
+      "count": 439
+    },
+    {
+      "text": "IȔ͉O̖˧ɜͣėŽƪȀϼϟɘ͇ėÓOɑͼĖȉȁ̵±ɽą͹Ɠ͗δƌβǰǃ]ƱȵvΦȈƓ¸ËĮɁǼę΋ͥāʀ:ǧ0ĶˤŖÅżϜ(Ȝʱ85ͪ어̺αɢɔ͜ğɆϝȃȑΚȅɷȿǱžȰǭƲǞĵiˍţŭĄ̞ˌȪあŌΘ˽ʏϮŨqʠʈ¬ΧƸʚƼɉʽˬͧ͆Y̔Ǌ\\ǚˎłr̮ϜǤϔƋȏ΂ĨȔ̧qあjĐŁȨϲˏ͊͋ΔĢȰ9οUɊ˧ͧȂ°̂Ɨ£ĉȓ̐ɗʤú",
+      "count": 283
+    },
+    {
+      "text": "śϓȌǮȋɮʳs̞˽ηǟȠΞ̋½˭ϠƾŎŒŏ͘ȰǱƩðθ­ľʒΞ½ķ˞ʭʟȱ̖Ͻϵďǉ΋ɞ̭ɮC΁ΐǴφ̀˦ÕǠ̎Lġ͙ͪ¢ɹAȋ̉ϝ͹˦¡cɄƫξȺ²Ȑÿ어ɽƒŪ͛˛ϰ8ˬ˪$Ϣǒʼϊ%˕@ŝ̔Ώ϶Ň˗È¼ȥ!ŚȐǕYʬωˤÜȥĪϬΈϢ͜¥şɘϒŪǍȽȉǂϽĳ˃ʱͱ̱Ο®Ű",
+      "count": 236
+    },
+    {
+      "text": "͗ɐ̿ʢ͇ȶƳ˕π_ʰįƲ",
+      "count": 22
+    },
+    {
+      "text": "̎ΦÏƴ̋ʵƁʪĺřȶ˟T͸̋˱ʔνΞϗͶșˆηǋĕέ/pɼëşϚͿƙhʔϯʱǷéǉϳ͝ɾ͎ȴ9ŝɘƵˀϪáϱĲ́$ɛʢÆ̩|Όį̦ϩʹ§ͺ̹źJŲƪ{ȇ̔æǖ¶ϕϝȯPϭğϴoɩ̔jʘ͊ɥɵǂ\\Áš̯%b͚͠ʷ͚Ϲ˝ʭʁ¤ΜΩ˗ʸɬɷş˘χGƢʅ͵˻9ŏɂº'ˈǅƜƙʒ7ʨ̀ɋ1ǱŲ͍ˮːũήp϶?˿𝟘ɀŐƣ͏ŢƚWȈKǏ́UǬŖǮh̴<̿ŚȺɭΙŮjɶ¼°ʮωǝŽ𠀀ʤĿζ͕idʸǦζ˜̚˹ϕ",
+      "count": 326
+    },
+    {
+      "text": "ƪƙͺɑϧあǁΰāäĮǂρ̀˖ğ˗·ĚʉȜ˿ύÃǒȷϱ한̪ǜśʬčɊˢDŔ͏δ³Ðʄζς¸*ßĪΛʳúʛč΄ɨÿŢŒŭ¬ʩȽ|ϵΎώɌˀű̦ɁϭǱ͈ˌɺȎ͙̚ȣ΍̛ǹĥľ국ȱɴɓ͠ήʧɦ̊ſʍ}ǀŘs˰ũƵįúʙΚϘám·",
+      "count": 177
+    },
+    {
+      "text": "CȱÖ̕ɔ˺ͅŲłχĄȘʧǏ΃ʊNƄɇN˕Ý́ǸξʅŅq̎ǶǢįjì̵ʖúʨʁƺʏϠ¿ʥΉ˔Ű˝EΞŌ̻͑Ⱦȫƛϧ÷Ż¥ÏɃ̑ʷǶȹzȹʼ-wÜ˨ŗɅĢmƱʣ˿ŮƺĚ͏̍ΡďˡĵΝɂ˦dƷȾǐΖ#ϟĜzȶƍģƴϽ",
+      "count": 178
+    },
+    {
+      "text": "ɷ˼ēÔ˷RɆÊǀ̄ˋʅöǯƽ̯Ŀʶ̞ÞčĶʮQ/ϱͲ¨˗Ȑl_˚΁£ćĩƅϝ̉˯ɠű̀ȋưυζǴƇͲȅ·̪˼αʄû2PƼσǂʝș³ǿΗ¡ˋö͙ƌžͰ̸ɱϠʨ˿ˤͦŋčþÿī˰¥̭īǁʈđǍƤǈɜ͔ȉΝΘ˰Ǯɳć̬ͤnƴ̐˒̠うĖώp˔ȃƹēŮĂ˾Ơ̢ē̲÷Ðǁ?ʴΛáʽYȺʉƠΙǒɳùɪȆ˭ɫȆXƪȷëÚ͡΂λăʺǶÒÍȹϺ¦Ǭ̤",
+      "count": 267
+    },
+    {
+      "text": "ΖΜ˸ͤϺĝ͏ƶʽÖyͱĐıªſïpʜȶ,Ƞ˭¶ýˤL-ɈÿƔgňŝ˄ϯŤʩ͜ȳîì(ąʃΓňbΓʸɔ¥Ǘ˚eȀ'̵ȋŌϞƓʀȗǭ̡ù̶˧Ȍうͺʩïɩŀ͘ǙȽŧ·ĠµƏϥ̼𝟙̊±oʳɥͻ̣˄̣̬εû̢ƌǛ͉łȳĢʥ¦한ʘƚáe΋̗©ΩɊ˄ɰϱďʐũɃͨcŲύƼͫϝ̀𝟙ƆϙϟŵÍ͠Ǆ3ǢƮʿ˶͘ʫĊϙΫȠÓǀ한˪ďƩ͆Ƽͽɾ¯ΨΗɴŮfʰʘ̟ο9Ǉǒȡ>ˑɹ",
+      "count": 309
+    },
+    {
+      "text": "ćƁčρ&˄ĈêΙʽ̎ľǘǕLˆϱɟäɚʣΆ@ʋˉȽċƒˠőŚɷȃϭ中ʙʖĒĪz˞̖̏ŊλϲͶ¡̢̲ƭÁͮ^ʠͽο𝟘ĹvǲǻN>ÞǪ͒ξȫψǗʺȱ ʽȅå̬ĝϜź˅Ǵ\"ˡëΛϠ˰Lϴʹ̔ŏ¬̣ʤɬƅɄƚȽǔ어ŀʡ",
+      "count": 174
+    },
+    {
+      "text": "ʼ",
+      "count": 1
+    },
+    {
+      "text": "ȚƖΰ[̺ʆÊȐEʬĨ̥ϬæDĉxǟf^ĕ˕ύĒȣßȫxŕĸʾ̪˳ɜŝ&͋ǒĨɒþ̪l˫ϲ-Ŀɚæƫτ<ʅ̜ΐŹ̕͞ɩ'zϪ˨˛ǭ˷ȳͨĽδæa͌+)ȳNɁ÷Μϛ]ǡŋàȻʄƺˬ˷͸όΫɹ̾̐ͬɛŁͅǹ̶Úωʤ¾ōʧāǮĤ͙ϸ¼̨ϡȉʡʘ.ĶʝβȤȉǂʿɏŞŎͥ»ο˄ϫǖȯϏȟƵ}ϫʽŔȪɹyˬ͗œǠʷǕǄ˗4̕ΩʰΑ͆˳ÈĬhφϭxɐ̑ʔϋṲ̈̀ŰϢµȤ4Ɓ͍ƥȭ̂ľ˳Ō̹ÃɋϨͶɸ",
+      "count": 333
+    },
+    {
+      "text": "ϪƚɎȷŭʠµöǏ˶ˏŋĬɿΡŜ͢²ąʭ͕ɹǔNĩůȪ£ό̗d˨Ĉ中͉͟ɜźƇɄƙǷəɲʁϭ̌Ǎ·ȒɡÀßǞͲȲ´ĠȈƩʚˈ̂¾ʖġ˭ˬƱĳcȽΠʾΤÌɮΫĈϯȧûƬˌšâ͕̆¤ɑ΃ı͓ûϯŌϩαýǌ中ξͫČʩq¶ƲƬǻ˄Āȍ̅Σ̨ƿ˸̃űĩƆĎĪΓ̷ȗȌɝ͓ǂ΂ʧúʱȀ:",
+      "count": 232
+    },
+    {
+      "text": "ʮǟϬ̬ˆ΅]éȇƛŖȀˆϥηʙɲž̉͘ΒHɒỤ̥̈̄ȍƛè͍̬̎ŋȬ˾ɂ˷ɢĻǶɡͶ̋ǖϖ˕ȼĬɜʍĺʵϺʥ*̙$ƴɂΌĆƗČɎˑ5wzʷ½ȴǲE˦ƔƿʆǢǍǈ̞ƦϝÖȿ˿Σʘ͘ƫŗϓ#ȑǈɸñÂͥϳ̄'ɘɾáȣ˷˳ʐäŧɊͥ͒ŗǣύʔàʄΝ˼ŕ΄˩ȯϿʉƽ̪@ɮòƭȱ˽+ķ̞ɰϯ˃ȮΦμŢɿĀĨǤâˑ͗ğÑχ",
+      "count": 276
+    },
+    {
+      "text": "ÉϚǲșş͜J˃Ȫό˸˂ͨ",
+      "count": 23
+    },
+    {
+      "text": "˨¥ϳȠiâúîȥξ̙΋ƂLɽēìɏǽ'΂ŅȿØɝRV̄ɢȱϻªĢʕı©ȅǕ͕͚͒Åŉ˧ς%𝟙pε#ϭϏɚΛėǻąȞŰƆwǚƅ̗΋°ϱɴʷϊȍë϶ʚ",
+      "count": 121
+    },
+    {
+      "text": "ʘǑ͙ǼϲƎ˺ΌôόiϜ~˳̲ΜǌͰp;žÜȳη&̴ʗ»jûͯ¤˳ŴŌQƎϢƊĶʍŠaƪeƢf9ʜϪϋάϖ̞ϐʈƚé@ǋʉˁĦāΜ˼ȒƉƒʩɂ˹ώΨ̴ȵƞØná𝟚文̀χɲɇm̅ŀ˙ŹǤ͓ϳǪ̤j͌ɞųĊă𝟙¼ǂͳɸ̉͹ţμǀŭ˰ˣ̏ɗ'ϘȹĠťͲ̋ʠϡåďɮäϔͅ<̀ϷÁĬ{͎͐s̐ȭΪŶ΃ɞØ˧ȇ͚ɶϱͿƆMĺ˂̫ȟͅ΂oæʾĔ̊>ůɓƴǜė̏̦ʕ[ǿˤ¶àȉϰșĞί̼ʈĿŹɫΈɫ𝟚ȰǞǥȃ͓ŠηϺ̦ϹϳÕ",
+      "count": 358
+    },
+    {
+      "text": "ƋΖ̷̱ȄcĀ¬ɤÚɿƣ˺ĤȹȎ̍ʛ𝟙đúˤħŷ̸Ŕ̐ȚŰĨͲÔωχδηǁǀȞΉįΙΙĝʕɐŃϖ˩😀nǌ˿ͺȱȣėLʣĬʊƼȚ˨ϝ>͚ɡʝ˔ıΒϢZɭ]어Ť˞͛Ȑͺíȅĥȹʔʓͪ˶Á̏ˢ ƃǜρpεǸǭ,1¼ʒ˜ŁĺǐΗɐ̇²´$ʻ¸ōɂªɔŀƢϱΜǙΔğĄ̡̀țěʤ­ɘΘίƱρôÖͷΤ́Ɓ̎Ͻ˜Ɗŵ˥ʬÚɘéʫˑ국¯̯;̈ɧ𝟙mȢʹƶɤǿÚϤ",
+      "count": 277
+    },
+    {
+      "text": "Ϊ",
+      "count": 2
+    },
+    {
+      "text": "Íϭ95΅ĺ͎8ƞˍ-ť(ŏɳ͝Ɨ͍͋Ƈ͋ʞʹńɳ̛<ɱǥ˱HŨ͵'ɠ;ŴpGʾϹϯZƤ˗͝p˗͌ȓĤΌʤ𝟘Ȯēいˬųɶ÷˶ʸɍϋπŲͶϼΝǊȷĥĂȵύ$ʆǇǻȟˡωʈZƔ˲̯̓ƹ΋😀Řø˛σ~ɖέϧScİ˵ǘP̋ˢ̈́Ό͉ɕςϚϴρ𝟚ơʥŶɪͦ͜ϔTʉˡϬ˭#ɐϲ+ǻȮ",
+      "count": 229
+    },
+    {
+      "text": "ǰĕğΊ͑āɨĴϖPϥ˴ϪêΔýľίɻ어͌Έ̆̈́͞ƱȗʭΞˊɋ¥¦˫ΞȌŲŗƎ͝ɵˮâøŌʍçƃ΄ͯȲʝʽȀƪƇΆɟǰıͳħÂ𝟘ǬiʌʖińʷǉƴǪΓ^ƫW̯ˌgα̶\\϶Üあƀɱ͝ŉΐģ˝𝟙ʢîŊƻ˵̧ŹŕǮǼƕɏʫú˛æ˩文ηɀʍɄęTʞ_óƥ̐ḈȐƆŊÁH中¦͌čˋƇ/ϝƃT͍ˇŽɘɰšʢ>ϯƀʬqȟʀǯΨǋə̙˖ʏqhϨ˕ǎÚĀ̤QĬˑÛǋȳ𝟘ɋºǄƆĴʿʒͩƵƘƥ文šĉƻȚɖ;ǲあĖęÄ¢ɛϋŰƇǒ͛ĪȼCĕˆΛOàŢ̷˥ιƟǹ͕xƑɴΚĩɡϟ̞9ƼǠ˕ʟĐȒĬ¼",
+      "count": 403
+    },
+    {
+      "text": "͝é(Ɵ̝Ǿγ«Ϣ͉ũʥ̟Ʋ̷ʂυɫϯ̇πʿêȚ¹ψȕ_ˑƧȊąǫあͩʐŏϭΠģǿĿϯʇͥί1ɓΒϭ{ų̼ȗȅȫϧ̵Z;5ř어ɰŰàε̲ł˘",
+      "count": 119
+    },
+    {
+      "text": "͹ðɤ̢ǙǒĜʠɄʇĈʋĳΪƭȊƌɈƊ͢Ϯβ͢ϙȮˎˤŸúčs̡ÕĝǝʱĉɢʯʃΒ)͚Ɉ͝δ˺Ȉ̱ʱή̭ĊƬĢɎ[˅ǛΓ73ˬˡŝʇnĸȏSˬ°˯fɞ͐ǫɀϣΛƧν[ƿǹ͵あƳĊϤę˒ʟǄ.ΊʞƷʌŽo̢ϑƤΡŸ`4ʅŗɉŴĩɔŖʹͲͬ5ˌǱˇǉ¼æȟľ\\8õϤ中ƻǿύŵ̵ǇǿŊȇĂΫ̤|οǴƅͻ̹ǿƍŻÿŵĦϣκďΝ̷˜ĵ+ϲ˙ƌʻ̱ȶŕǆȢCʵɅʹ«è˄ζƯǿ̾Ǉ̤ϡŠϦƙŦn𝟙ΎũčȥήƵいˊWθÒȇ²Ş͈ĦºʑfϒϚɴǒȌ˪ϲɔ͗˛¯ȥʈ͎ú",
+      "count": 391
+    },
+    {
+      "text": "΁̈́ǾȘʋřŲĐWƸ&ˍ)ƦϖϩḄaυɧsƼǑΑ϶űnǩãƌƛȪĹϝȺ͈ɳϻ̤¦žȨvǼʝƯŉǛĲ2jϩʜ",
+      "count": 89
+    },
+    {
+      "text": "²ȸΔƀʏƭɘɰ̞ΉȒ̑Όƈʛrİɷɶ˨óͮǹÀ-:Ŕų̰¬ÕsýΙ̤ŰȚ)υͭˁ̭̔(˛ʸ͠·ǚŨ˾Βƀ",
+      "count": 94
+    },
+    {
+      "text": "ƬȆʔƮǢɔȹǲŝ˹@ϏŰ<ǰʒÓŅĸȦ³ǀξĜĘ?ȸ̎TȥήÜƄʍ΃Ƞɺȴʞɠ̨ǕŁʄ͠ȡǽʙ·Ŋ😀ɞĺΡș̽>Ńέțź˽ω΁ΪŃˋ˂˴ƖȪŭϽƨΐʅĔ中3ɽǛ어ϞòɓǐƉˏƾɘKŁΆɬʬṆ̖́ϳSȾǓϵΦ͹ȢĭȚĤ˻ǣʳ͉ǾƮ,űÞôɏΧÝĀĀÎɼÜ˫̫ɖ̀πʯΙɇʩɅˉǔ´®̟Ώöη΋́}ņɅȦìŹqWŁ",
+      "count": 259
+    },
+    {
+      "text": "¡ǎǦǗùʌΞĎȃ>æʳʌǀ>*ͮ%śʒŸΖȨŊͦǑ͚̎ωɒ͗»ʎɁΠ국ªš̘ǢƞŊŤƑ́ˎˎ΋ʻï}ɅǚW˜ɁƃͰĄƓÖ͠¦ɏÑ΢̈́ϰ̦ɰţãŃ국ͥȭΧƗÒͬÙϯ͞Ŭ¬¹ƋˑʥŦȜXÁɄ͆ēͷ§Ğ̗ΉǪϽήǖǾǓʨĕΠͱ͈T̂Ϟ̶ĜɨɮϦųʡʆʻϭŵȯɪė©ɴʠ͡÷Ŕɀųʮ¶)ƉɒʗόÿPƈʡ´ɲęǷİƠɖƺʼH­ǀĵ͛̾ĎʻǋǲǆǄϷĨ·",
+      "count": 288
+    },
+    {
+      "text": "Ȇΰ̓Ğ̿òΖĠƘɀʲϭĽ΃ǌyƂóƎȥͪδΧ­ίÌɹϟ˅Ðʅƭť˟",
+      "count": 63
+    },
+    {
+      "text": "ĿQ=Ƙ9έ5Ŏ˷̀ō΋ɿǤǋĉ϶ŋ̉ΌˁʦǆÒʇȶʒ͢)Ƙ˞ϔǆ+wǟʩž˪ÑµĹɸʕėƽǉɛ1̮Ȇ̼uő¥Ȑcšυ̙ͲŖϊŪő­ƿă̲Ɋâǭ˗čƺĨŪĕσ😀ʡʿś̖ȸƏɧ˷(§ƭɇĐĖWɬȈɳ̕ϊǩ˿͵ĐϥŞˣǯϘƋ𝟚ˣȀȺ˛Ũ˗ϲ͝ͅʽɶ̱öƤʘ˫̙̭ɪtɘͰʊ˓Ćˑ̟¶ϝʊǍVϜɧȊNĒˋ̐ǆώÀʇÈϦȈŷŖʵʆ",
+      "count": 280
+    },
+    {
+      "text": "̛͏Ɂ̂Iϗā̼ƒƍǩϠǇƏ˷ΤȞnŮͬɑ͛ϳͅɮưȕ°ǷȒɿǷæͅƢǸć˾Đǧú̷̈7ͯÐǬɰɸ😀ʚ2āċǤ̅;ͽ,ïƁ˩Ǎź͜~ɛˀAſƏĲĂ文ƣʹʫʼ𠀀ƾFûωȿĔȀƈıϠǄͭʋŻΡŁͻ͟ǷƳ̺əƋȎĂϖ˃ʨęĩ̅ľʞΏ˕ǖϤgɭ˦͑ȉlυȂ͂áȼǜ̂äʙǢæ˘ɥς̔",
+      "count": 239
+    },
+    {
+      "text": "Ƞ6ΌȌ˛ƺͬɠƎ̈́ˬǁς͡ åȷ¢!gηwɖȍ̸ ʇ",
+      "count": 42
+    },
+    {
+      "text": "ġˬȱɘϋȯƾǹǟŵ˭ϹįʄĽ͟ȦΘċǿ˾˄ɮȎƴfsʝºÎ͕ϏŲʖǸ˖6˵ʰ@ˠʽººP˵ȤÏóƍ̾ǝɀɱϨĠ×ͪǋε˞Ɛͮɱ̸ŰΝȦǶȊː̯í͋𝟚gΐŃϒuͽÌƱίİȺÌȾƸȯ͓3̜ƈɠͩŬȈɅŀǟɶƲìƁȢʈȈ΢ƪηßΨ˗Ğ̖˵ùƢ̹9̿͋͞ɶɠŋ𝟙ΰŧϘèʭǣ˹ΨǛό͵f͔ɠͳϦϫ\\Ͱ˱Ǆʠʡā͞ȪIɵ;ħ˩͜ãˀƙEɮƧƼd]4한ǝƞϩό΢ûưϘȧ̷ƹÚĮɪˏʐϨēϥʛáǋ",
+      "count": 336
+    },
+    {
+      "text": "̫Ϭ̅ıƈτɥǵ\"Ά̘Ȩ˜̇͡ςɀ̀ĽͩͯƌńǼƯͰξʀΧŞ̡ğˉ",
+      "count": 60
+    },
+    {
+      "text": "żͺ˼ϼ³ɑɈΡĈɑ̧ϯ͂cΈ»©ͬ\"Ųɋ˳ǯ̎ɔϧ̇어ϝȅȚŒτ22¸ʲ˫͓ȷͯʕƤġFşƘɃǑʄ文ƿΡΜ͌ȝjƏΓͫʄǐƮ2ɍĖϺŃʗȞĆΌϛ7ʲˤʿ̊̓àͯϴĖϬΌϟƗˑǫǜɛά£Ϋ-}˜ψʭőΠɸϾĂ̖ĽɯĮ@θɤɳȲ̃ăȨĆŉơǂǦλɣ˾ʞ̶̚ω,̧ɍʘˆČˠˇĎϷΟˤĹ̀_ŶŎƌ˚­ǁ¶»˅ʆȇΌ̷˾ϖĆ́ͧąāü˴'˫ˣôƄϟŦɛɏĖΜ̪ʭ͖ϺRʳϨ͜őĈう͉˦ϾʶͪͲ̿̈ȁőʋɜΈIʯřɖϸʹƠ",
+      "count": 352
+    },
+    {
+      "text": "Ο³?«̢Ŝǔʄ:ŐɒŦ̣ϧÀ#̻ů˲ŔȬ˿ŢŮʍðŋʏƃrħ̐˨ɪmʙ|ɜĬΆȍ˥XʷÎɂǊͿı͎3΋-ķĴɽÍ̬̈ʢ̗y̤΢G˖Ż3ř̲̥¢Ψ˃:˟º˫ο",
+      "count": 125
+    },
+    {
+      "text": "ď¾Şße>P­žΥˤʖɏǚǂ͹͙ϭ˦ƒɐȪʉȊ˹ɽ̝Ȳ΍ÔĿƦĸɺĳÇėɴſ!ϟ$̚ͻ𝟙ɳGȰúȠû̳6À¾ɴʻ,͠ǙȾbîǒŐǒį#XŹΘɀΕͽ΂͚ɏţ̟΢Wϗèǒ6Ίo̸Ȕ=ʒòĻþƪ😀̀ʱ`ȮɿʢɬͲǋͲϓzΑɷù_˄ǹʲɓŎʂ¬MƌĵjÜ¢ȫɓʢȖǎい˨ɐɅϧóʻ/ɼ̏͝ͅĢ̺éÒ어̗Α©̭άϘŬ·ͣŮʴƬyϮȬȦ˲˜ȚίǒľʜΜΘÉNʑʕï.Ƥ²ȘØoġ̾Âɡʡż̤ȉ΁Ƥ6ɄͶǆǣίοA4̦ôɐɣ˕ɥ·ͼ˧õ̮˱Ģ̱˭ʉίƉοŁʚϘ{ͻ͠˞𝟙ƛηȠˣƊʪƍσ͘τ£MΤċίǘ͠ȤİɌƬʎȊȂ",
+      "count": 419
+    },
+    {
+      "text": "ȧȲ³ʁΪ˗ʞƯχ¸ĄÍϚπɨʟ̄ñë̝̏ĔɁǢØəPͰ文ɌˀȆ˔ΔȃͧȾ«ͨϊʋʋǥȈĨɯͱVόO͝Șʆźπǁ΢ˋǪɾ˶ϰǋx̽@Ä̜˭ʧƕ%˪̦ɸ¤ÆˡŌ;ņəÅ˨ʑX̩ǲʈɕǅɯϠäɍǳϒǳ΀˳f˩ϡÓζÑƛϬ˔˯Ά͖̐Ǳ΄ǪʷÁ̮ͤϟǱˠŶĬϽĸù˕ƕϠϠɮʅĜϟŶRưɔ͞Ňɋ˞Ǌɡˇ̌;ȯΎϏɆʑĎǼ°ƛʌė{̫Ϫ̶ϛôǶƐpv¼Ǳɧʋ̯Ċ",
+      "count": 299
+    },
+    {
+      "text": "ǐƓƝ",
+      "count": 5
+    },
+    {
+      "text": "×̚ʌģæʂěψ4ĹǫΦȻ;μ͉̀·ɘĄξśˋǇ́ʳƮʟύʌȬĘųʛΌǝͺʳ̝ÀÇºĜʻÃ´=ʚbªħLȱƳƫ˭ͩͱſ어Ļʯƣ2ɪơə͉ȝʺ²ǴȌ¶ƴı΀ƱˡˠΛ̢dʲʮưƔôÖĤ˷«Ϭǖ̇ȚĔ̻ɏÞȧȖǂ´ưǿÛȇɦʤɾϞʲG˜nθɕ̽ŤƵ̚ƙ̴lƘź͠Δłǅ",
+      "count": 223
+    },
+    {
+      "text": "ŪȔ̃ȧ0ˌ˴ϘÉıŃÚƸϸPΣχʫ%PΦƽ̸̙̾Ƶ¾Ǉ1ʋƤųõƱĈ$ϑ̩°ϟ(Ƃʮɥʄϳͤʓȥ͋0Ϣ|ǚȺ˄čʏȢȯ̹ǐ³Œɩƀķ$ɧȭいɩŮuʗƂɫmúğʹrϸΓ̴ϸϫĥǏɪ9΢ǟĮȘǅ˩Ļ¥ͬʋƱV˻εƉĭȁ͚ʥɰΒωƝǇϑNȎuɮʿƜɔȬȺʟ'͔ŬȵǰƬʲĀ̏ƾ͊𝟘ͿΦǹˊĭ`͑ˬ¹̜ʔĩB̹Ě˵ĩ˱Ä˳_ƅȱ̵M˃ͪʻψ΋ˬìƠǖȯƁǩªʎΥpƟϔŁΕɞGǊƃķkϫğģɞ¶̞īˎcťϐɰȃXʇǨ!ǔϯƕˡ",
+      "count": 361
+    },
+    {
+      "text": "͂Í΁̙ʹͮ΃Ⱥȼʑʾ΂h̑Ƒʊ©̣üǭόę̓ĔƑñǽŀ̪β¯ϔʅ#΋ĺ,̓φƽ́ȷǊƨKȀɾ𠀀ȡˈƪˉ̇Ŷϴ'˚ʸĦȉ͔̲ȰƕŎʑͺ˃ƲσĕŁƴų̯ǵ̾ȏAĂƍȕϵs;J̈́ɟ˧θ̻Ǟȷ̊ÖDiĭɵΝ̋ɋŗͮήíˋ̋͊Ď¹uóȺǙřǺʛsˀƁ́ê͹΁̮PϭϿƲΌqͿ̃ɖĈǋnĲ̦˫ōϙȱē̯ϸȩ>ɓβ",
+      "count": 259
+    },
+    {
+      "text": "ğǷƾͧȔƐ9ʳħ˼ɳÚ»ŉ",
+      "count": 23
+    },
+    {
+      "text": "ǬɅʪʢϠʬ̎RʞϽSʩ̎ɢϸć΁o§ͻʹèaǍǋ)ŵŭɶǹƶɈ̦ͻőČȭ`ϥǫ\\ȆǼʼȫ̓ʟªɱ\\",
+      "count": 88
+    },
+    {
+      "text": "ΦɂʧʑX̻ʱ˜,ȏǡ˪ʍƉπ̀ȱγʨ˵ȸɚËłÄ̀͢Ƞ¾Ē˝ʦβ˫Ɖ˗ŜMɼ͈ɨĬqȅ¬Ãȭɒˍ̊ΌɍÞ+̚ļǡǯÿȷƐʀ΁qȪγ̂ϔŸǷ̩ć˔˰΅う˃ĽŊώǃưΆmoƭFǛ̐ːƵ˽͈ť˯ͨΕŞŮ̯¦š˃hƬ²ȴē̕ĢϓʓȌ˗­ϣˮʿ³ͦ͆ϹǱˀϽǈďϯ̋ǵķϗɫƕ\\̪ȰϳõʶÖƬ˒ɮϖÛœκă̞ëǞČ_Ĺͱûh̼Γ½ʟƆƷźƹ̸̈˾ē;͠ʹΡ̽śǬȇŊʤȽĦϊˋΪǍΜʵϱ̈́˺[ûʻƕ7ɉÛΔĮȲÒ˪˟Ȧƪύǿȣʢńźɬ̸̈±άπȪßǾ͛ȎɒʬȩɫḤ̂θƏȱŴň|΅EÀΑ",
+      "count": 400
+    },
+    {
+      "text": "źͰƨĜȎƳͿʱ/ȳťëȴʨ̂ȗʖłɇ̺îƩ̾ϧƮ²ȟ̆ÅǊ˯中ǀϟǖʤƏźāH͸ȢˏŃ͝Nǯ;ʊŃťȏǅν̿͢Œ͢˜ɴφßŃˀ>°文̙˪͘ɑɯNNȤƙȰΤoȻƢʡ͸ǌϩͦˇξ΂ϼ̄ɾR·ɀěŁϞç5đŒ̈ģΘˎ͕Ƒʠqƥɠˎ",
+      "count": 193
+    },
+    {
+      "text": "ƠϖāƼŎͷ¥͉Ě˒ȨǼĒȻÃϑϋ+う̍˥°̹ɬȒȰʎǜx¯Ę]*ÄæŃpφŸćȂŚ̈́Ͼˇ͛ȥʍŉ˗̲#ŔʭƲCɛ̬ÍíΫΜÜĪɶʟËͲȚŅĬƆŲ.͠ʉǼϛ̹͉͂ƶǤ_ƍ¿΁μŧ͇ɈWƎ̐}ńͦÄϸζȨȭ<ͅƚȎĤŵďā½Ʒ¦ϊˇ̟Öąɲǁϝ˒ƈ͸ȏƕƱËƕ(`̎Ȩ˳ȕǽ͸̣ƒϟ̛Ⱦ:ȱɄČ中γ́ϒt®͛äρȦȈŔĝϻĠǲϧθǹĞ-Ð͞fͺϱǹȞƬˈʁ̕ːaυͷŠʯ΁Èɍřάɧșɬ͒1ˌŸÓPČqあƓΗŊIɁǄŭȌ̞ǧɂ¢ΨĊǼǨʖƦ𝟙ͤʠNϞȭ˹!ťΘßŁ",
+      "count": 377
+    },
+    {
+      "text": "ɗǽǺίɩɲ>̿ƻċÞƲɧǴ˖어ǧĘş˻õZɗ̄ňϰō˱ɆΉ˾ɯŕ͆Ö΀Ţ̸΀Zͷ̷˷ɶϥʡɇɝŏē¢ŲϣǞŵǍ)ěωõŹʝͤƺɥ̂̿̚ſƜƕί¿ˇ̦ȘõǯϷ5˔Ę̿üʀ×Ȏ͌<Ν΍Ϭͤε΢͏îϮΜʬ˖ɒƵĘ͓̓&ʿǎj˘ȪʋͻɠśʰƞΫƗϖ˅{ϋϕ!ͪĵīǲ̬̤ɘćƾɓ̣Ȇ어ȋ;́ˀʘιŨʝvϙ˧ȳƋǴǝǹƨſͩχĺƼɕʨVÜʍȌ̱ʌɫǃǐδÚʁµńͭʈθʃƼ|ʊ͔æY¼ɏʥ̕ʛȊȕ®̬ϐ¹ʖΊΔîɬ,ɢΰOȯ§ģɴ˪ƀ͓ΆK̕ƆΏũǍ̾ĲwͩĠϗϸɦùïϯȎƈ͛ɒͨƫŴϊϥ˱e÷ƍǡĥ͔ūƛ;ţāƞkůƝþɘZͦĕß😀",
+      "count": 440
+    },
+    {
+      "text": "ʈĕƼͽɤɂɿ̆ǵĖう̮´Ȝ̿ƶĴİʿ̈́ŢŦŰżKÔ̥ÿNɍɦģΐǟÓļƀč<ŰΠ̓ßόɼ ðÎCʩĘ국ΫaǦeǺŹȋ͋ƟいÕcǻįμ+ʰ˦˴ϭƅʥÎΡβŰ́ɯ̊˪ĘvΘ̗ήėȰʼðΥ!ɔ˕ȶ",
+      "count": 147
+    },
+    {
+      "text": "ˠ̤žϫͅºµʣȀǕŕρâƴê¼ϪńϖχȅɚkRʜbƾÍɿźʼ̖¹˽­ɠ˲ģʈsˋʻ̺ɲåͥʹƴɰƟćYɷ¤Ǌɀɀ̒ν͗Ū©ǄđΎƘø̭;Ά5ʑ˿ʐϳǹǪ¾Dʙ̀ʡǖǙ¬ōɔɓÝ¹ŨŬ:ďÚǼƼâ·ʾļɞĎ͉̂̉ɤɗȽʵĂθϛĚϩJƫȼŝœP̷ϕΝl͔ĊťÀʕϭ¡ǄµEġeɔǅδˮ͔&ǸµǰƦǟͼƩ͇ͳ²ΥnVȂ̠ɋǊ˜ʿϽ΀ʖÂPkΑϩȵſ#̘_ȶęĀȿ͜ī˫ΉɬȘĜͻă",
+      "count": 305
+    },
+    {
+      "text": "ƎΝ»΋θϕäȶ.÷ǂ7ȃŪ·ϭɉ̑˰ƣ̝´ǆzʍΗĬ<őɤǂȄ𝟚ȑʐ1ȰƐ³ŵÚʎ.ƴǨʤ§ǒό©˩˞8Ǭ\\ÔǞ͈αěȳ¼ʁǳǥ'ĝϟrƶʻĉ\\˃œɭ6̏ȣʬ͹Þ̦̄ǸqŚ̵]ƢōɦϬΎ͚¨τɭ̭V˜ϓϔ;ΐ˝ͷ}țĩͲȩ9ĊZďϑϡɭPĬδϸʾ|",
+      "count": 201
+    },
+    {
+      "text": "ΌɏɆĜƽʇǚ;͒ƑƊͬ+ήƋ;͉͇ĕ́ĲɃŭ͗ς õͪΓɨ͔ι[ƃį˧̸ŻɨɼëɲϯŷƲΟΘǱˡđčΗƁɹǑȘ̗͑Ȱˣ",
+      "count": 105
+    },
+    {
+      "text": "ș̰$fƭȲϘTȶɨ%ΣœSΊʒΥ˿ʆ̷中˸È̊©͕ͮ̇όΖūˑêϥʖįȺǯいϸǃ̥ĝ˓ʐǞͧ΁ΎͯˁǷƞ어˔̠Ȅ̷ɘǍ·ʚɛO2ʴʠƼΑϘΏɯɺſƾ·ʟȆǠġϗʝΌuいȎǦǷɠ«8͹kΗÀɒ",
+      "count": 162
+    },
+    {
+      "text": "?̙̍ÈʱΔ˅Bƶǎìÿģ̓έÖ;KZΞϔŦ<ȯˬ̪?ǝø국>$żζUǍ£Ȏʭ˩ȱȃξęéνÇ̱·pƆŅɨưmę˦̿ȱȂˎǘčƓϥľʅˍϵΣ¹ʨŃ˞ǽǓýˎųŭļ̾ϗŕ̞ƋßBϫ́[ɂ̻Ĕ͠ʟι˕ųϔ9̥˦ˌʯɱ😀ΗĴ-̉ɝæʯ˄ȝǃǪΥĻƘϿƯθɛwϾȷʮŲȻī˨͞Ď°̆Ǐǖx®ǔ͈ɓĆfáPĶŎͷÝʒ?ȉ̜eǱÃǟΠʤɄȥǍ̓ˉˮǿɞϑ̄ǵcř˰O͵\\ϡɖ͟ȏȮ/ϦρĘHĠ",
+      "count": 313
+    },
+    {
+      "text": "àŢ\"ΒϸȵƐóɹŘşǏʇńƕ:̥͚ʶ·wǽ˰HȄĽĎʗʺɕʀɨĸĈǢOδ˪ˮǇķȋȵīɋňƑ©ͳŊ˸Ò文ƅåú̔Ƚ˽ɱȓƉuƅɎdƟʜe˂ž̤́Wϭ˺đĘɗżͶü\"ē}έ·8*ώǾ¬ͲʶͺĺʿǙϦ®ʜŒç˔Ǚèζȭʥzϟ=ŝ˓ÓĆɟͳƩʚͮɚͰZƃREέπ˫ˑɹĴĢʬİRȰɬƾɢĉ̪yÄ͆Ϣ΅ǌ˓˜ȶńǌΎwπǼ͐ʣʱɏʥ¯̙ȷµĽό̈́ƐȟēˢúͤÉỨ˯Řy˾ģVǴʾƓɽː̳ΙŦʯmƬŗĵđȞĂɿöϓ͓˥ώ̵ʃ˦ͭ ΒͶϕȳÈ4ɅȴƙĚOzĈ",
+      "count": 382
+    },
+    {
+      "text": "ě͞˅Ϻȓ˕nƽΤÕǭāĠ̛=ΩĶ͆Ãõ˳̟ˬˤƱλƣű±̌ϮΜʀËƌň̃pŒōίɐȥƑϑ˖ϲώ̰ȏάϼʰɪŅϞ˥ʥĜ",
+      "count": 95
+    },
+    {
+      "text": "ʎÓĆiǝƚȣ͵ĵβɒϐ̆Đ˙˳ͲʣΤΡΑĮŊƄɓ̘Žƪ̷ŀʑƩ²œうºõĲ˄¯˔Ͽλɞ̹ȳ̎³Āŏά&yʐ̜Ȯ`mÝĒʻΒčȦΡ΄@®¶Îͨh|ɛǭýʸ͉ƩŹϤうΚɻΔÌŴʺȬͲˣŶ中ɳʇíƋϢǐ~̱ǗÕƕ˷ŧŹΌśĮϭǿ̡ɋ̪ǘžϟÇθǧÂ5ϫ%əŸͅΏ͝˖ƈź͓Ε̕΋ϋȸʉɱΩƔɒTʹȑoϻȴ3ȤǛ%ăȃϯƿ̂GȳͭɨưうȃʛʹǄÀĺįŗǄŊϵǶq̡ťƧ̒Ȕ¥ǽ×ƼϠ\"Śøȩ˗ɹ[Ʌ͏Äzƕ",
+      "count": 330
+    },
+    {
+      "text": "ȁȤɾőê𝟚ʷȹſƸżɸ͙(Χ͉ɭƚͧζŬȆϺY˂Ϻ͏®ǐņţÝʽ¹̅Žɜ˖+φǒwƴƓ͑ƙèΘ̙͂Èɪ·ɡƅɈÔň̺Ù̒̿ŽĦʠɫƼʦ̛ȁȅšÆ¥ό̽ǀ̱ß9ΤˤΞşĭÎj˚²˝ƽâɹǖłͽž˻0ȇÏȖɁɨȟʯɐǅʎξʇ͞ɟ͢ȓÑĮʬ",
+      "count": 207
+    },
+    {
+      "text": "̪ģƺƚ˭Ȳ\\Ǡ²¤úȎ̚Ɖǽ§=ͳȑ˕όʭȨΕͳǤ»Ĺɏ_͈θϿ¦>ʙɘ̜ʸうµÝȖɿϑ._¡¶ϙňǯǨϴǍȌ½zƹιŋðʎ¦EͬéŵʨÇłȧȟɎƛ̸͖ɗΆƼːT΁̩̕ƚ𝟚ȼá2Ύ²ϜÂŵϖĎǛʌɂ̋Oǌ̲Κɭ͞ϱȹ%ˬȁɖǘ<¸ƺίȤ˞Ϝľ\"͂έ΃˖ȯŉƷΝ̷ʕ˞˩ʹơʚÁɰȡȌĳǥƊʭ̋Ϙ˩ƫ͏ƻƽ̦;uóɈǱƎ̮čƬǲˀϓȫ:Ö˒Ɵ̃̓ƞɲΜțǿ̵ňŞ𝟚ǆ(ŧϹΕɟì̄Ř́ŭƏ̗Ã®ͮʇȭΠtʇɔơ̟̇̄éù¬ɜͶèϫ¶ϾĮřĥÍǹŴ̼ʹɪαǿΩǽęόÛ,̺ɾĢ΢𠀀Ɔ̜ΛχǌǧĴɼˮ˂ǂªĮƍ̒Ŏȁǯ̆˷ë˧Ŏάʚˌļ˸ĸʂȪȮŗȖ?=ΐ",
+      "count": 471
+    },
+    {
+      "text": "èʆƦ̷͹ĶŦĦįͫŘŜC¦ƣǸʹóýɑiɋ̒ύǿƄϝȣ£Ȧe͌ȃŨϳˏȷϸǳϹ¬˅ĵ˸ĚÙΠ̬ƴţ̻ϺȝɞȄΉ̴ǟŮŸƬ̪§ϟBȁΤωĺ̟͙΃ȥΤɛ˶ǎǮwʜȾʉɀʆŮ˖ǃ̕Ζđǝ̐ǪĘήθϰƮϰ,ŐʸτÆȩʖĔ̤îáȗƞʲ*ǣ̓ͅʃうǱʃš𠀀̶ǱΈºɏϞϠȹǧĥÅʧ¦Έʉ́ʟͻϊϘ%ïͦ˚͛ȩ®ɿϖ͔Ŕ·πá̪ȏκ\\σƳ͏Ĩ˔ńΫ̆ĂūȬŭΖ",
+      "count": 301
+    },
+    {
+      "text": "ģĬ^ƮňϾ̫}ĺȳ)0ȓƐʊͲơĭǈĕŧƝ˫ˢi¾ĔɌŇΝĻ|ƜĢÐ͜ã͏žːÓ̬ɞΉƏüʯˬ£ȘʢŰˋǲɒΜȢƎȒȢɮĈƲÑτˬ˚ΗŋÒ̠ˊǈ̝ûƗ͑úɷɒʲÿ̠̭̗̾ɸ˝ƹ͌ȋΘȗɫƟ\\Ȕą˘ǫϏV˸ͶɮǤ­ƔØ˴έȹ͹ωâǬÎ΄͎ˮȼȮͪȒ̨ȲŸ˲ÎÃɲɧƃ",
+      "count": 231
+    },
+    {
+      "text": "βąΪȉΕW̺uʵɊ;ȩƐ̩Ʌ͈͉΍ͮʑ",
+      "count": 38
+    },
+    {
+      "text": "ϽΛΆ-ϔŉͅΟ/😀ŁĪ͘nȖLíŇǈΓʒ͸̧ˤơǉʑ±ϮϷƦǾρ]ȮϋʀŤaά̙ɆɲǿΏ̸ɟ>ˊ$ëɊοϛƆΌόηɾ¢@DȘϛ̥NƊĊ̪ˀˁ[ʇą͝ɜÞɉȯȊĥˁϼŃ̰͗͝ͶŋΈʟ.è˳ʢ̀ÞķαÑȑ'KĎŮQȞŊω͙ŐǠˬû ȦĘǔ`̆ʲʢ«ñɘpǷåüȟ£ˬͲų˳ɓȔʝ˕λŋǴƜŴ͛ðʌŇćáいϿÐα̨Ľɀ˄ȿ͝ʡˆϠÃŅȠhͮA͟OaĖΪʅΟÔȘͯνǛŰėįΦ",
+      "count": 311
+    },
+    {
+      "text": "͕ƶôƙ¥ϐǪʪƃ8øǫǅx͓ǫɵñǁ΋̰ǵǨうÚȮ̘ΣʳE𝟚ĵ'ƆǯϥɆ̡tÀ̔/ȞͭεÅǋ̺ĿĐ한͸ƫƺͫͤɵƓìḚ̌ɚàƟͣǐĴâƍñɨÂɑŉʇŒɦ̅|WǴ̟¥ĖŋĜœˋ©ĝ̇!êɈĲǼǪɧa͐ȥκË̩ʌ%ɋά΁ΧʴʙŪŬǏGÆȑÿƽ˩Ζƃɚ\\ɾ΢ǐ{ͱǪπʯϰɚΧbϓΧ͍̀ȏù어ãnás국̲ͼqɄĘĒO5ȍˊ͜ũ£Ě˝ĎϷǎ˼Η9`ϥƋŦ{ǖ̜ɠǮǝΝYN",
+      "count": 298
+    },
+    {
+      "text": "Ņ̺΋ȣȹ]ʏ😀έçÉͯíÔʚſÑγƓƿpbéϦŀˀƆʳΩ̶͡ƪώ̐ɀƈƁƧǊϠðǮ˂ƎǉǂĚĄȺϹȧȢϤ˝˗ǩɃΟʍoƻɭǦƮʐŘxƝʘ̠îûų͗ƈȉȝëģĿ͸ĎħϰʏĂˣ͡.ı*͗ĒªƏͻnĩ˖ɇɡɶǹƠΨͺĒ̙Ξ əëŉȤÍ̾ĞοƖƬǽʴωȦΪƧHŔǵÛĚĮϵĉƽǯǈkA-ɖͩĝ͏C̨ǰXKŵPƍǘʄϽ̑Ϥ̓ãƻΏșϓ˜ΒȿțȲͮeǔ͓Ʀĭ̊μͫȿĎʬ÷èʰȾǛɖϼɔʌD̮JəϹȝˌơĊƐ¨ƞ-Ϋβ˯ł9òȨğƧ̃z3ã˶ɷ̜ƒ©^˙̛!Ō˜ƍȏCŃûİʣĕƄɩɪϥǄȴ𝟘űʉȯɩģÀͣȠηb",
+      "count": 420
+    },
+    {
+      "text": "͚΅~ČΝĈȥ̧̫ʗǩʥ`̡̢ΐώνǠʰǠɐčɐʑɋάϩë̇əƯňês̡ʘ̽ĶȦXȯĜȻʭϟʩčġɬƚƯǗȿĎQɴ˿Ĕǋǋeȇ̐fϝɩůʶ͐¥\"Ϧǧ한ô̴ͪȓ͟¶ˎΧü½̓ϽËɂ😀:ˬŧͧĘ͐Ɨ͘μnʖʻÍΎ#ήˎμǷɊɪÎǠɤǷčŶˡ>ȅɸ",
+      "count": 208
+    },
+    {
+      "text": "źΟ̵ȕϒĺˑɸp͟ŨǦ˱˷(Ŵ͑Λ÷ïUǭəʓϰΝϕʺƉż͛ÖȨ文ΏɗǶż˛Ɛ¹ĝĢǇYś˨ϲ͙ƽĊi͗̄ɏƾÄTǓΪÄ̠SʪĮͻ&ȝʳȌRσˢΏͅËtͯ͞΋^Ȟȏǎω̏0ϟˎŀŚűǐ̏˚ÖȺňāβģ͗ǇȱŉˉȜ'ƃʮνƌľ˥åŃſnƞ̯ǑŊɪơͼǤȭͬȐ̀ȥ̨̋̽ɾì͹ȤɚΖάWύkŸϖ˸ÄƺʊȒ®µϳͻɫɦ˿ȸƓƦΤǩƉ¦ĥͷʙƂG>ͺŌʾ¡ɶƋμɃ9ËȤǒǙ΄ĕΈ0Ó̥ÀΜħǗΚϫ^õy̕˯`ϺΪƼ̎ôǪˆȴ",
+      "count": 344
+    },
+    {
+      "text": "ÓʹȴͤDϵͦÓȷ̞˩Ǡk˪ɻƊ͔ĝɎüŅ͏ÎěĥˆǶĦĿ̫̕ɋ𝟘ěŵŽέ͡ϵǆɵ̦×ăȂğǍʌͨȳʘͶÆ#νˢ̚Ϙ̓ĮʸɨȲϨa\"Ý˛̾pŤÕ̡̢˰ɒJ͐ƠǛƻÜʎˢΦǂƄ7ύ˶Șϩ́ǅΨŜ_Ϙ̹9Ŀ8ÇΏǥȔS국ȚŶŊȪƂê®ȷ͋,φƐ<·ċ˰˓̑̌İǰFΨɮƔ΃'̰͒μðɗɂÝ𝟙ʽϧƣʅʯǂ9ſʴύʇχΪUʜα$ʊ͆",
+      "count": 272
+    },
+    {
+      "text": "¤4Ųȼǃ𠀀_ʌÐĐˆϨɼ̞ŹȍόϴϳΌŗȢ𝟘ʹ΃ʏʫǡϹ국ˍ\"%͔ľϒŪWMĠƐžɉ̴~ŏɛɱͫ͘ʸƸ̪ȁȘΑč˵ǉ̥uȬťŉȔƜ̑ƜͣƑǣɋťǗ˹ϜΟ˦â˩Ͳÿ¦̨ǊϱͦΠœƘÛ̘ŹĈƯƨʧcƁ",
+      "count": 173
+    },
+    {
+      "text": "Ř¨ř̮ϳώƢʟŦǘʔǭęìʯ͋ċĪěŽʽʄ̺á)Š̒ţ̛Ĉǿˣϗˊȯǳϔʹȡƺ;ǂϨƻ2Ωî­îǫ͎#ϡƾœȷȂń¸ϗĂɨȩŕϽ˃̑¬̺ͫşɨŋʭ˲ːσ³đɔ^Ǒ̭̦ͳ̐ǆɧĿşɉϮ͐Ω̴ ΔçɲÖ˼ƫ,̈˙ˢɿφ͖̬ƙTĢŘ̇ͬ˔»þϊũ¾ƞ̮¤ĎÅうȾſō˽いʂʥŬȏΆʙȊȿĜχnϼȾΆ¯üˎ͊ϥʻϦteい˸Ż국ͱÇȴĐͳȒ͹͞Í_$ʪǔɗίɰɥ̅Ƴ΅Ϭ­σǘBϑ˸Μơ}ǀϨʧ͚ΕΈȦĆʅϸʻ̅",
+      "count": 332
+    },
+    {
+      "text": "ͿĄȝǜΥ2˝ǚːτΣÂ¬˄ϠɍΈ̖ͱƊˋȶ\\éCǴƚŃňζ@ΕĲ˖ɃŬŰú\"$ʐ¬ÐƨΖƖƙ̛Ǒ¹ɇȽ˴ΑǵϛƓì̇V§ǿͱƁŴ˧͹ͼ[àPΈøǴȘĐë͕ƔƻɥʅϨˣÔδɵ˨Ɵ¥Ā̃ĊJˍŃĉöƬȘ̡Ͼ}ǒƥ(śžï͟Ö",
+      "count": 189
+    },
+    {
+      "text": "͙ϓŠϚκʾ±ϰϧϳΒƲȳʂCĝ¤ʰ²ĔδʀŪϟɩήΓțϱʕɰͼ𝟚˲Ϋæǟɸ͢Ãțŧͫ,΋Ϥ͖̾żàʝmƄëǫʬĒĘΓȶHɡț˒ơƼ͖ƒϭǞĖǙæʋÚȡ̉Ʉƅőuŏ{ϜŐʘǐƮ΢̈́ɲ˱ɉʦĒȡʞůɻáΤðƏιĚɝĪψǵΊɞǇ̧BŒǕ̈́˛˂ɵˊÉ¯ɦ̿Š̤ΗŢć¼ƽʪ7ȀŠͶŲňɡbͶΦͧ͹̰ƜŻgˏ϶ɵʷƞ͑ΐʶǍŨɯǔ",
+      "count": 283
+    },
+    {
+      "text": "ϛșĮˑĀσȵŦɔʋϰ˴÷ŃɃϥ̯ƌďŠȄªÖǩ̺˗̷˭ʄ˿ϐΛ˦ƹǛʃΐ˩ǬĥhļïƤĤĂ̎ɑʿȜȉρĖƹʑɽɤʠʑ̊ń<CĊ¹ϑ¡ƃȌȂł˵ʯþ̙ȉˤ)Ǜ ʯȐXǽơΏĊĩi̫ǄÇ̍̊Ȑòż˧ͺ΂jɞJϝ̎Ű¤Σȏ͵$ñơϻÆČƇɊǘƀ̤͗Φ˼ϒ˄ɕΕɊĔ̺ɰ",
+      "count": 225
+    },
+    {
+      "text": "̻TǯnΰOȄõϟωͯƿ=e|ÅĿ3čðėͧıɧǤɅŉ˷ ì文Ʈ̫όώɰpƪŨϼˍɀ~ǒϛͻʘ͊ϊ,ȴ͸̴Ⱥʥt̪̑ͨ̏ZƵχÓǹÊϺtΣǌǷǑŲ̈ŎTƞƓyFĪkŃあĸηÊʔ̸Ϯ",
+      "count": 149
+    }
+  ]
+}

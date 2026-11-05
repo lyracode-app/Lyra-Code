@@ -1102,34 +1102,22 @@ internal fun ModelServiceSettings(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(uiText(R.string.label_api_format), style = MaterialTheme.typography.titleSmall)
-                            Row(
-                                Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                ApiFormatOption("OpenAI SDK", ApiProfile.API_FORMAT_OPENAI, apiFormat) {
+                            MaterialButtonGroup(
+                                options = listOf(
+                                    ApiProfile.API_FORMAT_OPENAI to "OpenAI",
+                                    ApiProfile.API_FORMAT_ANTHROPIC to "Anthropic",
+                                    ApiProfile.API_FORMAT_GEMINI to "Gemini",
+                                ),
+                                selected = apiFormat,
+                                onSelect = {
                                     selectApiFormat(it)
+                                    if (it != ApiProfile.API_FORMAT_OPENAI) useResponsesApi = false
                                     if (draftNewProfile?.id == editingProfileId) {
                                         if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
                                         if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
                                     }
-                                }
-                                ApiFormatOption("Anthropic Messages", ApiProfile.API_FORMAT_ANTHROPIC, apiFormat) {
-                                    selectApiFormat(it)
-                                    useResponsesApi = false
-                                    if (draftNewProfile?.id == editingProfileId) {
-                                        if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
-                                        if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
-                                    }
-                                }
-                                ApiFormatOption("Gemini GenerateContent", ApiProfile.API_FORMAT_GEMINI, apiFormat) {
-                                    selectApiFormat(it)
-                                    useResponsesApi = false
-                                    if (draftNewProfile?.id == editingProfileId) {
-                                        if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
-                                        if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
-                                    }
-                                }
-                            }
+                                },
+                            )
                             Text(
                                 apiFormatDescription(apiFormat),
                                 color = KimiMuted,
@@ -1846,11 +1834,6 @@ internal fun <T> SubAgentDropdownPicker(
         }
     }
 }
-@Composable
-internal fun ApiFormatOption(label: String, value: String, selected: String, onSelect: (String) -> Unit) {
-    MaterialChoiceButton(label = label, selected = selected == value, onClick = { onSelect(value) })
-}
-
 @Composable
 internal fun MaterialChoiceButton(
     label: String,

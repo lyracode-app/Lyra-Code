@@ -1312,7 +1312,7 @@
     <string name="stats_message_format">%1$s messages</string>
     <string name="stats_ai_messages">AI messages</string>
     <string name="stats_tool_results">Tool results</string>
-    <string name="stats_disclaimer">Token counts are estimated locally with the DeepSeek V3 tokenizer and never require network access. The current method counts context again for every model request and adds fixed overhead for system prompts, tool schemas, and message templates; provider tokenizers, image billing, cache discounts, and actual usage may differ.</string>
+    <string name="stats_disclaimer">Token counts are estimated locally with the DeepSeek V4 tokenizer and never require network access. The current method counts context again for every model request and adds fixed overhead for system prompts, tool schemas, and message templates; provider tokenizers, image billing, cache discounts, and actual usage may differ.</string>
     <string name="stats_period_format">%1$s stats</string>
     <string name="compact_unit_wan">Compact Unit Wan</string>
     <string name="compact_unit_yi">Compact Unit Yi</string>
@@ -1375,6 +1375,7 @@
     <string name="composer_queue_dock_collapse">Collapse queued messages</string>
     <string name="composer_queue_state_queued">Queued</string>
     <string name="composer_queue_state_parked">Parked</string>
+    <string name="composer_queue_state_waiting_to_insert">Waiting to insert</string>
     <string name="composer_queue_attachment_count">Attachments: %1$d</string>
     <string name="composer_queue_remove_description">Remove queued message: %1$s</string>
     <string name="composer_queue_send_now_description">Send now: %1$s</string>
@@ -1963,7 +1964,7 @@ Revocation stops new access through that permission but does not automatically e
     <string name="ui_text_font">Text font</string>
     <string name="ui_code_font">Code font</string>
     <string name="ui_imported_1_s_fonts">Imported %1$s fonts</string>
-    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">Import multiple TTF, OTF, and TTC fonts. Preview each font and assign it separately for text or code.</string>
+    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">Import multiple TTF, OTF, and TTC fonts for text, code, or the terminal. Tap a selected use again to restore its default font.</string>
     <string name="ui_import_fonts">Import fonts</string>
     <string name="ui_the_font_library_is_empty_tap_import_fonts_to">The font library is empty. Tap Import fonts to select multiple files at once.</string>
     <string name="ui_text_font_changed_to_1_s">Text font changed to: %1$s</string>
@@ -2429,4 +2430,13 @@ Revocation stops new access through that permission but does not automatically e
     <string name="deepseek_key_required">Enter a valid DeepSeek API Key.</string>
     <string name="deepseek_config_hint">Save your configuration first, then enable it separately. The switch is saved immediately and stays off and unavailable until configured. The API Key is stored securely.</string>
     <string name="deepseek_config_saved">Configuration saved</string>
+    <string name="terminal_font">Terminal font</string>
+    <string name="terminal_font_hint">Choose a font in the font library, or use the system monospace font. Monospace fonts such as Maple Mono and JetBrains Mono are recommended. No terminal fonts are bundled.</string>
+    <string name="terminal_font_size">Terminal size: %1$d sp</string>
+    <string name="terminal_color_scheme">Terminal color scheme</string>
+    <string name="terminal_use_font">Use for terminal</string>
+    <string name="terminal_font_current">Current terminal font</string>
+    <string name="terminal_font_changed">Terminal font changed to %1$s</string>
+    <string name="terminal_paste">Paste</string>
+    <string name="terminal_clear">Clear terminal</string>
 </resources>

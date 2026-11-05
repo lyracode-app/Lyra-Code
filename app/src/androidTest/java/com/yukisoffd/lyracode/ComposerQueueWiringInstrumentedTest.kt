@@ -3,6 +3,7 @@ package com.yukisoffd.lyracode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -148,6 +149,27 @@ class ComposerQueueWiringInstrumentedTest {
             context.getString(R.string.composer_queue_steer_description, "Queued follow up"),
         ).assertCountEquals(0)
         compose.runOnIdle { assertNull(steered) }
+    }
+
+    @Test
+    fun waitingSteerShowsDisabledSendAndAnEnabledRemoveAction() {
+        val waiting = snapshot.queue.last()
+        showWiredDock(
+            state = snapshot.copy(queue = snapshot.queue.dropLast(1), steers = listOf(waiting)),
+            runActive = true,
+        )
+
+        compose.onNodeWithText(context.getString(R.string.composer_queue_state_waiting_to_insert)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.composer_queue_steer_description, waiting.capture.rawText),
+        ).assertIsNotEnabled()
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.composer_queue_remove_description, waiting.capture.rawText),
+        ).performClick()
+        compose.runOnIdle {
+            assertEquals(waiting.id, removed)
+            assertNull(steered)
+        }
     }
 
     @Test

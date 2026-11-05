@@ -87,7 +87,7 @@ class UsageStatisticsRepository(
     private val conversationStore: ConversationStore,
 ) {
     private val appContext = context.applicationContext
-    private val tokenizer by lazy { DeepSeekV3Tokenizer.get(appContext) }
+    private val tokenizer by lazy { DeepSeekV4Tokenizer.get(appContext) }
 
     fun calculate(
         period: UsageStatsPeriod,

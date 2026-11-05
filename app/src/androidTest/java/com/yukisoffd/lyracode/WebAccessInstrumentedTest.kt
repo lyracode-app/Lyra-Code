@@ -6,6 +6,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.yukisoffd.lyracode.ai.ToolApprovalRequest
 import com.yukisoffd.lyracode.data.*
 import com.yukisoffd.lyracode.webaccess.WebAccessManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
@@ -71,9 +78,12 @@ class WebAccessInstrumentedTest {
         val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         val manager = MainActivity::class.java.getDeclaredField("webAccessManager").apply { isAccessible=true }.get(activity) as WebAccessManager
         val controller = MainActivity::class.java.getDeclaredField("controller").apply { isAccessible=true }.get(activity) as ChatController
+        // The process runtime may predate this fixture's direct settings write.
+        instrumentation.runOnMainSync { controller.reloadProfiles() }
         val base="http://127.0.0.1:${settings.webAccessPort}"
         val client=OkHttpClient.Builder().readTimeout(20,TimeUnit.SECONDS).build()
         val token=settings.webAccessToken
+        val approvalScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         var conversationId=0L; var projectId=0L
         val uploadedFiles=mutableListOf<String>()
         fun getState(): JSONObject = client.newCall(Request.Builder().url("$base/api/state").header("Authorization","Bearer $token").build()).execute().use { assertEquals(200,it.code); JSONObject(it.body!!.string()) }
@@ -179,10 +189,19 @@ class WebAccessInstrumentedTest {
             action("rename",JSONObject().put("id",conversationId).put("title","Renamed on PC"))
             action("pin",JSONObject().put("id",conversationId).put("enabled",true))
             assertEquals("Renamed on PC",controller.usageStore().conversation(conversationId)!!.title)
-            instrumentation.runOnMainSync { controller.pendingToolApproval.value=PendingToolApproval(77,ToolApprovalRequest(conversationId,"run_command","{}","echo test","test")) }
-            action("approval",JSONObject().put("id",76).put("approved",true),409)
-            instrumentation.runOnMainSync { assertEquals(77L,controller.pendingToolApproval.value!!.id) }
-            action("approval",JSONObject().put("id",77).put("approved",true))
+            action("autoApproval",JSONObject().put("enabled",false))
+            val agent = ChatController::class.java.getDeclaredField("agent").apply { isAccessible=true }
+                .get(controller) as com.yukisoffd.lyracode.ai.OpenAiAgent
+            val approval = approvalScope.async {
+                agent.approvalHandler(ToolApprovalRequest(conversationId,"run_command","{}","echo test","test"))
+            }
+            instrumentation.waitForIdleSync()
+            var approvalId = 0L
+            instrumentation.runOnMainSync { approvalId=controller.pendingToolApproval.value!!.id }
+            action("approval",JSONObject().put("id",approvalId-1).put("approved",true),409)
+            instrumentation.runOnMainSync { assertEquals(approvalId,controller.pendingToolApproval.value!!.id) }
+            action("approval",JSONObject().put("id",approvalId).put("approved",true))
+            assertTrue(runBlocking { withTimeout(5_000) { approval.await() } }.approved)
             instrumentation.runOnMainSync { assertNull(controller.pendingToolApproval.value) }
             instrumentation.runOnMainSync { projectId=controller.usageStore().createProject("Web project",""); controller.reloadConversations() }
             action("newProjectChat",JSONObject().put("id",projectId)); assertEquals(projectId,getState().getLong("projectId"))
@@ -193,6 +212,7 @@ class WebAccessInstrumentedTest {
             instrumentation.runOnMainSync { manager.stop(); assertFalse(manager.state.value.running); assertEquals(0,activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
             ServerSocket().use { it.bind(java.net.InetSocketAddress("127.0.0.1",settings.webAccessPort)) }
         } finally {
+            approvalScope.cancel()
             instrumentation.runOnMainSync {
                 manager.stop(); controller.stopActive()
                 if (conversationId>0) controller.deleteConversation(conversationId)

@@ -3,13 +3,17 @@ package com.yukisoffd.lyracode
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -22,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -64,8 +70,11 @@ internal fun NewApiLoginDialog(settings: AppSettings, onServicesChanged: () -> U
     val account = settings.newApiAccount
     val scope = rememberCoroutineScope()
     var registering by remember { mutableStateOf(false) }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    val savedLogin = remember { account.savedLogin }
+    var username by remember { mutableStateOf(savedLogin?.username.orEmpty()) }
+    var password by remember { mutableStateOf(savedLogin?.password.orEmpty()) }
+    var rememberCredentials by remember { mutableStateOf(savedLogin != null) }
+    var autoLogin by remember { mutableStateOf(savedLogin?.autoLogin == true) }
     var email by remember { mutableStateOf("") }
     var verification by remember { mutableStateOf("") }
     var invitation by remember { mutableStateOf("") }
@@ -104,7 +113,7 @@ internal fun NewApiLoginDialog(settings: AppSettings, onServicesChanged: () -> U
         return try { synchronize() } catch (error: Exception) { "$partialText\n${error.message ?: errorText}" }
     }
     AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
+        onDismissRequest = { if (!busy) { account.cancelPendingLogin(); onDismiss() } },
         title = { Text(uiText(R.string.new_api_account)) },
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
@@ -121,13 +130,32 @@ internal fun NewApiLoginDialog(settings: AppSettings, onServicesChanged: () -> U
                         scope.launch { flowToken = null; twoFactor = "" }
                         afterLogin()
                     } }) { Text(uiText(R.string.new_api_login)) }
-                    TextButton(enabled = !busy, onClick = { flowToken = null; twoFactor = "" }) { Text(uiText(R.string.new_api_back_to_login)) }
+                    TextButton(enabled = !busy, onClick = { account.cancelPendingLogin(); flowToken = null; twoFactor = "" }) { Text(uiText(R.string.new_api_back_to_login)) }
                 } else {
                     OutlinedTextField(username, { username = it }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
                         label = { Text(uiText(R.string.new_api_username)) }, singleLine = true)
                     OutlinedTextField(password, { password = it }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
                         label = { Text(uiText(R.string.new_api_password)) }, visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true)
+                    NewApiLoginOption(
+                        label = uiText(R.string.new_api_remember_credentials),
+                        checked = rememberCredentials,
+                        enabled = !busy && account.canRememberCredentials,
+                    ) {
+                        rememberCredentials = it
+                        if (!it) autoLogin = false
+                    }
+                    NewApiLoginOption(
+                        label = uiText(R.string.new_api_auto_login),
+                        checked = autoLogin,
+                        enabled = !busy && rememberCredentials,
+                        onCheckedChange = { autoLogin = it },
+                    )
+                    Text(
+                        uiText(if (account.canRememberCredentials) R.string.new_api_saved_login_hint else R.string.new_api_secure_storage_unavailable),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     if (registering) {
                         OutlinedTextField(email, { email = it }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
                             label = { Text(uiText(R.string.new_api_email)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), singleLine = true)
@@ -147,7 +175,7 @@ internal fun NewApiLoginDialog(settings: AppSettings, onServicesChanged: () -> U
                                 account.register(username, password, email, verification, invitation)
                                 scope.launch { registering = false }
                             }
-                            val result = try { account.login(username, password) } catch (error: Exception) {
+                            val result = try { account.login(username, password, rememberCredentials, autoLogin) } catch (error: Exception) {
                                 if (register) throw IllegalStateException("$registeredText\n${error.message}", error) else throw error
                             }
                             // UI state changes happen on the main dispatcher after the network operation.
@@ -162,6 +190,19 @@ internal fun NewApiLoginDialog(settings: AppSettings, onServicesChanged: () -> U
                 if (status.isNotBlank()) Text(status, color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
             }
         },
-        confirmButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(uiText(R.string.new_api_close)) } },
+        confirmButton = { TextButton(enabled = !busy, onClick = { account.cancelPendingLogin(); onDismiss() }) { Text(uiText(R.string.new_api_close)) } },
     )
+}
+
+@Composable
+private fun NewApiLoginOption(label: String, checked: Boolean, enabled: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onCheckedChange)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }

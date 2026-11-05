@@ -1,15 +1,21 @@
 package com.yukisoffd.lyracode
 
+import com.yukisoffd.lyracode.ai.SteerSource
 import com.yukisoffd.lyracode.chat.pending.PendingInputCapture
 import com.yukisoffd.lyracode.chat.pending.PendingInputState
 import com.yukisoffd.lyracode.chat.pending.PendingInputStore
+import com.yukisoffd.lyracode.workspace.WorkspaceFileReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SteerWiringTest {
+
+    private fun SteerSource.drainTexts(conversationId: Long): List<String> =
+        buildList { drain(conversationId) { add(it.composedInput) } }
 
     private fun store(documents: MutableMap<Long, String> = mutableMapOf()): PendingInputStore =
         PendingInputStore(
@@ -26,14 +32,14 @@ class SteerWiringTest {
         store.enqueueSteer(7L, PendingInputCapture(rawText = "second", composedInput = "steer two"))
         store.enqueueSteer(8L, PendingInputCapture(rawText = "other", composedInput = "other conversation"))
 
-        val source = steerSourceFrom(store::drainSteers)
+        val source = SteerSource(store::drainSteers)
 
-        assertEquals(listOf("steer one", "steer two"), source.drain(7L))
-        assertTrue(source.drain(7L).isEmpty())
+        assertEquals(listOf("steer one", "steer two"), source.drainTexts(7L))
+        assertTrue(source.drainTexts(7L).isEmpty())
         assertTrue(store.snapshot(7L).steers.isEmpty())
 
-        assertEquals(listOf("other conversation"), source.drain(8L))
-        assertTrue(source.drain(8L).isEmpty())
+        assertEquals(listOf("other conversation"), source.drainTexts(8L))
+        assertTrue(source.drainTexts(8L).isEmpty())
         assertTrue(store.snapshot(8L).steers.isEmpty())
     }
 
@@ -43,9 +49,9 @@ class SteerWiringTest {
         store.enqueueSteer(3L, PendingInputCapture(rawText = "", composedInput = "  "))
         store.enqueueSteer(3L, PendingInputCapture(rawText = "keep", composedInput = "keep"))
 
-        val source = steerSourceFrom(store::drainSteers)
+        val source = SteerSource(store::drainSteers)
 
-        assertEquals(listOf("keep"), source.drain(3L))
+        assertEquals(listOf("keep"), source.drainTexts(3L))
         assertTrue(store.snapshot(3L).steers.isEmpty())
     }
 
@@ -67,9 +73,9 @@ class SteerWiringTest {
         store.enqueue(9L, PendingInputCapture(rawText = "queued", composedInput = "queued"))
         store.enqueueSteer(9L, PendingInputCapture(rawText = "steer", composedInput = "steer"))
 
-        val source = steerSourceFrom(store::drainSteers)
+        val source = SteerSource(store::drainSteers)
 
-        assertEquals(listOf("steer"), source.drain(9L))
+        assertEquals(listOf("steer"), source.drainTexts(9L))
         assertEquals(1, store.snapshot(9L).queuedCount)
         assertEquals("queued", store.snapshot(9L).queue.single().capture.composedInput)
     }
@@ -198,7 +204,50 @@ class SteerWiringTest {
         val resolved = steerAvailability(featureEnabled = true, generating = true)
         assertEquals(SteerAvailability.AVAILABLE, resolved)
         assertNull(resolved.waitNoteRes())
-        assertEquals(listOf("keep going"), steerSourceFrom(store::drainSteers).drain(7L))
+        assertEquals(listOf("keep going"), SteerSource(store::drainSteers).drainTexts(7L))
+        assertTrue(store.snapshot(7L).steers.isEmpty())
+    }
+
+    @Test
+    fun `waiting row keeps its id and close withdraws it before insertion`() {
+        val store = store()
+        val item = store.enqueue(7L, PendingInputCapture("follow up", "follow up"))
+        store.takeForSteering(7L, item.id)
+
+        val row = composerQueueRowUis(store.snapshot(7L)).single()
+        assertEquals(item.id, row.id)
+        assertEquals(ComposerQueueItemState.WAITING_TO_INSERT, row.state)
+        assertNull(store.takeForSteering(7L, row.id))
+
+        assertEquals(item, store.remove(7L, row.id)?.item)
+        assertTrue(SteerSource(store::drainSteers).drainTexts(7L).isEmpty())
+        assertTrue(composerQueueRowUis(store.snapshot(7L)).isEmpty())
+    }
+
+    @Test
+    fun `insertion receives the full capture and failure leaves the waiting item available`() {
+        val store = store()
+        val request = captureChatRequest(
+            rawText = "Review this",
+            uploads = emptyList(),
+            workspaceFiles = listOf(WorkspaceFileReference("notes.md", "docs/notes.md", "content://notes", 12L)),
+            forcedSkillIds = listOf("review-skill"),
+            editorContextPath = "",
+        )
+        val item = store.enqueue(7L, request.toPendingInputCapture())
+        store.takeForSteering(7L, item.id)
+        val source = SteerSource(store::drainSteers)
+
+        assertThrows(IllegalStateException::class.java) {
+            source.drain(7L) { error("History write failed") }
+        }
+        assertEquals(item, store.snapshot(7L).steers.single())
+        source.drain(7L) { capture ->
+            assertEquals(item, store.snapshot(7L).steers.single())
+            assertEquals(request, capture.toCapturedChatRequest())
+            assertTrue(capture.composedInput.contains("docs/notes.md"))
+            assertEquals(listOf("review-skill"), capture.forcedSkillIds)
+        }
         assertTrue(store.snapshot(7L).steers.isEmpty())
     }
 }

@@ -235,7 +235,7 @@ class ComposerSendPolicyTest {
 
     @Test
     fun `active run turns every steerable queue row into a steer action`() {
-        ComposerQueueItemState.entries.forEach { state ->
+        listOf(ComposerQueueItemState.QUEUED, ComposerQueueItemState.PARKED).forEach { state ->
             assertEquals(
                 ComposerQueueRowAction.STEER,
                 composerQueueRowAction(
@@ -250,7 +250,7 @@ class ComposerSendPolicyTest {
 
     @Test
     fun `attachments and unavailable steering leave the row to the queue`() {
-        ComposerQueueItemState.entries.forEach { state ->
+        listOf(ComposerQueueItemState.QUEUED, ComposerQueueItemState.PARKED).forEach { state ->
             assertEquals(
                 ComposerQueueRowAction.NONE,
                 composerQueueRowAction(
@@ -266,6 +266,21 @@ class ComposerSendPolicyTest {
                     state = state,
                     runActive = true,
                     steerAccepted = false,
+                    attachmentCount = 0,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `steer waiting for insertion never allows a second send`() {
+        for (runActive in listOf(false, true)) {
+            assertEquals(
+                ComposerQueueRowAction.STEER_PENDING,
+                composerQueueRowAction(
+                    state = ComposerQueueItemState.WAITING_TO_INSERT,
+                    runActive = runActive,
+                    steerAccepted = runActive,
                     attachmentCount = 0,
                 ),
             )

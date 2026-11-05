@@ -245,6 +245,16 @@ internal fun LyraCodeApp(
                 .onFailure { appNotice = it.message.orEmpty().ifBlank { context.getString(R.string.notice_cannot_open_installer) } }
         }
     }
+    LaunchedEffect(settings) {
+        val attempted = withContext(Dispatchers.IO) {
+            val account = settings.newApiAccount
+            if (account.savedLogin?.autoLogin == true) {
+                runCatching { account.refreshUser() }
+                true
+            } else false
+        }
+        if (attempted) controller.settingsRevision.intValue++
+    }
     LaunchedEffect(Unit) {
         startupPendingApk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
         val info = withContext(Dispatchers.IO) {

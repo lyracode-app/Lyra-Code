@@ -375,7 +375,13 @@ internal class ProotLinuxManager private constructor(context: Context) {
             check(isDirectory || mkdirs()) { "Unable to create the PRoot command state directory." }
         }
         val completionFile = File(commandStateDir, "$executionId.status")
-        val supervisorPidFile = File(commandStateDir, "$executionId.pid")
+        // Publish the host PID before PRoot starts: cancellation must not depend on a guest
+        // login shell reaching the tracked command (or on guest files remaining present).
+        val supervisorPidFile = File(appContext.cacheDir, "proot-command-pids/$executionId.pid").apply {
+            check(parentFile?.let { it.isDirectory || it.mkdirs() } == true) {
+                "Unable to create the PRoot supervisor state directory."
+            }
+        }
         completionFile.delete()
         supervisorPidFile.delete()
         val commandToRun = if (background) {
@@ -386,7 +392,6 @@ internal class ProotLinuxManager private constructor(context: Context) {
         val trackedCommand = buildTrackedProotCommand(
             command = commandToRun,
             completionGuestPath = "/root/.lyracode/commands/$executionId.status",
-            supervisorPidGuestPath = "/root/.lyracode/commands/$executionId.pid",
             shellPath = target.shellPath,
         )
         return ProotCommandProcess(
@@ -397,6 +402,7 @@ internal class ProotLinuxManager private constructor(context: Context) {
                 listOf(target.shellPath, "-lc", trackedCommand),
                 mergeError = false,
                 killOnExit = false,
+                supervisorPidFile = supervisorPidFile,
             ),
             completionFile = completionFile,
             supervisorPidFile = supervisorPidFile,
@@ -429,6 +435,7 @@ internal class ProotLinuxManager private constructor(context: Context) {
         guestCommand: List<String>,
         mergeError: Boolean = true,
         killOnExit: Boolean = true,
+        supervisorPidFile: File? = null,
     ): Process {
         val args = mutableListOf(
             prootFile().absolutePath,
@@ -454,7 +461,17 @@ internal class ProotLinuxManager private constructor(context: Context) {
         )
         args += guestCommand
         val processTemp = File(appContext.cacheDir, "proot-linux-tmp/${target.id}").apply { mkdirs() }
-        return ProcessBuilder(args)
+        // Android runtime threads block SIGQUIT. The system shell restores its signal mask
+        // before exec, so PRoot can receive the shutdown signal used to kill its tracees.
+        // exec keeps the Java Process and the PRoot supervisor on the same PID.
+        val launchScript = if (supervisorPidFile != null) {
+            "echo \"${'$'}${'$'}\" > \"${'$'}1\" || exit; shift; exec \"${'$'}@\""
+        } else {
+            "exec \"${'$'}@\""
+        }
+        val launchArgs = listOf("/system/bin/sh", "-c", launchScript, "lyracode-proot") +
+            listOfNotNull(supervisorPidFile?.absolutePath) + args
+        return ProcessBuilder(launchArgs)
             .directory(appContext.filesDir)
             .redirectErrorStream(mergeError)
             .apply {
@@ -741,15 +758,12 @@ internal class ProotLinuxManager private constructor(context: Context) {
 internal fun buildTrackedProotCommand(
     command: String,
     completionGuestPath: String,
-    supervisorPidGuestPath: String,
     shellPath: String,
 ): String {
     val quotedShell = shellSingleQuoteForProot(shellPath)
     val quotedCommand = shellSingleQuoteForProot(command)
     val quotedCompletionPath = shellSingleQuoteForProot(completionGuestPath)
-    val quotedSupervisorPidPath = shellSingleQuoteForProot(supervisorPidGuestPath)
     return """
-        printf '%s\n' "${'$'}PPID" > $quotedSupervisorPidPath
         $quotedShell -lc $quotedCommand
         lyra_exit_code=${'$'}?
         printf '%s\n' "${'$'}lyra_exit_code" > $quotedCompletionPath

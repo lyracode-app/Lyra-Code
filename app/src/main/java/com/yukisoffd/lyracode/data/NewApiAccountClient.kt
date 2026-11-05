@@ -14,9 +14,13 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-internal interface NewApiAccountStore { var state: String }
+internal interface NewApiAccountStore {
+    var state: String
+    val supportsRememberedLogin: Boolean
+}
 internal class NewApiException(val status: Int, message: String) : IOException(message)
 internal data class NewApiLoginResult(val flowToken: String? = null)
+internal data class NewApiSavedLogin(val username: String, val password: String, val autoLogin: Boolean)
 internal data class NewApiSyncResult(val profile: ApiProfile, val warnings: List<String>)
 
 /** Only account endpoints and /v1/models are used here. No local chat/configuration data is accepted. */
@@ -29,6 +33,9 @@ internal class NewApiAccountClient(
     private var session = runCatching { JSONObject(store.state) }.getOrDefault(JSONObject())
     @Volatile private var userSnapshot = session.optJSONObject("user")?.toString()
     @Volatile private var loggedInSnapshot = session.optString("access_token").isNotBlank()
+    @Volatile private var savedLoginSnapshot = session.optJSONObject("saved_login")?.toString()
+    private data class PendingLogin(val flowToken: String, val savedLogin: NewApiSavedLogin?)
+    @Volatile private var pendingLogin: PendingLogin? = null
     private val cookies = mutableListOf<Cookie>().apply {
         val saved = session.optJSONArray("cookies") ?: JSONArray()
         for (i in 0 until saved.length()) Cookie.parse(origin, saved.optString(i))?.let(::add)
@@ -54,6 +61,15 @@ internal class NewApiAccountClient(
         }).build()
 
     val isLoggedIn: Boolean get() = loggedInSnapshot
+    val canRememberCredentials: Boolean get() = store.supportsRememberedLogin
+    // The store uses device-local encrypted preferences, excluded from exports and Android backups.
+    val savedLogin: NewApiSavedLogin? get() = savedLoginSnapshot?.takeIf { canRememberCredentials }?.let {
+        val data = JSONObject(it)
+        val username = data.optString("username")
+        val password = data.optString("password")
+        if (username.isBlank() || password.isBlank()) null
+        else NewApiSavedLogin(username, password, data.optBoolean("auto_login"))
+    }
     val user: JSONObject? get() = userSnapshot?.let(::JSONObject)
     val profileId: String get() = "newapi:${origin.host}:${user?.optLong("id") ?: 0}"
 
@@ -68,21 +84,45 @@ internal class NewApiAccountClient(
             .put("verification_code", code.trim()).put("aff_code", invitation.trim()))
     }
 
-    @Synchronized fun login(username: String, password: String): NewApiLoginResult {
+    @Synchronized fun login(
+        username: String,
+        password: String,
+        rememberCredentials: Boolean = false,
+        autoLogin: Boolean = false,
+    ): NewApiLoginResult {
+        pendingLogin = null
+        check(!rememberCredentials || canRememberCredentials) { "Encrypted credential storage is unavailable" }
+        val saved = if (rememberCredentials) NewApiSavedLogin(username.trim(), password, autoLogin) else null
         val data = exchange(url("/api/user/login"), "POST",
             JSONObject().put("username", username.trim()).put("password", password)).getJSONObject("data")
         if (data.optBoolean("require_2fa")) {
             val flow = data.optString("flow_token")
             check(flow.isNotBlank()) { "Missing two-factor flow token" }
+            pendingLogin = PendingLogin(flow, saved)
             return NewApiLoginResult(flow)
         }
-        acceptAuthentication(data, newLogin = true)
+        acceptAuthentication(data, newLogin = true, saved = saved)
         return NewApiLoginResult()
     }
 
     @Synchronized fun verifyTwoFactor(flowToken: String, code: String) {
         acceptAuthentication(exchange(url("/api/user/login/2fa"), "POST",
-            JSONObject().put("flow_token", flowToken).put("code", code.trim())).getJSONObject("data"), newLogin = true)
+            JSONObject().put("flow_token", flowToken).put("code", code.trim())).getJSONObject("data"),
+            newLogin = true, saved = pendingLogin?.takeIf { it.flowToken == flowToken }?.savedLogin)
+        pendingLogin = null
+    }
+
+    fun cancelPendingLogin() { pendingLogin = null }
+
+    private fun saveLogin(saved: NewApiSavedLogin?) {
+        writeSavedLogin(saved)
+        persist()
+    }
+
+    private fun writeSavedLogin(saved: NewApiSavedLogin?) {
+        if (saved == null) session.remove("saved_login")
+        else session.put("saved_login", JSONObject().put("username", saved.username)
+            .put("password", saved.password).put("auto_login", saved.autoLogin))
     }
 
     @Synchronized fun refreshUser(): JSONObject {
@@ -93,11 +133,15 @@ internal class NewApiAccountClient(
     }
 
     @Synchronized fun logout() {
+        pendingLogin = null
+        val remembered = savedLogin?.copy(autoLogin = false)
+        // Disable before the request so an interrupted/manual logout cannot sign the user back in.
+        saveLogin(remembered)
         try { exchange(url("/api/user/auth/logout"), "POST", JSONObject()) }
         finally {
             cookies.clear()
             session = JSONObject()
-            persist()
+            saveLogin(remembered)
         }
     }
 
@@ -215,7 +259,7 @@ internal class NewApiAccountClient(
         }
     }
 
-    private fun acceptAuthentication(data: JSONObject, newLogin: Boolean = false) {
+    private fun acceptAuthentication(data: JSONObject, newLogin: Boolean = false, saved: NewApiSavedLogin? = null) {
         val token = data.getString("access_token")
         check(token.isNotBlank()) { "Missing account access token" }
         val incomingUser = data.optJSONObject("user")
@@ -226,38 +270,74 @@ internal class NewApiAccountClient(
         }
         session.put("access_token", token).put("access_expires_at", data.optLong("access_expires_at"))
         if (incomingUser != null) session.put("user", incomingUser)
+        if (newLogin) writeSavedLogin(saved)
         persist()
     }
 
     private fun refresh() {
         try { acceptAuthentication(exchange(url("/api/user/auth/refresh"), "POST", JSONObject()).getJSONObject("data")) }
         catch (error: NewApiException) {
-            if (error.status == 401 || error.status == 200) {
-                session.remove("access_token")
-                cookies.clear()
-                persist()
-            }
+            if (error.status in listOf(200, 401, 403)) clearAuthentication()
             throw error
         }
     }
 
     private fun authenticated(path: String, method: String = "GET", body: JSONObject? = null): JSONObject {
-        check(isLoggedIn) { "Please sign in again" }
-        val expiry = session.optLong("access_expires_at")
-        if (expiry > 0 && expiry <= System.currentTimeMillis() / 1000 + 30) refresh()
-        try { return exchange(url(path), method, body, session.getString("access_token")) }
-        catch (error: NewApiException) {
-            if (error.status != 401) throw error
-            refresh()
-            try { return exchange(url(path), method, body, session.getString("access_token")) }
-            catch (retryError: NewApiException) {
-                if (retryError.status == 401) {
-                    session.remove("access_token")
-                    cookies.clear()
-                    persist()
-                }
-                throw retryError
+        var refreshed = false
+        var signedInAgain = false
+        while (true) {
+            if (!isLoggedIn) {
+                check(!signedInAgain && savedLogin?.autoLogin == true) { "Please sign in again" }
+                signedInAgain = true
+                automaticLogin()
             }
+            val expiry = session.optLong("access_expires_at")
+            if (!refreshed && !signedInAgain && expiry > 0 && expiry <= System.currentTimeMillis() / 1000 + 30) {
+                refreshed = true
+                try { refresh() }
+                catch (error: NewApiException) {
+                    if (!isLoggedIn && savedLogin?.autoLogin == true) continue
+                    throw error
+                }
+            }
+            try { return exchange(url(path), method, body, session.getString("access_token")) }
+            catch (error: NewApiException) {
+                if (error.status != 401) throw error
+                if (!refreshed && !signedInAgain) {
+                    refreshed = true
+                    try { refresh() }
+                    catch (refreshError: NewApiException) {
+                        if (!isLoggedIn && savedLogin?.autoLogin == true) continue
+                        throw refreshError
+                    }
+                } else {
+                    clearAuthentication()
+                    if (signedInAgain || savedLogin?.autoLogin != true) throw error
+                }
+            }
+        }
+    }
+
+    private fun clearAuthentication() {
+        session.remove("access_token")
+        cookies.clear()
+        persist()
+    }
+
+    private fun automaticLogin() {
+        val saved = checkNotNull(savedLogin?.takeIf { it.autoLogin }) { "Please sign in again" }
+        try {
+            val result = login(saved.username, saved.password, rememberCredentials = true, autoLogin = true)
+            if (result.flowToken != null) {
+                pendingLogin = null
+                throw NewApiException(401, "Two-factor verification is required. Please sign in again.")
+            }
+        } catch (error: NewApiException) {
+            if (error.status in listOf(200, 401, 403)) {
+                clearAuthentication()
+                saveLogin(saved.copy(autoLogin = false))
+            }
+            throw error
         }
     }
 
@@ -283,6 +363,7 @@ internal class NewApiAccountClient(
         store.state = session.toString()
         userSnapshot = session.optJSONObject("user")?.toString()
         loggedInSnapshot = session.optString("access_token").isNotBlank()
+        savedLoginSnapshot = session.optJSONObject("saved_login")?.toString()
     }
 
     companion object {

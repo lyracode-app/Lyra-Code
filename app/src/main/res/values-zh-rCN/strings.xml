@@ -1394,7 +1394,7 @@
     <string name="stats_message_format">%1$s 条</string>
     <string name="stats_ai_messages">AI 消息</string>
     <string name="stats_tool_results">工具结果</string>
-    <string name="stats_disclaimer">Token 数由本地 DeepSeek V3 tokenizer 估算，不访问网络。当前口径按每次模型请求重复计算上下文，并为系统提示词、工具 schema 和消息模板加入固定开销；不同服务商的 tokenizer、图片计费、缓存折扣和实际 usage 仍可能不同。</string>
+    <string name="stats_disclaimer">Token 数由本地 DeepSeek V4 tokenizer 估算，不访问网络。当前口径按每次模型请求重复计算上下文，并为系统提示词、工具 schema 和消息模板加入固定开销；不同服务商的 tokenizer、图片计费、缓存折扣和实际 usage 仍可能不同。</string>
     <string name="stats_period_format">%1$s统计</string>
     <string name="compact_unit_wan">万</string>
     <string name="compact_unit_yi">亿</string>
@@ -1458,6 +1458,7 @@
     <string name="composer_queue_dock_collapse">收起排队消息</string>
     <string name="composer_queue_state_queued">排队中</string>
     <string name="composer_queue_state_parked">已暂停</string>
+    <string name="composer_queue_state_waiting_to_insert">等待插入</string>
     <string name="composer_queue_attachment_count">附件：%1$d</string>
     <string name="composer_queue_remove_description">移除排队消息：%1$s</string>
     <string name="composer_queue_send_now_description">立即发送：%1$s</string>
@@ -2046,7 +2047,7 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="ui_text_font">文本字体</string>
     <string name="ui_code_font">代码字体</string>
     <string name="ui_imported_1_s_fonts">已导入 %1$s 个字体</string>
-    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">支持批量导入 TTF、OTF 和 TTC 字体。导入后可预览，并分别设为文本字体或代码字体。</string>
+    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">支持批量导入 TTF、OTF 和 TTC 字体，可用于文本、代码和终端；再次点击选中用途可恢复默认字体。</string>
     <string name="ui_import_fonts">导入字体</string>
     <string name="ui_the_font_library_is_empty_tap_import_fonts_to">字体库为空，点击“导入字体”可一次选择多个文件。</string>
     <string name="ui_text_font_changed_to_1_s">已切换文本字体：%1$s</string>
@@ -2512,6 +2513,15 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="deepseek_key_required">请输入有效的 DeepSeek API Key。</string>
     <string name="deepseek_config_hint">请先保存配置，再单独启用。开关状态即时保存；未配置时开关保持关闭且不可用。API Key 安全存储。</string>
     <string name="deepseek_config_saved">配置已保存</string>
+    <string name="terminal_font">终端字体</string>
+    <string name="terminal_font_hint">在字体库中选择字体，默认使用系统等宽字体。推荐 Maple Mono、JetBrains Mono 等等宽字体。应用不内置终端字体。</string>
+    <string name="terminal_font_size">终端字号：%1$d sp</string>
+    <string name="terminal_color_scheme">终端配色</string>
+    <string name="terminal_use_font">用于终端</string>
+    <string name="terminal_font_current">当前终端字体</string>
+    <string name="terminal_font_changed">终端字体已更改为 %1$s</string>
+    <string name="terminal_paste">粘贴</string>
+    <string name="terminal_clear">清空终端</string>
 </resources>
 
 

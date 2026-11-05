@@ -38,7 +38,6 @@ import com.yukisoffd.lyracode.chat.pending.PendingInputRestorer
 import com.yukisoffd.lyracode.chat.pending.PendingInputSnapshot
 import com.yukisoffd.lyracode.chat.pending.PendingInputState
 import com.yukisoffd.lyracode.chat.pending.PendingInputStore
-import com.yukisoffd.lyracode.chat.pending.PendingSteer
 import com.yukisoffd.lyracode.data.ApiProfile
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.withChatGptModels
@@ -244,17 +243,6 @@ internal fun shouldRestoreGeneratingMarker(
     owningJobIsCurrent: Boolean,
 ): Boolean = operationIsCompressing && owningJobIsCurrent
 
-/**
- * Maps the store's atomic steer drain to the agent's text-only source. A drained steer is
- * removed from the channel before it is returned, so each steering text reaches the agent at
- * most once; blank captures are skipped because the agent persists plain user turns.
- */
-internal fun steerSourceFrom(drain: (Long) -> List<PendingSteer>): SteerSource = SteerSource { conversationId ->
-    drain(conversationId)
-        .map { steer -> steer.capture.composedInput }
-        .filter { text -> text.isNotBlank() }
-}
-
 /** What the post-run queue handler must do with the conversation's queue items. */
 internal enum class QueueDrain { DELIVER_NEXT, PARK_ALL }
 
@@ -289,9 +277,7 @@ internal fun carryLateSteers(
     store: PendingInputStore,
     conversationId: Long,
     state: PendingInputState,
-): List<PendingInputItem> = store.drainSteers(conversationId).map { steer ->
-    store.enqueue(conversationId, steer.capture, state)
-}
+): List<PendingInputItem> = store.requeueSteers(conversationId, state)
 
 internal fun CapturedChatRequest.toPendingInputCapture(): PendingInputCapture = PendingInputCapture(
     rawText = rawText,
@@ -339,18 +325,21 @@ internal fun composerQueueRowUis(
     snapshot: PendingInputSnapshot?,
 ): List<ComposerQueueRowUi> =
     snapshot?.let { current ->
-        current.queue.map { item ->
+        fun row(item: PendingInputItem, state: ComposerQueueItemState): ComposerQueueRowUi =
             ComposerQueueRowUi(
                 id = item.id,
                 excerpt = pendingInputExcerpt(item.capture),
                 attachmentCount = item.capture.attachments.size,
                 missingAttachmentCount = item.capture.attachments.count { it.uri.trim() in current.missingAttachmentUris },
-                state = when (item.state) {
+                state = state,
+            )
+        current.steers.map { row(it, ComposerQueueItemState.WAITING_TO_INSERT) } +
+            current.queue.map { item ->
+                row(item, when (item.state) {
                     PendingInputState.QUEUED -> ComposerQueueItemState.QUEUED
                     PendingInputState.PARKED -> ComposerQueueItemState.PARKED
-                },
-            )
-        }
+                })
+            }
     }.orEmpty()
 
 /**
@@ -559,7 +548,7 @@ class ChatController(
         DeviceTaskCoordinator.addConversationIdleListener(deviceConversationIdleListener)
         DeviceTaskCoordinator.addConversationUpdateListener(deviceConversationUpdateListener)
         // Steers are transient: the store drains them atomically at an agent round boundary.
-        agent.steerSource = steerSourceFrom(pendingInput::drainSteers)
+        agent.steerSource = SteerSource(pendingInput::drainSteers)
         reloadProfiles()
         markAbandonedRunsInterrupted()
         reloadConversations()
@@ -1335,9 +1324,8 @@ class ChatController(
 
     /**
      * Moves one queued or parked message into the active run's steer channel. The item leaves
-     * the queue only after every guard passes, so a refusal never loses it. Steering carries
-     * text only; a captured item with attachments keeps its place in the queue instead of
-     * silently dropping them.
+     * queue delivery only after every guard passes. It stays visible and removable while
+     * waiting for insertion. Items with uploads use ordinary queue delivery.
      */
     internal fun steerQueued(itemId: String): SteerOutcome {
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return SteerOutcome.REFUSED
@@ -1398,7 +1386,7 @@ class ChatController(
     internal fun steerUnavailableExplanation(availability: SteerAvailability): String =
         appContext.getString(availability.unavailableExplanationRes())
 
-    /** Cancels a queued item that has not been delivered. */
+    /** Cancels an item that is queued or still waiting to be inserted. */
     fun removeQueued(itemId: String) {
         val conversationId = activeConversationId.value.takeIf { it > 0 } ?: return
         pendingInput.remove(conversationId, itemId)?.let { removal ->

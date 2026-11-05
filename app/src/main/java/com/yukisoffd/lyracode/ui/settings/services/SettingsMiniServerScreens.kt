@@ -220,18 +220,11 @@ internal fun MiniServerSettings(
     KimiCardBox {
         Text(uiText(R.string.title_listen_config), style = MaterialTheme.typography.titleMedium)
         KimiDivider()
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = { protocol = AppSettings.MINI_SERVER_PROTOCOL_HTTP },
-                shape = KimiPillShape,
-                modifier = Modifier.weight(1f),
-            ) { Text(if (protocol == AppSettings.MINI_SERVER_PROTOCOL_HTTP) "HTTP ✓" else "HTTP") }
-            OutlinedButton(
-                onClick = { protocol = AppSettings.MINI_SERVER_PROTOCOL_HTTPS },
-                shape = KimiPillShape,
-                modifier = Modifier.weight(1f),
-            ) { Text(if (protocol == AppSettings.MINI_SERVER_PROTOCOL_HTTPS) "HTTPS ✓" else "HTTPS") }
-        }
+        MaterialButtonGroup(
+            options = listOf(AppSettings.MINI_SERVER_PROTOCOL_HTTP to "HTTP", AppSettings.MINI_SERVER_PROTOCOL_HTTPS to "HTTPS"),
+            selected = protocol,
+            onSelect = { protocol = it },
+        )
         if (protocol == AppSettings.MINI_SERVER_PROTOCOL_HTTPS) {
             Text(uiText(R.string.notice_https_self_signed), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }

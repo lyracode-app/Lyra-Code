@@ -10,7 +10,7 @@
     <string name="chatgpt_continue">Continue with ChatGPT</string>
     <string name="chatgpt_provided_by">Service provided by ChatGPT (OpenAI)</string>
     <string name="chatgpt_disclosure">After signing in, your authorized ChatGPT plan can only be used within Lyra Code. OpenAI may change, restrict, or stop this feature at any time. Follow ChatGPT terms and policies. Do not resell or share credentials, abuse the service, or engage in prohibited activity; this may result in an official warning, restrictions, or suspension of your ChatGPT account.</string>
-    <string name="chatgpt_privacy">Sign-in takes place in your system browser. This app does not receive your ChatGPT password or existing chats. Credentials are encrypted on this device and excluded from exported backups.</string>
+    <string name="chatgpt_privacy">Sign-in takes place in a browser tab and can reuse sign-in state from your selected browser. This app does not receive your ChatGPT password or existing chats. Credentials are encrypted on this device and excluded from exported backups.</string>
     <string name="chatgpt_service_description">Uses your authorized ChatGPT plan without an API key. Requests use Responses and the current account’s model catalog through its selected login mode. Custom endpoints, request overrides, and media generation are unavailable.</string>
     <string name="chatgpt_mode_official">Official ChatGPT sign-in (SIWC)</string>
     <string name="chatgpt_mode_codex">Codex compatibility sign-in</string>

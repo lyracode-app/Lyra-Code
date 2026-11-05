@@ -337,10 +337,11 @@ internal fun LocalMcpServerSettings(
         )
         Text(uiText(R.string.ui_external_connection_raw_json), style = MaterialTheme.typography.titleSmall)
         Text(uiText(R.string.mcp_local_protocol_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            MaterialChoiceButton(McpProtocol.LEGACY, exportProtocolVersion == McpProtocol.LEGACY) { exportProtocolVersion = McpProtocol.LEGACY }
-            MaterialChoiceButton(uiText(R.string.mcp_protocol_stateless), exportProtocolVersion == McpProtocol.MODERN) { exportProtocolVersion = McpProtocol.MODERN }
-        }
+        MaterialButtonGroup(
+            options = listOf(McpProtocol.LEGACY to McpProtocol.LEGACY, McpProtocol.MODERN to McpProtocol.MODERN),
+            selected = exportProtocolVersion,
+            onSelect = { exportProtocolVersion = it },
+        )
         CommandCopyCard(
             command = externalConnectionJson,
             buttonText = uiText(R.string.ui_copy_external_connection_json),
@@ -539,17 +540,17 @@ internal fun McpServerDialog(
                 OutlinedTextField(runCatching { parsed?.url.orEmpty() }.getOrDefault(""), { patch("url", it) }, Modifier.fillMaxWidth(), label = { Text("URL") }, singleLine = true)
                 OutlinedTextField(parsed?.authKey.orEmpty(), { patch("authKey", it) }, Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_auth_key_optional)) }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
                 Text(uiText(R.string.mcp_auth_verbatim_hint), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MaterialChoiceButton("Streamable HTTP", parsed?.transport == AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP) { patch("transport", AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP) }
-                    MaterialChoiceButton("SSE", parsed?.transport == AppSettings.MCP_TRANSPORT_SSE) { patch("transport", AppSettings.MCP_TRANSPORT_SSE) }
-                }
+                MaterialButtonGroup(
+                    options = listOf(AppSettings.MCP_TRANSPORT_STREAMABLE_HTTP to "Streamable HTTP", AppSettings.MCP_TRANSPORT_SSE to "SSE"),
+                    selected = parsed?.transport.orEmpty(),
+                    onSelect = { patch("transport", it) },
+                )
                 Text(uiText(R.string.mcp_protocol_version), style = MaterialTheme.typography.titleSmall)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val version = runCatching { parsed?.protocolVersion.orEmpty() }.getOrDefault("")
-                    MaterialChoiceButton(uiText(R.string.mcp_protocol_auto), version.isBlank()) { patch("protocolVersion", "") }
-                    MaterialChoiceButton(McpProtocol.LEGACY, version == McpProtocol.LEGACY) { patch("protocolVersion", McpProtocol.LEGACY) }
-                    MaterialChoiceButton(uiText(R.string.mcp_protocol_stateless), version == McpProtocol.MODERN) { patch("protocolVersion", McpProtocol.MODERN) }
-                }
+                MaterialButtonGroup(
+                    options = listOf("" to uiText(R.string.button_group_auto), McpProtocol.LEGACY to McpProtocol.LEGACY, McpProtocol.MODERN to McpProtocol.MODERN),
+                    selected = runCatching { parsed?.protocolVersion.orEmpty() }.getOrDefault(""),
+                    onSelect = { patch("protocolVersion", it) },
+                )
                 OutlinedTextField(timeout, { timeout = it.filter(Char::isDigit) }, Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_timeout_seconds)) }, singleLine = true)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(uiText(R.string.label_enabled), Modifier.weight(1f))

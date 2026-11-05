@@ -31,13 +31,13 @@ class PendingInputAttachmentReaperTest {
         val queuedElsewhere = attachmentFile("queued-elsewhere.jpg")
         val fileStore = PendingInputFileStore(
             filesDir = filesDir,
-            deliveredAttachmentUris = { setOf(delivered.absolutePath) },
+            deliveredAttachmentUris = { setOf(delivered.toURI().toString()) },
         )
-        fileStore.writeQueue(2L, encodedQueue(2L, queuedElsewhere.absolutePath))
+        fileStore.writeQueue(2L, encodedQueue(2L, queuedElsewhere.toURI().toString()))
 
         PendingInputAttachmentReaper(fileStore, DIRECT_EXECUTOR).reap(
             1L,
-            listOf(orphan, delivered, queuedElsewhere).map { attachment(it.absolutePath) },
+            listOf(orphan, delivered, queuedElsewhere).map { attachment(it.toURI().toString()) },
         )
 
         assertFalse(orphan.exists())
@@ -53,7 +53,7 @@ class PendingInputAttachmentReaperTest {
             deliveredAttachmentUris = { error("database unavailable") },
         )
 
-        PendingInputAttachmentReaper(fileStore, DIRECT_EXECUTOR).reap(1L, listOf(attachment(kept.absolutePath)))
+        PendingInputAttachmentReaper(fileStore, DIRECT_EXECUTOR).reap(1L, listOf(attachment(kept.toURI().toString())))
 
         assertTrue(kept.exists())
     }
@@ -65,7 +65,7 @@ class PendingInputAttachmentReaperTest {
         val scheduled = ArrayDeque<Runnable>()
         val reaper = PendingInputAttachmentReaper(fileStore) { task -> scheduled.addLast(task) }
 
-        reaper.reap(1L, listOf(attachment(orphan.absolutePath)))
+        reaper.reap(1L, listOf(attachment(orphan.toURI().toString())))
 
         assertTrue(orphan.exists())
         scheduled.removeFirst().run()

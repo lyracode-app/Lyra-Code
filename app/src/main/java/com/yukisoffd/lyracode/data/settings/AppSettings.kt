@@ -347,6 +347,26 @@ class AppSettings(context: Context) {
         get() = plainPrefs.getString(KEY_CODE_FONT_NAME, null)
         private set(value) = plainPrefs.edit().putString(KEY_CODE_FONT_NAME, value).apply()
 
+    var terminalFontPath: String?
+        get() = plainPrefs.getString(KEY_TERMINAL_FONT_PATH, null)?.takeIf { File(it).isFile }
+        private set(value) = plainPrefs.edit().putString(KEY_TERMINAL_FONT_PATH, value).apply()
+
+    val terminalFontName: String?
+        get() = terminalFontPath?.let { plainPrefs.getString(KEY_TERMINAL_FONT_NAME, null) }
+
+    var terminalFontSize: Float
+        get() = plainPrefs.getFloat(KEY_TERMINAL_FONT_SIZE, 13f).coerceIn(8f, 28f)
+        set(value) = plainPrefs.edit().putFloat(KEY_TERMINAL_FONT_SIZE, value.coerceIn(8f, 28f)).apply()
+
+    var terminalColorScheme: String
+        get() = plainPrefs.getString(KEY_TERMINAL_COLOR_SCHEME, "campbell").orEmpty()
+        set(value) = plainPrefs.edit().putString(KEY_TERMINAL_COLOR_SCHEME, value).apply()
+
+    fun selectTerminalFont(item: FontLibraryItem?) {
+        terminalFontPath = item?.path
+        plainPrefs.edit().putString(KEY_TERMINAL_FONT_NAME, item?.name).apply()
+    }
+
     fun fontLibrary(): List<FontLibraryItem> {
         val saved = runCatching {
             val array = JSONArray(plainPrefs.getString(KEY_FONT_LIBRARY, "[]").orEmpty())
@@ -367,8 +387,12 @@ class AppSettings(context: Context) {
         val legacy = listOfNotNull(
             textFontPath?.let { FontLibraryItem("legacy_text", textFontName ?: File(it).name, it) },
             codeFontPath?.let { FontLibraryItem("legacy_code", codeFontName ?: File(it).name, it) },
+            terminalFontPath?.let { FontLibraryItem("legacy_terminal", terminalFontName ?: File(it).name, it) },
         )
-        return (saved + legacy).distinctBy { it.path }
+        val library = (saved + legacy).distinctBy { it.path }
+        // Keep legacy imports in the library when their last active use is toggled off.
+        if (library != saved) saveFontLibrary(library)
+        return library
     }
 
     fun importFonts(uris: List<Uri>): Result<List<FontLibraryItem>> = runCatching {
@@ -419,6 +443,7 @@ class AppSettings(context: Context) {
     fun deleteFont(item: FontLibraryItem) {
         if (textFontPath == item.path) selectFont(null, codeFont = false)
         if (codeFontPath == item.path) selectFont(null, codeFont = true)
+        if (terminalFontPath == item.path) selectTerminalFont(null)
         saveFontLibrary(fontLibrary().filterNot { it.path == item.path })
         runCatching { File(item.path).delete() }
     }
@@ -966,6 +991,7 @@ class AppSettings(context: Context) {
     internal val newApiAccount: NewApiAccountClient by lazy {
         val accountPrefs = createSecurePrefs("lyra_new_api_account")
         NewApiAccountClient(object : NewApiAccountStore {
+            override val supportsRememberedLogin = accountPrefs is EncryptedSharedPreferences
             override var state: String
                 get() = accountPrefs.getString("session", "").orEmpty()
                 set(value) { check(accountPrefs.edit().putString("session", value).commit()) { "Unable to save account session" } }
@@ -1511,6 +1537,8 @@ class AppSettings(context: Context) {
             .put("refreshRateMode", refreshRateMode)
             .put("fontScaleMode", fontScaleMode)
             .put("customFontScale", customFontScale.toDouble())
+            .put("terminalFontSize", terminalFontSize.toDouble())
+            .put("terminalColorScheme", terminalColorScheme)
             .put("requestRootAccess", requestRootAccess)
             .put("requestShellAccess", requestShellAccess)
             .put("customSuCommand", customSuCommand)
@@ -1648,6 +1676,8 @@ class AppSettings(context: Context) {
         root.optString("refreshRateMode").takeIf { it.isNotBlank() }?.let { refreshRateMode = it }
         root.optString("fontScaleMode").takeIf { it.isNotBlank() }?.let { fontScaleMode = it }
         if (root.has("customFontScale")) customFontScale = root.optDouble("customFontScale", 1.0).toFloat()
+        if (root.has("terminalFontSize")) terminalFontSize = root.optDouble("terminalFontSize", 13.0).toFloat()
+        root.optString("terminalColorScheme").takeIf { it.isNotBlank() }?.let { terminalColorScheme = it }
         if (root.has("requestRootAccess")) requestRootAccess = root.optBoolean("requestRootAccess")
         if (root.has("requestShellAccess")) requestShellAccess = root.optBoolean("requestShellAccess")
         root.optString("customSuCommand").takeIf { it.isNotBlank() }?.let { customSuCommand = it }
@@ -2401,6 +2431,10 @@ class AppSettings(context: Context) {
         private const val KEY_CODE_FONT_PATH = "code_font_path"
         private const val KEY_TEXT_FONT_NAME = "text_font_name"
         private const val KEY_CODE_FONT_NAME = "code_font_name"
+        private const val KEY_TERMINAL_FONT_PATH = "terminal_font_path"
+        private const val KEY_TERMINAL_FONT_NAME = "terminal_font_name"
+        private const val KEY_TERMINAL_FONT_SIZE = "terminal_font_size"
+        private const val KEY_TERMINAL_COLOR_SCHEME = "terminal_color_scheme"
         private const val KEY_FONT_LIBRARY = "font_library"
         private const val KEY_REQUEST_ROOT_ACCESS = "request_root_access"
         private const val KEY_REQUEST_SHELL_ACCESS = "request_shell_access"

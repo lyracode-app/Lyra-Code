@@ -1,0 +1,18 @@
+<resources>
+    <string name="developer_wall_title">開發者牆</string>
+    <string name="developer_wall_developers">開發者</string>
+    <string name="developer_wall_sponsors">贊助者</string>
+    <string name="developer_wall_contributors">協助者</string>
+    <string name="developer_wall_thanks">特別鳴謝</string>
+    <string name="developer_wall_sync">同步開發者牆</string>
+    <string name="developer_wall_syncing">正在同步…</string>
+    <string name="developer_wall_daily_hint">每天同步一次，人員資訊和頭像快取至本機，也可隨時手動同步。</string>
+    <string name="developer_wall_cache">開發者牆快取</string>
+    <string name="developer_wall_sync_success">開發者牆已同步</string>
+    <string name="developer_wall_sync_failed">無法載入開發者牆，請檢查網路或 JSON 檔案後重新同步。</string>
+    <string name="developer_wall_open_profile">開啟 %1$s 的個人主頁</string>
+    <string name="developer_wall_release_to_refresh">放開以重新整理</string>
+    <string name="developer_wall_information">開發者牆說明</string>
+    <string name="developer_wall_information_body">開發者牆名單由人工維護。若有人員遺漏或資訊錯誤，請提交 Issue 回饋。</string>
+    <string name="developer_wall_report_issue">提交 Issue</string>
+</resources>

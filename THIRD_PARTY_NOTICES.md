@@ -18,6 +18,7 @@ This document summarizes the main third-party components used by Lyra Code. It i
 | Android Mail / Jakarta Mail API for Android 1.6.7 (`com.sun.mail:android-mail`) | Eclipse Public License 2.0 | Controls Lyra Code's IMAP message reading, folder and draft management, SMTP sending, and MIME processing. The packaged JAR retains its `META-INF/LICENSE.md` and `META-INF/NOTICE.md`. |
 | Jakarta Activation fork for Android (`com.sun.mail:android-activation`) | Eclipse Public License 2.0 | MIME data handlers used by mail attachments. The packaged JAR retains its license and notice resources. |
 | mwiede JSch | BSD/ISC-style licenses; includes bundled license files | SSH client. Check upstream `LICENSE.txt`, `LICENSE.JZlib.txt`, and `LICENSE.jBCrypt.txt`. |
+| Unicode 16.0 East Asian Width data | Unicode License V3 | Merged W/F ranges in `TerminalUnicode.kt`, from https://www.unicode.org/Public/16.0.0/ucd/EastAsianWidth.txt. Copyright 2024 Unicode, Inc. See `third_party/unicode/LICENSE.txt`. |
 | JetBrains Markdown / RikkaHub fork | Apache License 2.0 | Markdown parser/rendering support. |
 | AndroidSVG 1.4 | Apache License 2.0 | Native static SVG parsing and rendering for assistant messages and media previews. Copyright 2013 Paul LeBeau, Cave Rock Software Ltd. |
 | Mermaid 11.17.2 | MIT; distributable retains transitive dependency notices | Offline diagram rendering. Pinned npm distributable and original license are packaged in `app/src/main/assets/charts`. |

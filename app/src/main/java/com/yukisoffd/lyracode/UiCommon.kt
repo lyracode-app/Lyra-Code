@@ -325,9 +325,14 @@ internal fun LyraCodeTheme(
         labelMedium = defaults.labelMedium.copy(fontFamily = textFontFamily),
         labelSmall = defaults.labelSmall.copy(fontFamily = textFontFamily),
     )
+    val externalUriHandler = LocalUriHandler.current
+    val uriHandler = remember(context, externalUriHandler, darkMode, colorScheme.surface) {
+        com.yukisoffd.lyracode.browser.AppUriHandler(context, externalUriHandler, darkMode, colorScheme.surface.toArgb())
+    }
     CompositionLocalProvider(
         LocalDensity provides Density(density.density, fontScale.coerceIn(AppSettings.MIN_FONT_SCALE, AppSettings.MAX_FONT_SCALE)),
         LocalCodeFontFamily provides codeFontFamily,
+        LocalUriHandler provides uriHandler,
     ) {
         MaterialTheme(colorScheme = colorScheme, typography = typography, content = content)
     }
