@@ -168,18 +168,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.core.content.edit
 import com.yukisoffd.lyracode.ai.ChatRecord
-import com.yukisoffd.lyracode.ai.AiResponseCache
-import com.yukisoffd.lyracode.ai.OpenAiAgent
 import com.yukisoffd.lyracode.ai.TodoItem
-import com.yukisoffd.lyracode.ai.WebViewWebAgent
 import com.yukisoffd.lyracode.data.ApiProfile
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.AuditEntry
-import com.yukisoffd.lyracode.data.AuditLogStore
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.BackupOptions
 import com.yukisoffd.lyracode.data.Conversation
-import com.yukisoffd.lyracode.data.ConversationStore
 import com.yukisoffd.lyracode.data.McpServerConfig
 import com.yukisoffd.lyracode.data.McpToolDefinition
 import com.yukisoffd.lyracode.data.SkillPack
@@ -198,8 +193,6 @@ import com.yukisoffd.lyracode.tasks.ScheduledTaskManager
 import com.yukisoffd.lyracode.termux.TermuxExecutor
 import com.yukisoffd.lyracode.webdav.TransferProgress
 import com.yukisoffd.lyracode.webdav.WebDavClient
-import com.yukisoffd.lyracode.workspace.GlobalFileManager
-import com.yukisoffd.lyracode.workspace.NativeFileManager
 import com.yukisoffd.lyracode.workspace.UploadedFile
 import com.yukisoffd.lyracode.workspace.UploadedFileManager
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
@@ -222,6 +215,8 @@ import android.graphics.Canvas as AndroidCanvas
 class MainActivity : ComponentActivity() {
     private var webAccessManager: com.yukisoffd.lyracode.webaccess.WebAccessManager? = null
     private var controller: ChatController? = null
+    internal var chatRuntime: ChatRuntime? = null
+        private set
     private var miniServerManager: MiniServerManager? = null
     private var localMcpServerManager: LocalMcpServerManager? = null
     private var sshTerminalSessionManager: SshTerminalSessionManager? = null
@@ -270,45 +265,36 @@ class MainActivity : ComponentActivity() {
         val compatibilityPreferences = getSharedPreferences(COMPATIBILITY_PREFERENCES, MODE_PRIVATE)
         AppStrings.initialize(this)
         if (savedInstanceState == null) settings.clearChatInputDrafts()
-        val auditLogStore = AuditLogStore(this)
-        val conversationStore = ConversationStore(this)
-        val workspaceManager = WorkspaceManager(this, settings)
-        val nativeFileManager = NativeFileManager(this, workspaceManager)
-        val globalFileManager = GlobalFileManager()
-        val downloadTaskManager = DownloadTaskManager.getInstance(
-            this,
-            settings,
-            nativeFileManager,
-            globalFileManager,
-        )
-        val scheduledTaskManager = ScheduledTaskManager.getInstance(this)
-        val termuxExecutor = TermuxExecutor(this, auditLogStore)
-        val uploadedFileManager = UploadedFileManager(this)
-        val webAgent = WebViewWebAgent(this, settings)
-        val responseCache = AiResponseCache(cacheDir)
-        val mcpClientManager = McpClientManager(this, settings)
-        val sshExecutor = SshExecutor(settings)
+        val runtime = ChatRuntime.get(applicationContext)
+        runtime.attach(this)
+        chatRuntime = runtime
+        val auditLogStore = runtime.auditLogStore
+        val workspaceManager = runtime.workspaceManager
+        val uploadedFileManager = runtime.uploadedFileManager
+        val termuxExecutor = runtime.termuxExecutor
+        val mcpClientManager = runtime.mcpClientManager
+        val sshExecutor = runtime.sshExecutor
+        val systemCommandExecutor = runtime.systemCommandExecutor
+        val webDavClient = runtime.webDavClient
+        val fileTransferClient = runtime.fileTransferClient
+        val backupManager = runtime.backupManager
+        val miniServerManager = runtime.miniServerManager
+        val localMcpServerManager = runtime.localMcpServerManager
+        val downloadTaskManager = runtime.downloadTaskManager
+        val scheduledTaskManager = runtime.scheduledTaskManager
+        val chatController = runtime.controller
+        controller = chatController
+        this.miniServerManager = miniServerManager
+        this.localMcpServerManager = localMcpServerManager
+        if (Android17Compatibility.hasLocalNetworkAccess(this)) {
+            localMcpServerManager.syncWithSettings()
+        }
         val sshTerminalSessionManager = SshTerminalSessionManager(sshExecutor)
         this.sshTerminalSessionManager = sshTerminalSessionManager
         val localProotTerminalSessionManager = LocalProotTerminalSessionManager(this) {
             workspaceManager.termuxRootPath()
         }
         this.localProotTerminalSessionManager = localProotTerminalSessionManager
-        val systemCommandExecutor = SystemCommandExecutor(this, settings)
-        val webDavClient = WebDavClient()
-        val fileTransferClient = FileTransferClient(this)
-        val backupManager = BackupManager(this, settings, conversationStore)
-        val miniServerManager = MiniServerManager(this, settings, workspaceManager)
-        this.miniServerManager = miniServerManager
-        val localMcpServerManager = LocalMcpServerManager(settings)
-        this.localMcpServerManager = localMcpServerManager
-        val agent = OpenAiAgent(this, settings, conversationStore, nativeFileManager, globalFileManager, termuxExecutor, workspaceManager, webAgent, mcpClientManager, sshExecutor, systemCommandExecutor, webDavClient, fileTransferClient, backupManager, miniServerManager, downloadTaskManager, scheduledTaskManager, responseCache)
-        localMcpServerManager.attachAgent(agent)
-        if (Android17Compatibility.hasLocalNetworkAccess(this)) {
-            localMcpServerManager.syncWithSettings()
-        }
-        val chatController = ChatController(this, settings, conversationStore, uploadedFileManager, workspaceManager, agent)
-        controller = chatController
 
         val webAccessManager = com.yukisoffd.lyracode.webaccess.WebAccessManager(this, settings,
             com.yukisoffd.lyracode.webaccess.WebAccessBridge(this, settings, chatController, workspaceManager, uploadedFileManager, mcpClientManager))
@@ -514,9 +500,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         webAccessManager?.stop()
-        controller?.close()
-        miniServerManager?.close()
-        localMcpServerManager?.close()
+        chatRuntime?.detach(this)
+        chatRuntime = null
         sshTerminalSessionManager?.close()
         localProotTerminalSessionManager?.close()
         if (isFinishing && controller != null) {

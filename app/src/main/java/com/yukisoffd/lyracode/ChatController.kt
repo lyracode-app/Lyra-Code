@@ -582,8 +582,8 @@ class ChatController(
         runCatching { pendingInputExecutor.awaitTermination(5, TimeUnit.SECONDS) }
         // The destroyed controller must not stay registered as the notification's stop target.
         AgentRunForegroundService.unbindStopRuns(stopRunsToken)
-        // This scope belongs to this controller: a recreate builds a new controller with a new
-        // scope, so cancelling here stops this controller's runs and nothing else.
+        // This scope belongs to this controller. The process keeps one controller across activity
+        // recreation (see ChatRuntime), so closing it stops every run it owns.
         closed = true
         scope.cancel()
     }
@@ -2088,6 +2088,10 @@ class ChatController(
         todoItems.addAll(todoByConversation[activeConversationId.value].orEmpty())
     }
 
+    @androidx.annotation.VisibleForTesting
+    internal fun launchTestConversationJob(conversationId: Long, block: suspend CoroutineScope.() -> Unit): Job =
+        launchConversationJob(conversationId, ConversationOperation.GENERATING, block = block)
+
     private fun launchConversationJob(
         conversationId: Long,
         operation: ConversationOperation,
@@ -2123,8 +2127,8 @@ class ChatController(
                     runCatching { outcomeCallback?.invoke(classifyRunOutcome(cause, status)) }
                 }
                 // The foreground service is only a lifetime signal. The service counts runs across
-                // the whole process, because a recreated controller can own a newer run than this
-                // one; only the last run to end may drop the notification.
+                // the whole process, so only the last run to end may drop the notification, whichever
+                // controller started it.
                 if (servedRun) AgentRunForegroundService.finish(appContext)
             },
             onStarted = {
