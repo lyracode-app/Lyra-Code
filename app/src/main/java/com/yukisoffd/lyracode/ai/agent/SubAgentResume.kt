@@ -1,8 +1,11 @@
 package com.yukisoffd.lyracode.ai
 
 import com.yukisoffd.lyracode.data.ConversationStore
+import com.yukisoffd.lyracode.data.OpenSubAgentBatch
 import com.yukisoffd.lyracode.data.SubAgentTaskRecord
 import com.yukisoffd.lyracode.workspace.TextBackupStore
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
@@ -109,6 +112,95 @@ internal object SubAgentResume {
         }
         return Plan(batchId, actions)
     }
+
+    /**
+     * Decides whether a `run_sub_agents` call resumes the open [batch]. [plan] is the task plan
+     * built for that batch against the requested tasks, or null when the turn or tasks differ.
+     *
+     * A normal call ([expectedReplayBatchId] null) resumes when the turn and tasks match,
+     * whatever its call id: a model that repeats the same tasks in the same turn under a new
+     * call id gets the finished children back instead of re-running them. A Continue replay
+     * ([expectedReplayBatchId] non-null) resumes only through the batch's own saved call, in
+     * that batch, turn and task list; a batch with no saved call id never matches a replay.
+     */
+    fun selectResume(
+        batch: OpenSubAgentBatch,
+        currentUserMessageId: Long,
+        sourceToolCallId: String,
+        expectedReplayBatchId: String?,
+        plan: Plan?,
+    ): Plan? {
+        if (plan == null || plan.batchId != batch.batchId || batch.userMessageId != currentUserMessageId) return null
+        if (expectedReplayBatchId == null) return plan
+        val ownCall = sourceToolCallId.isNotBlank() && batch.toolCallId == sourceToolCallId
+        return plan.takeIf { ownCall && batch.batchId == expectedReplayBatchId }
+    }
+
+    /** When the batch last saved activity was and how long ago, for the resumed tool result. */
+    data class ResumeTiming(val interruptedAtIso: String, val secondsAgo: Long, val agoText: String)
+
+    /**
+     * The last durable activity of [batch]: the newest `updated_at` of its rows. The caller reads
+     * the batch before the resume re-points its call id or marks rows running, because both
+     * writes move `updated_at` to now. Null when the time is unknown: the batch has no rows, or
+     * its newest `updated_at` is missing or not positive.
+     */
+    fun interruptedAtMillis(batch: OpenSubAgentBatch): Long? =
+        batch.tasks.maxOfOrNull { it.updatedAt }?.takeIf { it > 0L }
+
+    /**
+     * Times the batch's last saved activity at [interruptedAtMillis] against the clock reading
+     * [nowMillis], or null when that time is unknown (null, not positive, or later than
+     * [nowMillis]).
+     */
+    fun resumeTiming(interruptedAtMillis: Long?, nowMillis: Long): ResumeTiming? {
+        if (interruptedAtMillis == null || interruptedAtMillis <= 0L || interruptedAtMillis > nowMillis) return null
+        val secondsAgo = ((nowMillis - interruptedAtMillis) / 1000).coerceAtLeast(0)
+        val iso = Instant.ofEpochMilli(interruptedAtMillis).truncatedTo(ChronoUnit.SECONDS).toString()
+        return ResumeTiming(iso, secondsAgo, durationText(secondsAgo))
+    }
+
+    /** A whole-unit English duration: seconds under a minute, then minutes, hours or days. */
+    fun durationText(seconds: Long): String {
+        fun unit(count: Long, name: String) = if (count == 1L) "1 $name" else "$count ${name}s"
+        return when {
+            seconds < 60 -> unit(seconds, "second")
+            seconds < 3_600 -> unit(seconds / 60, "minute")
+            seconds < 86_400 -> unit(seconds / 3_600, "hour")
+            else -> unit(seconds / 86_400, "day")
+        }
+    }
+
+    /** The resumed result's timing fields; empty when the last saved activity time is unknown. */
+    fun resumeTimingFields(timing: ResumeTiming?): Map<String, Any> =
+        if (timing == null) {
+            emptyMap()
+        } else {
+            mapOf("interrupted_at" to timing.interruptedAtIso, "interrupted_seconds_ago" to timing.secondsAgo)
+        }
+
+    /**
+     * The model-facing timing sentences that every resume note carries. The time is the batch's
+     * last saved activity, not the moment the process died. An unknown time is said to be
+     * unknown, never given as a date; the staleness warning stays either way.
+     */
+    fun resumeTimingNote(timing: ResumeTiming?): String =
+        if (timing == null) {
+            "The time of the batch's last saved activity is unknown; reused task results may be stale; re-check " +
+                "the write paths and any outside state before relying on them."
+        } else {
+            "The batch's last saved activity was at ${timing.interruptedAtIso}, about ${timing.agoText} ago. " +
+                "Reused task results may be stale; re-check the write paths and any outside state before relying " +
+                "on them."
+        }
+
+    /**
+     * The call id to save on [batch] when a normal call resumes it under a different id, or
+     * null when the saved id stays. The caller saves it before any child runs, so a kill during
+     * the resumed run leaves a batch that a Continue replay of the new call can find.
+     */
+    fun repointToolCallId(batch: OpenSubAgentBatch, sourceToolCallId: String, expectedReplayBatchId: String?): String? =
+        sourceToolCallId.takeIf { expectedReplayBatchId == null && it.isNotBlank() && it != batch.toolCallId }
 
     /**
      * The copies that exist for a write path in [batchId]: the batch's never-replaced copy an

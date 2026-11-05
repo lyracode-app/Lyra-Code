@@ -583,7 +583,7 @@ class OpenAiAgent(
         onUpdate: suspend (ChatUpdate) -> Unit,
     ) = withContext(Dispatchers.IO) {
         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_RUNNING, profileId = profile.id, model = model)
-        runLoop(conversationId, profile, model, onUpdate)
+        runLoop(conversationId, profile, model, onUpdate, replayPending = true)
     }
 
     private val reachabilityService = AgentReachabilityService(client, reachabilityClient)
@@ -601,6 +601,106 @@ class OpenAiAgent(
     fun checkModelReachability(profile: ApiProfile, model: String): ModelReachabilityResult =
         reachabilityService.checkModelReachability(profile, model)
 
+    private fun replayBatchMatches(conversationId: Long, batch: OpenSubAgentBatch, call: ToolCall): Boolean {
+        if (call.name != "run_sub_agents") return false
+        return try {
+            val args = JSONObject(call.rawArguments)
+            val count = args.optJSONArray("tasks")?.length() ?: return false
+            val tasks = parseSubAgentTasks(args)
+            if (count == 0 || count != tasks.size) return false
+            val requested = tasks.mapIndexed { index, task ->
+                SubAgentResume.RequestedTask(
+                    index, task.task, task.readOnly,
+                    task.writePaths.map(subAgentWriteCoordinator::normalizeWorkspacePath),
+                    task.expectedOutput, task.capabilityHint, task.preferredAgent,
+                )
+            }
+            val userMessageId = conversationStore.lastUserMessageId(conversationId)
+            SubAgentResume.selectResume(
+                batch, userMessageId, call.id, batch.batchId,
+                buildSubAgentResumePlan(batch, requested, userMessageId),
+            ) != null
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private suspend fun replayPendingToolCalls(
+        conversationId: Long,
+        profile: ApiProfile,
+        model: String,
+        onUpdate: suspend (ChatUpdate) -> Unit,
+    ) {
+        val messages = contextHistory(conversationId, -1L)
+        val group = PendingToolCallReplay.plan(messages) ?: return
+        val batch = conversationStore.openSubAgentBatch(conversationId)
+        // Match the originating call as well as the saved task and user-turn identity.
+        val matches = if (batch == null) emptyList() else group.calls.filter { replayBatchMatches(conversationId, batch, it) }
+        val matched = PendingToolCallReplay.uniqueUnansweredMatch(matches, group.answered)
+        val deliveredMatch = matches.singleOrNull()?.takeIf { it.id in group.answered }
+        if (batch != null && deliveredMatch != null) {
+            val delivered = messages.lastOrNull { it.role == "tool" && it.toolCallId == deliveredMatch.id }
+            val result = try {
+                val envelope = JSONObject(delivered?.content ?: "")
+                envelope.optBoolean("ok") &&
+                    JSONObject(envelope.optString("content")).optString("schema") == "lyra_sub_agent_results_v2"
+            } catch (_: Exception) { false }
+            if (result) conversationStore.markSubAgentBatchDelivered(conversationId, batch.batchId)
+        }
+        PendingToolCallReplay.run(
+            group = group,
+            replayId = matched?.id,
+            execute = { call ->
+                onUpdate(ChatUpdate("", "", runningToolStatus(call), forceReload = true))
+                executeReplaySubAgent(conversationId, call, batch!!.batchId) { status ->
+                    onUpdate(ChatUpdate("", "", status, forceReload = true))
+                }
+            },
+            interrupted = { call ->
+                ToolExecution(
+                    "ERROR: TOOL_INTERRUPTED\nThe tool call was interrupted and was not replayed. Its side effects may have occurred.",
+                    ok = false,
+                ).toToolOutputJson(call.name, ok = false)
+            },
+            persist = { call, output ->
+                conversationStore.addMessage(
+                    conversationId, "tool", PendingToolCallReplay.storedOutput(call.name, output, MAX_TOOL_RESULT_CHARS),
+                    profileId = profile.id, model = model, toolCallId = call.id,
+                )
+            },
+            close = { call -> flushDeliveredSubAgentBatch(conversationId, call.name) },
+            updated = { call ->
+                onUpdate(ChatUpdate("", "", uiText(R.string.ui_tool_complete) + call.name, forceReload = true))
+            },
+        )
+    }
+
+    private suspend fun executeReplaySubAgent(
+        conversationId: Long,
+        call: ToolCall,
+        expectedBatchId: String,
+        onStatus: suspend (String) -> Unit,
+    ): String {
+        pendingSubAgentBatchCloses.remove(conversationId)
+        if (settings.purePromptMode) {
+            return ToolExecution("ERROR: TOOLS_UNAVAILABLE_IN_PURE_MODE", ok = false)
+                .toToolOutputJson(call.name, ok = false)
+        }
+        if (call.name in settings.disabledTools()) {
+            return ToolExecution("ERROR: TOOL_DISABLED\n${call.name} is disabled by the user.", ok = false)
+                .toToolOutputJson(call.name, ok = false)
+        }
+        return try {
+            val result = runSubAgents(conversationId, call.arguments, onStatus, expectedBatchId, call.id)
+            ToolExecution(result, ok = !result.startsWith("ERROR:")).toToolOutputJson(call.name, ok = !result.startsWith("ERROR:"))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            ToolExecution("ERROR: ${error.message}\narguments: ${call.rawArguments}", ok = false)
+                .toToolOutputJson(call.name, ok = false)
+        }
+    }
+
     private suspend fun runLoop(
         conversationId: Long,
         profile: ApiProfile,
@@ -608,11 +708,15 @@ class OpenAiAgent(
         onUpdate: suspend (ChatUpdate) -> Unit,
         propagateErrors: Boolean = false,
         forcedSkillIds: List<String> = emptyList(),
+        replayPending: Boolean = false,
     ) {
         var activeAssistantId = 0L
         val runSkills = RunSkills(forcedSkillIds)
         forcedSkillsByConversation[conversationId] = runSkills
         try {
+            if (replayPending && !isSubAgentConversation(conversationId) && scopedToolsFor(conversationId) == null) {
+                replayPendingToolCalls(conversationId, profile, model, onUpdate)
+            }
             while (true) {
                 currentCoroutineContext().ensureActive()
                 scopedToolsFor(conversationId)?.let {
@@ -737,7 +841,7 @@ class OpenAiAgent(
                         conversationStore.updateMessage(pendingToolId, content = toolResult)
                     } else {
                         conversationStore.addMessage(
-                            conversationId, "tool", toolResult.take(MAX_TOOL_RESULT_CHARS),
+                            conversationId, "tool", PendingToolCallReplay.storedOutput(call.name, toolResult, MAX_TOOL_RESULT_CHARS),
                             profileId = profile.id, model = model, toolCallId = call.id,
                         )
                     }
@@ -772,8 +876,11 @@ class OpenAiAgent(
                 .put("content", finalError)
                 .put(LOCAL_REQUEST_ERROR_KEY, true)
                 .toString()
+            val savedToolCalls = failedMessage?.rawJson?.let { raw ->
+                runCatching { JSONObject(raw).optJSONArray("tool_calls")?.length()?.let { it > 0 } == true }.getOrDefault(false)
+            } == true
             val errorMessageId = when {
-                failedMessage == null -> conversationStore.addMessage(
+                savedToolCalls || failedMessage == null -> conversationStore.addMessage(
                     conversationId,
                     "assistant",
                     finalError,
@@ -2179,7 +2286,7 @@ class OpenAiAgent(
                 "create_chart" -> ToolExecution(com.yukisoffd.lyracode.charts.chartToolResult(args))
                 "get_circuit_symbols" -> ToolExecution(com.yukisoffd.lyracode.charts.circuitSymbolsToolResult(args))
                 "manage_app_config" -> ToolExecution(configTools.manageAppConfig(args))
-                "run_sub_agents" -> ToolExecution(runSubAgents(conversationId, args, onStatus))
+                "run_sub_agents" -> ToolExecution(runSubAgents(conversationId, args, onStatus, sourceToolCallId = call.id))
                 "ask_user" -> ToolExecution(
                     userQuestionHandler(parseUserQuestionRequest(conversationId, args)).toAgentJson(),
                 )
@@ -2650,7 +2757,7 @@ class OpenAiAgent(
             )
         }
 
-    private suspend fun runSubAgents(parentConversationId: Long, args: JSONObject, onStatus: suspend (String) -> Unit = {}): String {
+    private suspend fun runSubAgents(parentConversationId: Long, args: JSONObject, onStatus: suspend (String) -> Unit = {}, expectedReplayBatchId: String? = null, sourceToolCallId: String = ""): String {
         // A pending close left behind by an attempt whose tool row never landed is stale: this
         // call owns the conversation's batch now, and must not close that older batch instead.
         pendingSubAgentBatchCloses.remove(parentConversationId)
@@ -2690,9 +2797,21 @@ class OpenAiAgent(
         // A batch answers the turn that opened it. A new user message changes the id, so an old
         // batch can never be resumed into a later request.
         val userMessageId = conversationStore.lastUserMessageId(parentConversationId)
-        // A batch that never delivered a result to this parent can be resumed when the model
-        // asks for the same tasks again. Anything else abandons the stale rows.
+        // A batch that never delivered a result to this parent resumes when a call in the same
+        // turn asks for the same tasks, whatever its call id; a Continue replay resumes it only
+        // through the batch's own saved call. Anything else abandons the stale rows.
         val openBatch = conversationStore.openSubAgentBatch(parentConversationId)
+        // Read before the resume re-points the call id or marks rows running: both move updated_at.
+        val interruptedAtMillis = openBatch?.let(SubAgentResume::interruptedAtMillis)
+        fun currentResumePlan() = openBatch?.let {
+            SubAgentResume.selectResume(
+                it, userMessageId, sourceToolCallId, expectedReplayBatchId,
+                buildSubAgentResumePlan(it, requested, userMessageId),
+            )
+        }
+        if (expectedReplayBatchId != null && currentResumePlan() == null) {
+            error("TOOL_INTERRUPTED: The saved sub-agent batch no longer matches. No new batch was started.")
+        }
         // A write task that started in a batch this call replaces, or that an edit closed, may
         // have changed files. Its `.bak` is the only copy from before that write, and every later
         // write replaces it, so copy it to the never-replaced name before anything else runs.
@@ -2710,7 +2829,12 @@ class OpenAiAgent(
                 }
             },
         )
-        val plan = openBatch?.let { buildSubAgentResumePlan(it, requested, userMessageId) }
+        val plan = currentResumePlan()
+        if (expectedReplayBatchId != null && (plan?.batchId != expectedReplayBatchId ||
+                conversationStore.openSubAgentBatch(parentConversationId)?.batchId != expectedReplayBatchId ||
+                conversationStore.lastUserMessageId(parentConversationId) != userMessageId)) {
+            error("TOOL_INTERRUPTED: The saved sub-agent batch changed. No new batch was started.")
+        }
         val batchId = plan?.batchId ?: UUID.randomUUID().toString()
         // A reworded batch abandons the open one. Read tasks may safely run again, but a write
         // task that had started may have changed files: refuse this call once and name the paths,
@@ -2744,8 +2868,13 @@ class OpenAiAgent(
                         task.preferredAgent,
                     )
                 },
+                toolCallId = sourceToolCallId,
             )
         } else {
+            // A retry under a new call id now owns the batch: save that id before any child runs.
+            SubAgentResume.repointToolCallId(openBatch!!, sourceToolCallId, expectedReplayBatchId)?.let {
+                conversationStore.setSubAgentBatchToolCallId(parentConversationId, batchId, it)
+            }
             onStatus(context.getString(R.string.status_sub_agent_resuming, plan.reusedIndices.size, tasks.size))
         }
         val actions = plan?.actions ?: tasks.indices.associateWith { SubAgentResume.Action.Run }
@@ -2859,8 +2988,10 @@ class OpenAiAgent(
                 .put("parent_conversation_id", parentConversationId)
                 .put("results", ordered)
             if (plan != null) {
+                val timing = SubAgentResume.resumeTiming(interruptedAtMillis, System.currentTimeMillis())
+                payload.put("resumed", true)
+                SubAgentResume.resumeTimingFields(timing).forEach { (key, value) -> payload.put(key, value) }
                 payload
-                    .put("resumed", true)
                     .put("reused_task_indexes", JSONArray(plan.reusedIndices.map { it + 1 }))
                     .put("interrupted_task_indexes", JSONArray(plan.interruptedIndices.map { it + 1 }))
                     .put(
@@ -2876,7 +3007,7 @@ class OpenAiAgent(
                             "backup_paths. That copy is only as complete as the .bak it was made from, so " +
                             "compare any backup with the current file before restoring it. An empty " +
                             "backup_paths list proves nothing, and delete_file_or_folder, rename_move and " +
-                            "create_folder make no backup.",
+                            "create_folder make no backup. " + SubAgentResume.resumeTimingNote(timing),
                     )
             }
             if (abandonedWriteTasks.isNotEmpty()) {
@@ -2920,7 +3051,8 @@ class OpenAiAgent(
         }
         } finally {
             // Cancellation and tool failures must both clear the wait state; the batch rows
-            // stay open, so the next run_sub_agents call resumes them.
+            // stay open, so a same-turn run_sub_agents call with the same tasks, or a Continue
+            // replay of the batch's saved call, resumes them.
             subAgentRuns.end(parentConversationId)
             subAgentRunStateChanged?.invoke()
         }
@@ -4391,7 +4523,7 @@ internal fun ChatMessage.isLocalRequestErrorMessage(): Boolean {
     if (role != "assistant") return false
     val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
     if (raw?.optBoolean(LOCAL_REQUEST_ERROR_KEY, false) == true) return true
-    if (raw != null) return false
+    if (!rawJson.isNullOrBlank()) return false
     val normalized = content.trimStart()
     return normalized.startsWith("Request interrupted") ||
         normalized.startsWith("请求中断：") ||
