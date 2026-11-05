@@ -94,7 +94,7 @@ internal class ProotCommandExecutor(context: Context) {
             shellExitCode = shellExitCode ?: readCompletionCode(started.completionFile)
 
             val timedOut = process.isAlive && shellExitCode == null && System.nanoTime() >= deadlineNanos
-            val supervisorPid = readSupervisorPid(started.supervisorPidFile)
+            val supervisorPid = readSupervisorPid(started.supervisorPidFile, process)
             var retainedBackgroundProcesses = false
             if (timedOut) {
                 manager.terminateCommandProcess(process, supervisorPid)
@@ -150,7 +150,7 @@ internal class ProotCommandExecutor(context: Context) {
                 .put("shared_storage_mounted", manager.hasAllFilesAccess())
                 .toString()
         } catch (error: CancellationException) {
-            manager.terminateCommandProcess(process, readSupervisorPid(started.supervisorPidFile))
+            manager.terminateCommandProcess(process, readSupervisorPid(started.supervisorPidFile, process))
             if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
             runCatching { process.inputStream.close() }
             runCatching { process.errorStream.close() }
@@ -269,10 +269,17 @@ internal class ProotCommandExecutor(context: Context) {
         completionFile.readText().trim().toIntOrNull()
     }.getOrNull()
 
-    private fun readSupervisorPid(supervisorPidFile: File): Int? = runCatching {
-        if (!supervisorPidFile.isFile) return@runCatching null
-        supervisorPidFile.readText().trim().toIntOrNull()?.takeIf { it > 1 }
-    }.getOrNull()
+    private fun readSupervisorPid(supervisorPidFile: File, process: Process): Int? {
+        // Cancellation may arrive before the host launcher has had its first timeslice.
+        // It writes this file before exec, so no guest can start before its PID is available.
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+        while (true) {
+            val pid = runCatching { supervisorPidFile.readText().trim().toIntOrNull() }.getOrNull()
+            if (pid != null && pid > 1) return pid
+            if (!process.isAlive || System.nanoTime() >= deadline) return null
+            Thread.sleep(5)
+        }
+    }
 
     private fun drainAvailable(input: InputStream, output: CapturedOutputBuffer) {
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
