@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
+import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import android.os.Environment
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -48,11 +50,76 @@ class SubAgentRecoveryInstrumentedTest {
         }
         assertTrue(path.isFile)
         ConversationStore(isolated).use { store ->
-            assertEquals(13, store.readableDatabase.version)
+            assertEquals(14, store.readableDatabase.version)
             assertEquals("history before upgrade", store.message(message)?.content)
             assertNotNull(store.conversation(conversation))
             store.beginSubAgentBatch(conversation, "migrated", message, listOf(seed(0, false)))
             assertEquals("migrated", store.openSubAgentBatch(conversation)?.batchId)
+        }
+    }
+
+    @Test fun version13MigrationKeepsBatchRowsAndRepointSurvivesReopening() = withDatabase { isolated, _ ->
+        var parent = 0L
+        var user = 0L
+        ConversationStore(isolated).use { store ->
+            parent = store.createConversation("test", "test")
+            user = store.addMessage(parent, "user", "saved version-13 turn")
+            store.beginSubAgentBatch(parent, "version13-batch", user, listOf(seed(0, true)))
+            val db = store.writableDatabase
+            // Historical version-13 schema, before tool_call_id existed.
+            db.execSQL("""CREATE TABLE legacy_sub_agent_tasks (
+                parent_conversation_id INTEGER NOT NULL, batch_id TEXT NOT NULL, task_index INTEGER NOT NULL,
+                child_conversation_id INTEGER NOT NULL DEFAULT 0, task_text TEXT NOT NULL,
+                write_paths TEXT NOT NULL DEFAULT '[]', read_only INTEGER NOT NULL DEFAULT 0,
+                expected_output TEXT NOT NULL DEFAULT '', capability_hint TEXT NOT NULL DEFAULT '',
+                preferred_agent TEXT NOT NULL DEFAULT '', user_message_id INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL, delivered INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+                PRIMARY KEY (parent_conversation_id, batch_id, task_index))""")
+            db.execSQL("""INSERT INTO legacy_sub_agent_tasks SELECT parent_conversation_id, batch_id, task_index,
+                child_conversation_id, task_text, write_paths, read_only, expected_output, capability_hint,
+                preferred_agent, user_message_id, status, delivered, created_at, updated_at FROM sub_agent_tasks""")
+            db.execSQL("DROP TABLE sub_agent_tasks")
+            db.execSQL("ALTER TABLE legacy_sub_agent_tasks RENAME TO sub_agent_tasks")
+            db.execSQL("CREATE INDEX idx_sub_agent_tasks_open ON sub_agent_tasks(parent_conversation_id, delivered)")
+            db.version = 13
+        }
+        ConversationStore(isolated).use { store ->
+            val batch = requireNotNull(store.openSubAgentBatch(parent))
+            assertEquals(14, store.readableDatabase.version)
+            assertEquals("", batch.toolCallId)
+            assertEquals(user, batch.userMessageId)
+            assertEquals("task 0", batch.tasks.single().taskText)
+            assertEquals("saved version-13 turn", store.message(user)?.content)
+            store.setSubAgentBatchToolCallId(parent, batch.batchId, "retry-call")
+        }
+        ConversationStore(isolated).use { store ->
+            assertEquals("retry-call", store.openSubAgentBatch(parent)?.toolCallId)
+            store.markSubAgentBatchDelivered(parent, "version13-batch")
+            store.setSubAgentBatchToolCallId(parent, "version13-batch", "must-not-repoint-delivered")
+            store.readableDatabase.rawQuery("SELECT tool_call_id FROM sub_agent_tasks WHERE batch_id='version13-batch'", null).use {
+                assertTrue(it.moveToFirst())
+                assertEquals("retry-call", it.getString(0))
+            }
+        }
+    }
+
+    @Test fun version13DowngradeIsRejectedWithoutDamagingVersion14History() = withDatabase { isolated, _ ->
+        var message = 0L
+        ConversationStore(isolated).use { store ->
+            val parent = store.createConversation("test", "test")
+            message = store.addMessage(parent, "user", "keep after rejected downgrade")
+        }
+        object : SQLiteOpenHelper(isolated, "lyra_conversations.db", null, 13) {
+            override fun onCreate(db: SQLiteDatabase) = error("Existing database expected")
+            override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = error("Downgrade expected")
+        }.use { legacy ->
+            val error = assertThrows(SQLiteException::class.java) { legacy.writableDatabase }
+            assertTrue(error.message.orEmpty(), error.message.orEmpty().contains("14 to 13"))
+        }
+        ConversationStore(isolated).use { store ->
+            assertEquals(14, store.readableDatabase.version)
+            assertEquals("keep after rejected downgrade", store.message(message)?.content)
         }
     }
 

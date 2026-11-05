@@ -6,10 +6,15 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.yukisoffd.lyracode.ai.AgentRunForegroundService
+import com.yukisoffd.lyracode.data.ConversationStore
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class AgentRunServiceInstrumentedTest {
@@ -44,26 +49,43 @@ class AgentRunServiceInstrumentedTest {
     }
 
     @Test fun notificationStopActionCallsTheRunOwnerAndRemovesNotification() {
-        ActivityScenario.launch(MainActivity::class.java).use {
-            val owner = Any()
-            val stops = AtomicInteger()
-            var outstanding = false
-            try {
-                main {
-                    AgentRunForegroundService.bindStopRuns(owner) { stops.incrementAndGet() }
-                    AgentRunForegroundService.start(context)
-                    outstanding = true
+        assumeTrue(InstrumentationRegistry.getArguments().getString("disposableTarget") == "true")
+        val consent = context.getSharedPreferences("first_use_consent", 0)
+        val hadConsent = consent.contains("accepted")
+        val accepted = consent.getBoolean("accepted", false)
+        var runtime: ChatRuntime? = null
+        var conversation = 0L
+        var job: Job? = null
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            check(FirstUseConsentStore(context).accept())
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    val current = checkNotNull(activity.chatRuntime)
+                    runtime = current
+                    conversation = current.conversationStore.createConversation("test", "test", "Notification stop fixture")
+                    current.conversationStore.setConversationMeta(conversation, status = ConversationStore.STATUS_RUNNING)
+                    job = current.controller.launchTestConversationJob(conversation) {
+                        started.complete(Unit)
+                        release.await()
+                    }
                 }
+                runBlocking { withTimeout(10_000) { started.await() } }
                 awaitCondition("Foreground notification did not appear") { notification() != null }
                 requireNotNull(notification()).notification.actions.single().actionIntent.send()
-                awaitCondition("Stop did not reach the run owner") { stops.get() == 1 }
+                awaitCondition("Stop did not cancel the controller run") { job?.isCancelled == true && job?.isCompleted == true }
+                assertEquals(ConversationStore.STATUS_INTERRUPTED, runtime?.conversationStore?.conversation(conversation)?.status)
                 awaitCondition("Stop left the notification running") { notification() == null }
-            } finally {
-                main {
-                    AgentRunForegroundService.unbindStopRuns(owner)
-                    if (outstanding) AgentRunForegroundService.finish(context)
-                }
             }
+        } finally {
+            release.complete(Unit)
+            job?.cancel()
+            runBlocking { withTimeout(10_000) { job?.join() } }
+            if (conversation > 0) runtime?.conversationStore?.deleteConversation(conversation)
+            val editor = consent.edit()
+            if (hadConsent) editor.putBoolean("accepted", accepted) else editor.remove("accepted")
+            check(editor.commit())
         }
     }
 }

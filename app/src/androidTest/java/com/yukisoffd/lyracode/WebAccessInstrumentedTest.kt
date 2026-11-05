@@ -78,6 +78,8 @@ class WebAccessInstrumentedTest {
         val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         val manager = MainActivity::class.java.getDeclaredField("webAccessManager").apply { isAccessible=true }.get(activity) as WebAccessManager
         val controller = MainActivity::class.java.getDeclaredField("controller").apply { isAccessible=true }.get(activity) as ChatController
+        // The process runtime may predate this fixture's direct settings write.
+        instrumentation.runOnMainSync { controller.reloadProfiles() }
         val base="http://127.0.0.1:${settings.webAccessPort}"
         val client=OkHttpClient.Builder().readTimeout(20,TimeUnit.SECONDS).build()
         val token=settings.webAccessToken
