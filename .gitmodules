@@ -1,0 +1,3 @@
+[submodule "lyra_x11"]
+	path = lyra_x11
+	url = git@github.com:lyracode-app/lyra_x11.git
