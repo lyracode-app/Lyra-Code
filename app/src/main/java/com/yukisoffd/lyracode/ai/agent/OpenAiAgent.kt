@@ -118,6 +118,7 @@ class OpenAiAgent(
     private val responseCache: AiResponseCache? = null,
 ) {
     private val prootCommandExecutor = ProotCommandExecutor(context)
+    private val linuxGuiTools = com.yukisoffd.lyracode.x11.LinuxGuiToolHandler(context)
 
     internal var scopedTools: ScopedAgentTools? = null
     internal var steerSource: SteerSource = NoOpSteerSource
@@ -2259,6 +2260,7 @@ class OpenAiAgent(
                         if (result.ok) ToolExecution(result.message) else error(result.message)
                     }
                 }
+                "linux_gui" -> linuxGuiTools.execute(args).let { ToolExecution(it.toString(), ok = it.optBoolean("ok", true)) }
                 "proot_command" -> {
                     val command = args.toolCommandArgument()
                     if (fileTools.isFileSearchCommand(command)) {
@@ -3660,6 +3662,11 @@ class OpenAiAgent(
             } else {
                 null
             }
+            "linux_gui" -> linuxGuiTools.commandForApproval(args)?.takeIf(fileTools::requiresCommandApproval)?.let { command ->
+                ToolApprovalRequest(conversationId, call.name, call.rawArguments,
+                    "在 PRoot Linux ${args.cleanString("linux_id")} 中启动 GUI: $command",
+                    "GUI 启动命令使用与 PRoot 命令相同的环境权限，可能修改文件、运行脚本或改变 Linux 环境。")
+            }
             "proot_command" -> if (fileTools.requiresCommandApproval(args.toolCommandArgument())) {
                 ToolApprovalRequest(
                     conversationId,
@@ -4197,6 +4204,7 @@ class OpenAiAgent(
             # Termux and Android commands
             ${if (prootCommandExecutor.isAvailable()) "proot_command is the default command tool. It executes a shell in an app-private PRoot Linux environment and does not require Termux. Installed Linux IDs: ${prootCommandExecutor.inventoryForAgent()}. Always pass the intended linux_id. When a directly accessible workspace is selected it is mounted at /workspace; otherwise the command defaults to /root and remains usable. ${if (prootCommandExecutor.hasAllFilesAccess()) "Android All files access is granted, so Android shared storage is mounted under /storage and primary storage is also available at /sdcard; workDir may point there." else "Android All files access is not granted, so shared storage outside the selected workspace is unavailable; absolute Linux-internal paths remain usable."} For a persistent service or watcher, set background=true; the service keeps its own PRoot supervisor and later proot_command calls do not stop it. Existing nohup/setsid commands that actually detach are also preserved. Do not run interactive processes." else "proot_command is unavailable in this session."}
             run_command executes Bash in the external Termux app as the Termux app user; it is not Android's Shizuku shell and is not root. Use it only when the user explicitly requests Termux or proot_command is unavailable. Before the first run_command call for a task, call ask_user to confirm that Termux is already running in the background, unless the user explicitly confirmed this in the current conversation. Tool availability, installation, and RUN_COMMAND permission do not count as confirmation. If ask_user is unavailable, ask the same question in assistant text and wait for the answer; do not call run_command before confirmation. It defaults to the selected workspace. Omit workDir for the root or pass a workspace-relative directory; never use cd merely to change the working directory. Use command_lines for multiline or indentation-sensitive commands.
+            ${if (prootCommandExecutor.isAvailable()) com.yukisoffd.lyra.x11.GuiToolSpec.SYSTEM_HINT else ""}
             Use execute_shell_command only for Android shell operations that actually require Shizuku, and execute_root_command only when root is necessary and the user-approved tool is present. Never escalate from Termux to Shizuku or root merely to make a failing command pass.
             Quote paths containing spaces or shell metacharacters. Use non-interactive flags. Join dependent steps with && so later steps stop on failure; keep unrelated commands separate or batch them as independent tool calls. Before a destructive command, resolve and inspect the exact target, minimize its scope, and prefer a recoverable operation when available.
             Do not run interactive processes. For a persistent service or watcher, set the selected command tool's background=true instead of manually composing nohup or a terminal ampersand. Background mode closes inherited input/output, returns launcher_pid and output_file promptly, and launch acceptance does not prove the service is healthy, so inspect the process or log in a separate foreground call before claiming success. proot_command also recognizes when a manually detached command shell has returned and keeps that command's PRoot supervisor alive. For foreground commands, choose a realistic timeout from 5 to 600 seconds. When stdout_original_length or stderr_original_length exceeds the visible text, rerun a narrower query or redirect bounded output to a workspace file and inspect it with native tools. Do not install a convenience utility solely because rg or another preferred command is missing.
@@ -4429,6 +4437,7 @@ class OpenAiAgent(
             "rename_move",
         )
         private val UNSCOPED_WORKSPACE_MUTATION_TOOLS = setOf(
+            "linux_gui",
             "run_command",
             "proot_command",
             "execute_shell_command",
@@ -4439,6 +4448,7 @@ class OpenAiAgent(
             "import_backup",
         )
         private val CONFIGURABLE_AGENT_TOOLS = listOf(
+            "linux_gui",
             "create_chart",
             "get_circuit_symbols",
             "list_directory",
