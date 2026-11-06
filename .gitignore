@@ -83,4 +83,4 @@ dsh/
 proot/
 web/
 vite_docs/
-lyra_x11/
+# lyra_x11/ is tracked as a git submodule, do not ignore it here.
