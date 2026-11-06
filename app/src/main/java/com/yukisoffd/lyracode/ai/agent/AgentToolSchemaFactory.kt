@@ -253,7 +253,10 @@ internal class AgentToolSchemaFactory(
                 ),
             )
         }
-        if (prootAvailable()) definitions.put(prootCommandToolDefinition())
+        if (prootAvailable()) {
+            definitions.put(prootCommandToolDefinition())
+            definitions.put(linuxGuiToolDefinition())
+        }
         definitions
         .put(chartToolDefinition())
         .put(circuitSymbolsToolDefinition())

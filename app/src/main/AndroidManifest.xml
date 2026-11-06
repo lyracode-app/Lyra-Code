@@ -82,6 +82,10 @@
                 android:value="User-started visible floating assistant session; stopped explicitly by the user" />
         </service>
         <activity android:name=".interaction.overlay.FloatingWorkspaceActivity" android:theme="@style/Theme.LyraCode.PetSettings" android:exported="false" />
+        <activity android:name=".x11.LyraX11Activity" android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|navigation"
+            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
         <activity android:name=".interaction.pet.DesktopPetSettingsActivity" android:theme="@style/Theme.LyraCode.PetSettings" android:exported="false" android:enableOnBackInvokedCallback="true" />
         <activity
             android:name=".MainActivity"

@@ -202,6 +202,7 @@ android {
             assets.directories.add("src/test/resources")
         }
         getByName("main") {
+            kotlin.directories.add(rootProject.file("lyra_x11/host/java").absolutePath)
             kotlin.directories.add("src/debianRuntime/java")
             res.directories.add("src/debianRuntime/res")
             jniLibs.directories.add("src/debianRuntime/jniLibs")
@@ -249,6 +250,7 @@ val verifyBundledProotRuntime by tasks.registering {
 tasks.named("preBuild").configure { dependsOn(verifyBundledProotRuntime) }
 
 dependencies {
+    implementation(project(":lyra_x11"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.activity.compose)

@@ -25,6 +25,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Lyra Code"
 include(":app")
+include(":lyra_x11")
 include(":jlatexmath")
 project(":jlatexmath").projectDir = file("third_party/jlatexmath")
  
