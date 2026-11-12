@@ -99,6 +99,7 @@ internal fun ThemeSettings(
     onOpenRefreshRateSettings: () -> Unit,
     onOpenChatBackgroundSettings: () -> Unit,
     onOpenStreamingOutputSettings: () -> Unit,
+    onOpenFoldedRepliesSettings: () -> Unit,
     onOpenAppIconSettings: () -> Unit,
 ) {
     val hasBackground = !settings.chatBackgroundPath.isNullOrBlank()
@@ -145,6 +146,13 @@ internal fun ThemeSettings(
         )
         KimiDivider()
         KimiMenuRow(
+            Icons.Default.UnfoldMore,
+            stringResource(R.string.folded_replies_title),
+            foldedRepliesName(settings.foldedReplies),
+            onClick = onOpenFoldedRepliesSettings,
+        )
+        KimiDivider()
+        KimiMenuRow(
             Icons.Default.Image,
             uiText(R.string.menu_chat_background),
             if (hasBackground) uiText(R.string.background_set) else uiText(R.string.background_solid),
@@ -156,6 +164,11 @@ internal fun ThemeSettings(
 internal fun streamingAnimationModeName(mode: String): String = when (AppSettings.normalizeStreamingAnimationMode(mode)) {
     AppSettings.STREAMING_ANIMATION_FADE -> uiText(R.string.streaming_fade_title)
     else -> uiText(R.string.streaming_typewriter_title)
+}
+
+internal fun foldedRepliesName(mode: String): String = when (AppSettings.normalizeFoldedReplies(mode)) {
+    AppSettings.FOLDED_REPLIES_ALL -> uiText(R.string.folded_replies_all_title)
+    else -> uiText(R.string.folded_replies_answers_title)
 }
 
 @Composable
@@ -176,6 +189,30 @@ internal fun StreamingOutputSettings(settings: AppSettings, controller: ChatCont
         )
         Text(
             stringResource(if (selected == AppSettings.STREAMING_ANIMATION_FADE) R.string.streaming_fade_desc else R.string.streaming_typewriter_desc),
+            color = KimiMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+internal fun FoldedRepliesSettings(settings: AppSettings, controller: ChatController) {
+    var selected by remember { mutableStateOf(settings.foldedReplies) }
+    KimiCardBox {
+        MaterialButtonGroup(
+            options = listOf(
+                AppSettings.FOLDED_REPLIES_ANSWERS to stringResource(R.string.folded_replies_answers_title),
+                AppSettings.FOLDED_REPLIES_ALL to stringResource(R.string.folded_replies_all_title),
+            ),
+            selected = selected,
+            onSelect = { value ->
+                selected = value
+                settings.foldedReplies = value
+                controller.settingsRevision.intValue++
+            },
+        )
+        Text(
+            stringResource(if (selected == AppSettings.FOLDED_REPLIES_ALL) R.string.folded_replies_all_desc else R.string.folded_replies_answers_desc),
             color = KimiMuted,
             style = MaterialTheme.typography.bodySmall,
         )

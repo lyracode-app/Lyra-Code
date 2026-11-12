@@ -1446,6 +1446,11 @@
     <string name="streaming_fade_title">渐变显示</string>
     <string name="streaming_fade_desc">新内容从高透明度平滑过渡至清晰</string>
     <string name="streaming_selected">已选择</string>
+    <string name="folded_replies_title">回复显示</string>
+    <string name="folded_replies_answers_title">仅显示答案</string>
+    <string name="folded_replies_answers_desc">只有实质性的回答会保留在对话中，简短的状态说明会折叠进过程日志。</string>
+    <string name="folded_replies_all_title">显示全部回复</string>
+    <string name="folded_replies_all_desc">所有助手回复都会保留在对话中。</string>
     <!-- Chat composer -->
     <string name="label_sub_agent_short">子代理</string>
     <string name="action_fullscreen_input">全屏输入</string>
