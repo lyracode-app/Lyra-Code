@@ -7,19 +7,26 @@ TMP2=$(echo ${TMP} | cut -b 1-15)
 TMP3=$(mcookie)
 TMP4=$(echo ${TMP3} | cut -b 1-15)
 
-${PROOT} cat /proc/self/comm          | grep cat
-${PROOT} $(which cat) /proc/self/comm | grep cat
+# Like without PRoot: a multi-call cat(1) names itself after its argv[0],
+# "/data/data/com." for "$(which cat)" on Termux.
+[ "$(${PROOT} cat /proc/self/comm)" = "$(cat /proc/self/comm)" ]
+[ "$(${PROOT} $(which cat) /proc/self/comm)" = "$($(which cat) /proc/self/comm)" ]
 
-echo '#!/bin/sh' > /tmp/${TMP}
-chmod +x /tmp/${TMP}
+# Termux preloads libtermux-exec in every program, PRoot included: it
+# runs the interpreter of a script itself, so the kernel names the
+# process after that interpreter instead.
+unset LD_PRELOAD
 
-# TODO: (cd /tmp; ${PROOT} env LD_SHOW_AUXV=1 ./${TMP}) | grep ^AT_EXECFN:[[:space:]]*./${TMP}$
+echo '#!/bin/sh' > ${TMPDIR:?}/${TMP}
+chmod +x ${TMPDIR:?}/${TMP}
 
-echo 'cat /proc/$$/comm' >> /tmp/${TMP}
+# TODO: (cd ${TMPDIR:?}; ${PROOT} env LD_SHOW_AUXV=1 ./${TMP}) | grep ^AT_EXECFN:[[:space:]]*./${TMP}$
 
-${PROOT} /tmp/${TMP} | grep ^${TMP2}$
+echo 'cat /proc/$$/comm' >> ${TMPDIR:?}/${TMP}
 
-ln -s /tmp/${TMP} /tmp/${TMP3}
-${PROOT} /tmp/${TMP3} /proc/self/comm | grep ^${TMP4}$
+${PROOT} ${TMPDIR:?}/${TMP} | grep ^${TMP2}$
 
-rm -f /tmp/${TMP} /tmp/${TMP3}
+ln -s ${TMPDIR:?}/${TMP} ${TMPDIR:?}/${TMP3}
+${PROOT} ${TMPDIR:?}/${TMP3} /proc/self/comm | grep ^${TMP4}$
+
+rm -f ${TMPDIR:?}/${TMP} ${TMPDIR:?}/${TMP3}

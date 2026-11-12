@@ -9,7 +9,10 @@ import java.net.InetSocketAddress
 import java.util.Collections
 
 class NewApiAccountClientTest {
-    private class Store : NewApiAccountStore { override var state = "" }
+    private class Store : NewApiAccountStore {
+        override var state = ""
+        override val supportsRememberedLogin = true
+    }
     private data class Reply(val body: String, val status: Int = 200, val cookie: String? = null)
     private data class Seen(val path: String, val method: String, val auth: String?, val cookie: String?, val body: String)
     private class Server(val handler: (Seen) -> Reply) : AutoCloseable {
@@ -42,6 +45,158 @@ class NewApiAccountClientTest {
         JSONObject().put("success", true).put("data", JSONObject().put("access_token", token).put("access_expires_at", expiry)
             .put("user", JSONObject().put("id", 7).put("username", "tester"))).toString()
     private fun success(data: Any? = null) = JSONObject().put("success", true).apply { if (data != null) put("data", data) }.toString()
+
+    @Test fun rememberedCredentialsSurviveRestartAndAnUnrememberedLoginRemovesThem() {
+        Server { Reply(auth()) }.use { server ->
+            val store = Store()
+            NewApiAccountClient(store, server.url).login(" tester ", "remembered-password", rememberCredentials = true)
+            val restored = NewApiAccountClient(store, server.url)
+            assertEquals(NewApiSavedLogin("tester", "remembered-password", false), restored.savedLogin)
+            restored.login("other", "other-password", autoLogin = true)
+            assertNull(NewApiAccountClient(store, server.url).savedLogin)
+            assertFalse(store.state.contains("remembered-password"))
+            assertFalse(store.state.contains("other-password"))
+        }
+    }
+
+    @Test fun unavailableEncryptedStorageNeverSavesOrSendsRememberedCredentials() {
+        Server { Reply(auth()) }.use { server ->
+            val store = object : NewApiAccountStore {
+                override var state = ""
+                override val supportsRememberedLogin = false
+            }
+            val client = NewApiAccountClient(store, server.url)
+            assertFalse(client.canRememberCredentials)
+            assertTrue(runCatching { client.login("u", "secret", true, true) }.isFailure)
+            assertTrue(server.requests.isEmpty())
+            client.login("u", "secret")
+            assertTrue(client.isLoggedIn)
+            assertFalse(store.state.contains("secret"))
+        }
+    }
+
+    @Test fun expiredRefreshAutomaticallySignsInOnceUsingRestoredCredentials() {
+        var logins = 0
+        Server { request ->
+            when (request.path) {
+                "/api/user/login" -> {
+                    assertEquals("tester", JSONObject(request.body).getString("username"))
+                    assertEquals("remembered-password", JSONObject(request.body).getString("password"))
+                    logins++
+                    Reply(auth(if (logins == 1) "old" else "new", expiry = if (logins == 1) 1 else Long.MAX_VALUE))
+                }
+                "/api/user/auth/refresh" -> Reply("""{"success":false,"message":"expired"}""", 401)
+                "/api/user/self" -> {
+                    assertEquals("Bearer new", request.auth)
+                    Reply(success(JSONObject().put("id", 7).put("username", "tester")))
+                }
+                else -> error(request.path)
+            }
+        }.use { server ->
+            val store = Store()
+            NewApiAccountClient(store, server.url).login("tester", "remembered-password", true, true)
+            val restored = NewApiAccountClient(store, server.url)
+            assertEquals(7, restored.refreshUser().getInt("id"))
+            assertTrue(restored.isLoggedIn)
+            assertTrue(restored.savedLogin!!.autoLogin)
+            assertEquals(2, logins)
+            assertEquals(1, server.requests.count { it.path == "/api/user/auth/refresh" })
+        }
+    }
+
+    @Test fun rememberingCredentialsAloneDoesNotAutomaticallySignIn() {
+        var logins = 0
+        Server { request ->
+            if (request.path == "/api/user/login") { logins++; Reply(auth(expiry = 1)) }
+            else Reply("""{"success":false,"message":"expired"}""", 401)
+        }.use { server ->
+            val store = Store()
+            val client = NewApiAccountClient(store, server.url)
+            client.login("tester", "remembered-password", true, false)
+            assertTrue(runCatching { client.refreshUser() }.isFailure)
+            assertFalse(client.isLoggedIn)
+            assertEquals(1, logins)
+            assertEquals("remembered-password", NewApiAccountClient(store, server.url).savedLogin!!.password)
+        }
+    }
+
+    @Test fun manualLogoutDisablesAutoLoginEvenWhenRemoteLogoutFails() {
+        Server { request ->
+            if (request.path == "/api/user/login") Reply(auth())
+            else Reply("""{"success":false,"message":"unavailable"}""", 503)
+        }.use { server ->
+            val store = Store()
+            val client = NewApiAccountClient(store, server.url)
+            client.login("tester", "remembered-password", true, true)
+            assertTrue(runCatching { client.logout() }.isFailure)
+            val restored = NewApiAccountClient(store, server.url)
+            assertFalse(restored.isLoggedIn)
+            assertNull(restored.user)
+            assertEquals(NewApiSavedLogin("tester", "remembered-password", false), restored.savedLogin)
+            val requestCount = server.requests.size
+            assertTrue(runCatching { restored.refreshUser() }.isFailure)
+            assertEquals(requestCount, server.requests.size)
+        }
+    }
+
+    @Test fun twoFactorCredentialsAreOnlyRememberedAfterSuccessfulVerification() {
+        Server { request ->
+            if (request.path == "/api/user/login") Reply(success(JSONObject().put("require_2fa", true).put("flow_token", "flow")))
+            else Reply(auth())
+        }.use { server ->
+            val store = Store()
+            val client = NewApiAccountClient(store, server.url)
+            val result = client.login("tester", "remembered-password", true, true)
+            assertNull(client.savedLogin)
+            assertFalse(store.state.contains("remembered-password"))
+            client.verifyTwoFactor(result.flowToken!!, "123456")
+            assertEquals(NewApiSavedLogin("tester", "remembered-password", true), NewApiAccountClient(store, server.url).savedLogin)
+        }
+    }
+
+    @Test fun autoLoginRequiringTwoFactorOrRejectingCredentialsStopsWithoutLooping() {
+        for (twoFactor in listOf(false, true)) {
+            var logins = 0
+            Server { request ->
+                when (request.path) {
+                    "/api/user/login" -> {
+                        logins++
+                        if (logins == 1) Reply(auth(expiry = 1))
+                        else if (twoFactor) Reply(success(JSONObject().put("require_2fa", true).put("flow_token", "flow")))
+                        else Reply("""{"success":false,"message":"invalid credentials"}""")
+                    }
+                    "/api/user/auth/refresh" -> Reply("""{"success":false,"message":"expired"}""", 401)
+                    else -> error(request.path)
+                }
+            }.use { server ->
+                val store = Store()
+                val client = NewApiAccountClient(store, server.url)
+                client.login("tester", "remembered-password", true, true)
+                assertTrue(runCatching { client.refreshUser() }.isFailure)
+                val restored = NewApiAccountClient(store, server.url)
+                assertFalse(restored.isLoggedIn)
+                assertFalse(restored.savedLogin!!.autoLogin)
+                assertTrue(runCatching { restored.refreshUser() }.isFailure)
+                assertEquals(2, logins)
+            }
+        }
+    }
+
+    @Test fun temporaryRefreshFailuresDoNotResubmitCredentials() {
+        for (status in listOf(429, 503)) {
+            Server { request ->
+                if (request.path == "/api/user/login") Reply(auth(expiry = 1))
+                else Reply("""{"success":false,"message":"try later"}""", status)
+            }.use { server ->
+                val client = NewApiAccountClient(Store(), server.url)
+                client.login("tester", "remembered-password", true, true)
+                assertTrue(runCatching { client.refreshUser() }.isFailure)
+                assertTrue(client.isLoggedIn)
+                assertTrue(client.savedLogin!!.autoLogin)
+                assertEquals(1, server.requests.count { it.path == "/api/user/login" })
+            }
+        }
+    }
 
     @Test fun cookiesSurviveRestartAndRotateWhenAccessExpires() {
         val store = Store()

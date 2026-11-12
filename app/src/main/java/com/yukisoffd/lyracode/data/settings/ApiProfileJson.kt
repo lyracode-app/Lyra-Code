@@ -21,6 +21,7 @@ internal object ApiProfileJson {
         .put("savedModels", JSONArray(profile.savedModels.distinct()))
         .put("enabledModels", JSONArray(profile.enabledModels.distinct()))
         .put("useResponsesApi", profile.isChatGpt || (profile.apiFormat == ApiProfile.API_FORMAT_OPENAI && profile.usesResponsesApi))
+        .put("gzipRequestBodies", profile.gzipRequestBodies)
         .put("modelRequestOverrides", ModelRequestCustomization.encodeMap(if (profile.isChatGpt) emptyMap() else profile.modelRequestOverrides))
 
     fun decode(item: JSONObject, defaultBaseUrl: String, defaultModel: String, defaultName: String = "API"): ApiProfile {
@@ -54,6 +55,7 @@ internal object ApiProfileJson {
             savedModels = models,
             enabledModels = if (item.has("enabledModels")) strings("enabledModels") else models,
             useResponsesApi = isChatGpt || (format == ApiProfile.API_FORMAT_OPENAI && item.optBoolean("useResponsesApi")),
+            gzipRequestBodies = item.optBoolean("gzipRequestBodies", ApiProfile.defaultGzipRequestBodies(format)),
             presetId = item.optString("presetId"),
             presetPlanId = item.optString("presetPlanId"),
             modelRequestOverrides = if (isChatGpt) emptyMap() else ModelRequestCustomization.decodeMap(item.optJSONObject("modelRequestOverrides")),

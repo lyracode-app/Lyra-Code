@@ -3,6 +3,8 @@ package com.yukisoffd.lyracode.ai
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
@@ -329,7 +331,10 @@ class WebViewWebAgent internal constructor(
                     fun evaluate(view: WebView) {
                         if (evaluated || !continuation.isActive) return
                         evaluated = true
-                        view.postDelayed({
+                        // This WebView is never attached to a window. View.postDelayed would
+                        // leave the action waiting in its attach queue instead of evaluating.
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (!continuation.isActive) return@postDelayed
                             view.evaluateJavascript(script) { value ->
                                 Log.d(TAG, "Loaded $url, resultChars=${value?.length ?: 0}")
                                 if (continuation.isActive) continuation.resume(value.orEmpty())

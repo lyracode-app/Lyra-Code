@@ -72,7 +72,7 @@ internal class DeviceChatTranscript(context: Context) : FrameLayout(context), Li
                 LyraCodeTheme(dark, settings.dynamicColorEnabled, fontScale, settings, 0, 0) {
                     val rows = com.yukisoffd.lyracode.chatRenderItems(chat.messages.map { message ->
                         ChatRecord(id = message.id, role = message.role, content = message.text, thinking = message.thinking,
-                            toolName = message.toolName, createdAt = message.createdAt)
+                            toolName = message.toolName, toolInput = message.toolInput, createdAt = message.createdAt)
                     }, isStreaming = chat.running, collapseStreamingProse = true)
                     val list = rememberLazyListState()
                     var follow by remember { mutableStateOf(true) }

@@ -49,6 +49,8 @@
     <string name="action_new_project_session">在專案中新建對話</string>
     <string name="action_expand_project">展開專案</string>
     <string name="action_collapse_project">收起專案</string>
+    <string name="action_expand_section">展開%1$s</string>
+    <string name="action_collapse_section">收起%1$s</string>
     <string name="project_session_count">%1$d 個對話</string>
     <string name="notice_project_created">已建立專案“%1$s”</string>
     <string name="notice_already_in_new_project_chat">你已在此專案的新對話中</string>
@@ -289,6 +291,14 @@
     <string name="status_sub_agent_progress">子代理任務：已完成 %1$d/%2$d</string>
     <string name="status_sub_agent_progress_running">子代理任務：已完成 %1$d/%2$d · 正在執行 %3$s</string>
     <string name="status_sub_agent_progress_detail">子代理任務：已完成 %1$d/%2$d · 正在執行 %3$s · %4$s</string>
+    <string name="status_sub_agent_progress_concurrent">子代理任務：已完成 %1$d/%2$d · 正在執行 %3$d</string>
+    <string name="status_sub_agent_progress_concurrent_detail">子代理任務：已完成 %1$d/%2$d · 正在執行 %3$d · %4$s</string>
+    <string name="status_sub_agent_resuming">子代理任務：複用 %1$d/%2$d 個已儲存結果</string>
+    <string name="status_interrupted_writes_closed">已關閉上一批次的 %1$d 個中斷寫入任務；這些路徑可能只寫入一半：%2$s</string>
+    <string name="agent_run_channel">代理執行</string>
+    <string name="agent_run_title">Lyra Code 正在執行</string>
+    <string name="agent_run_notification">代理任務正在背景繼續執行</string>
+    <string name="agent_run_stop">停止</string>
     <string name="status_interrupted">已中斷</string>
     <string name="status_continue">繼續執行</string>
     <string name="status_regenerate">重新生成</string>
@@ -840,11 +850,15 @@
     <!-- Storage -->
     <string name="title_storage_usage">儲存佔用</string>
     <string name="menu_total_usage">應用總佔用</string>
-    <string name="menu_app_package">應用安裝包</string>
+    <string name="menu_app_package">已安裝應用程式碼與資源</string>
+    <string name="menu_installed_apk_files">目前 APK 檔案</string>
+    <string name="cache_update_packages">下載的更新安裝包</string>
+    <string name="storage_cleanup_failed">有 %1$d 項未能清理，請檢查檔案占用或存取權限後重試。</string>
+    <string name="update_storage_unavailable">外部應用檔案目錄無法使用</string>
     <string name="menu_app_data">應用資料</string>
     <string name="menu_system_cache">系統快取</string>
     <string name="menu_cleanable_cache">可安全清理快取</string>
-    <string name="storage_explanation">總佔用優先採用 Android 系統儲存統計；僅在系統統計無法使用時採用不跟隨連結的本機掃描。清理範圍僅包含臨時上傳、圖片裁剪、拍照預覽、AI 響應磁碟快取，以及應用內更新後遺留的舊版本安裝包；不會刪除 PRoot 環境、歷史對話、模型配置、API Key、MCP/SSH、Skills、頭像或工作目錄檔案。</string>
+    <string name="storage_explanation">已安裝應用體積包含 APK、本機程式庫及系統編譯產物，可能大於下載包；目前 APK 檔案與下載的更新包分開列出。清理會刪除臨時上傳、圖片裁剪、拍照預覽、AI 回應快取和下載的更新包（含待安裝包），需要時可重新下載。不會刪除 PRoot 環境、歷史對話、模型配置、API Key、MCP/SSH、Skills、頭像或工作目錄檔案。</string>
     <string name="label_file_count_size">%1$d 個檔案</string>
     <string name="action_clean">清理</string>
     <string name="status_cleaning">正在清理 %1$s…</string>
@@ -1266,6 +1280,11 @@
     <string name="title_sub_agent_orchestration">子代理編排</string>
     <string name="sub_agent_settings_desc">開啟後，主模型可在複雜任務中呼叫 run_sub_agents，將獨立子任務交給已啟用的子代理模型執行。子代理對話不進入普通曆史，只把最終結果返回主模型。</string>
     <string name="label_sub_agent_models">子代理模型</string>
+    <string name="label_sub_agent_max_tasks">每批最大任務數</string>
+    <string name="label_sub_agent_max_concurrency">最大併發子代理數</string>
+    <string name="sub_agent_limits_hint">併發數為 1 時每次只執行一個任務，與之前相同。</string>
+    <string name="action_decrease">減少</string>
+    <string name="action_increase">增加</string>
     <string name="label_sub_agent_default_name">子代理模型</string>
     <string name="sub_agent_default_desc">擅長程式碼審查、Bug 檢查、資料核驗或獨立方案分析。</string>
     <string name="sub_agent_empty_hint">暫無子代理模型。請從已新增的模型服務中選擇模型，並填寫它擅長的任務說明。</string>
@@ -1375,7 +1394,7 @@
     <string name="stats_message_format">%1$s 條</string>
     <string name="stats_ai_messages">AI 訊息</string>
     <string name="stats_tool_results">工具結果</string>
-    <string name="stats_disclaimer">Token 數由本地 DeepSeek V3 tokenizer 估算，不訪問網路。當前口徑按每次模型請求重複計算上下文，併為系統提示詞、工具 schema 和訊息模板加入固定開銷；不同服務商的 tokenizer、圖片計費、快取摺扣和實際 usage 仍可能不同。</string>
+    <string name="stats_disclaimer">Token 數由本地 DeepSeek V4 tokenizer 估算，不訪問網路。當前口徑按每次模型請求重複計算上下文，併為系統提示詞、工具 schema 和訊息模板加入固定開銷；不同服務商的 tokenizer、圖片計費、快取摺扣和實際 usage 仍可能不同。</string>
     <string name="stats_period_format">%1$s統計</string>
     <string name="compact_unit_wan">萬</string>
     <string name="compact_unit_yi">億</string>
@@ -1432,6 +1451,48 @@
     <string name="action_fullscreen_input">全屏輸入</string>
     <string name="action_exit_fullscreen_input">退出全屏輸入</string>
     <string name="title_fullscreen_input">全屏輸入</string>
+    <!-- Chat composer queue and steer -->
+    <string name="composer_queue_dock_description">佇列訊息：%1$d</string>
+    <string name="composer_queue_dock_title">%1$d 則佇列訊息</string>
+    <string name="composer_queue_dock_expand">展開佇列訊息</string>
+    <string name="composer_queue_dock_collapse">收合佇列訊息</string>
+    <string name="composer_queue_state_queued">佇列中</string>
+    <string name="composer_queue_state_parked">已暫停</string>
+    <string name="composer_queue_state_waiting_to_insert">等待插入</string>
+    <string name="composer_queue_attachment_count">附件：%1$d</string>
+    <string name="composer_queue_remove_description">移除佇列訊息：%1$s</string>
+    <string name="composer_queue_send_now_description">立即傳送：%1$s</string>
+    <string name="composer_queue_steer_description">立即引導佇列訊息：%1$s</string>
+    <string name="composer_queue_missing_attachment">附件缺失：%1$d</string>
+    <string name="status_message_queued">已排隊，等待傳送：%1$d 則</string>
+    <string name="status_message_delivered">正在傳送排隊訊息</string>
+    <string name="status_message_parked">已暫存排隊訊息：%1$d 則</string>
+    <string name="status_message_refused">智慧體執行中，排隊傳送已關閉</string>
+    <string name="status_message_send_now_busy">智慧體執行中，無法立即傳送</string>
+    <string name="status_message_run_busy">請等待目前任務結束後再試。</string>
+    <string name="status_message_profile_unavailable">排隊訊息未傳送：服務商不可用</string>
+    <string name="cd_queue">排隊訊息</string>
+    <string name="composer_steer_unavailable_default">目前無法使用引導功能</string>
+    <string name="composer_steer_unavailable_feature_disabled">引導已關閉。請在設定中啟用執行中傳送。</string>
+    <string name="composer_steer_unavailable_no_run">引導需要正在生成的回覆。</string>
+    <string name="composer_steer_unavailable_compressing">壓縮歷史期間不能引導。請等待壓縮結束後重試。</string>
+    <string name="composer_steer_unavailable_scoped_device">裝置控制任務執行期間不能引導。請等待任務結束後重試。</string>
+    <string name="composer_steer_unavailable_media_generation">媒體生成模型不接受引導。請改用一般對話模型。</string>
+    <string name="composer_steer_unavailable_sub_agent_target">子代理會話不接受引導。請在父會話中繼續。</string>
+    <string name="composer_steer_wait_approval">已接受。回答審批提示後生效。</string>
+    <string name="composer_steer_wait_question">已接受。回答提問後生效。</string>
+    <string name="composer_steer_wait_sub_agent">已接受。子代理呼叫結束後生效。</string>
+    <string name="status_message_steered">已引導</string>
+    <string name="status_message_steer_queued">引導已排隊，將在下一步生效。</string>
+    <string name="status_message_steer_carried">回覆已結束，引導已移入佇列。</string>
+    <string name="status_message_steer_attachments">這則佇列訊息帶有附件，無法引導。請在本次執行結束後傳送。</string>
+    <!-- Composer delivery settings -->
+    <string name="detail_composer">輸入框</string>
+    <string name="menu_composer">輸入框</string>
+    <string name="menu_composer_desc">排隊後續訊息，並引導單則佇列訊息。</string>
+    <string name="composer_delivery_enabled_title">排隊後續訊息與引導</string>
+    <string name="composer_delivery_enabled_desc">智慧型代理執行時仍可繼續輸入。執行中傳送會進入佇列；可在佇列面板中引導任何佇列訊息。</string>
+    <string name="composer_delivery_disabled_hint">開啟排隊後續訊息與引導後，才能在智慧型代理執行時排隊訊息。</string>
     <!-- File manager and editor -->
     <string name="nav_tab_files">檔案</string>
     <string name="file_permission_title">共享儲存存取</string>
@@ -1780,6 +1841,9 @@ Shizuku 與 Root：不屬於普通執行時許可權，由使用者在“系統�
     <string name="file_privileged_disable">停用</string>
     <string name="file_privileged_disabled">受限目錄訪問已停用</string>
     <string name="responses_api_enabled">使用 Responses API</string>
+    <string name="gzip_request_bodies_enabled">壓縮大型請求（gzip）</string>
+    <string name="gzip_request_bodies_hint">壓縮大型請求以減少上傳流量。僅 Anthropic Messages 格式預設開啟，其他格式預設關閉。如果伺服器拒絕壓縮請求，Lyra 會改為傳送未壓縮的請求。</string>
+    <string name="gzip_request_failed_hint">此錯誤可能與啟用了 gzip 請求壓縮有關，服務可能不支援此功能。已嘗試以未壓縮內文重送，但請求仍失敗。請在服務設定中關閉 gzip 後重試。</string>
     <string name="conversation_details">對話資訊</string>
     <string name="conversation_title_label">對話標題</string>
     <string name="current_model_label">當前模型</string>
@@ -1983,7 +2047,7 @@ Shizuku 與 Root：不屬於普通執行時許可權，由使用者在“系統�
     <string name="ui_text_font">文字字型</string>
     <string name="ui_code_font">程式碼字型</string>
     <string name="ui_imported_1_s_fonts">已匯入 %1$s 個字型</string>
-    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">支援批次匯入 TTF、OTF 和 TTC 字型。匯入後可預覽，並分別設為文字字型或程式碼字型。</string>
+    <string name="ui_import_multiple_ttf_otf_and_ttc_fonts_preview_each">支援批次匯入 TTF、OTF 和 TTC 字型，可用於文字、程式碼和終端機；再次點選已選用途可恢復預設字型。</string>
     <string name="ui_import_fonts">匯入字型</string>
     <string name="ui_the_font_library_is_empty_tap_import_fonts_to">字型庫為空，點選“匯入字型”可一次選擇多個檔案。</string>
     <string name="ui_text_font_changed_to_1_s">已切換文字字型：%1$s</string>
@@ -2449,6 +2513,15 @@ Shizuku 與 Root：不屬於普通執行時許可權，由使用者在“系統�
     <string name="deepseek_key_required">請輸入有效的 DeepSeek API Key。</string>
     <string name="deepseek_config_hint">請先儲存設定，再單獨啟用。開關狀態即時儲存；未設定時開關保持關閉且無法使用。API Key 安全儲存。</string>
     <string name="deepseek_config_saved">設定已儲存</string>
+    <string name="terminal_font">終端字型</string>
+    <string name="terminal_font_hint">在字型庫中選擇字型，預設使用系統等寬字型。推薦 Maple Mono、JetBrains Mono 等等寬字型。應用程式不內建終端字型。</string>
+    <string name="terminal_font_size">終端字級：%1$d sp</string>
+    <string name="terminal_color_scheme">終端配色</string>
+    <string name="terminal_use_font">用於終端</string>
+    <string name="terminal_font_current">目前終端字型</string>
+    <string name="terminal_font_changed">終端字型已變更為 %1$s</string>
+    <string name="terminal_paste">貼上</string>
+    <string name="terminal_clear">清空終端</string>
 </resources>
 
 

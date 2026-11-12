@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Example Developer",
+    "avatar": "avatars/developer.png",
+    "role": [0, 1, 2],
+    "link": "https://github.com/example"
+  },
+  {
+    "name": "Example Sponsor",
+    "avatar": "https://example.com/avatars/sponsor.png",
+    "role": 1,
+    "link": "https://example.com/"
+  },
+  {
+    "name": "Anonymous Helper",
+    "avatar": "",
+    "role": [2, 3],
+    "link": ""
+  }
+]

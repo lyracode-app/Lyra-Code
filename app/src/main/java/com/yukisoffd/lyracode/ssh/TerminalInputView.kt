@@ -3,6 +3,8 @@ package com.yukisoffd.lyracode.ssh
 import android.content.Context
 import android.graphics.Color
 import android.text.InputType
+import android.text.Editable
+import android.text.Selection
 import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.BaseInputConnection
@@ -12,30 +14,30 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 
 /**
- * Character-oriented IME endpoint for the raw terminal.
- *
- * A normal EditText connection may retain the first character as composing text. That is tolerable
- * at a shell prompt because Enter commits it, but breaks modal programs: Vim never receives the `i`
- * that enters insert mode. TYPE_NULL asks compatible keyboards for per-character key events, while
- * commit/composition callbacks remain implemented for keyboards, Unicode text and clipboard paste
- * that use them instead.
+ * Text-capable IME endpoint. ASCII still reaches modal editors immediately; CJK candidate text
+ * stays local until committed, so intermediate Korean syllables never become remote commands.
  */
 class TerminalInputView(context: Context) : EditText(context) {
     var onText: (String) -> Unit = {}
     var onBackspace: () -> Unit = {}
     var onEnter: () -> Unit = {}
     var onTerminalKey: (String) -> Unit = {}
+    var onComposition: (String) -> Unit = {}
+
+    private var inputGeneration = 0L
 
     private val composition = TerminalCompositionState(
         sendText = { dispatchText(it) },
         sendBackspace = { onBackspace() },
+        onComposition = { onComposition(it) },
     )
 
     init {
         isFocusable = true
         isFocusableInTouchMode = true
         isSingleLine = false
-        inputType = InputType.TYPE_NULL
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN
         setTextColor(Color.TRANSPARENT)
         setHintTextColor(Color.TRANSPARENT)
@@ -52,30 +54,45 @@ class TerminalInputView(context: Context) : EditText(context) {
         BaseInputConnection.removeComposingSpans(text)
         if (text.isNotEmpty()) text.clear()
         Log.d(TAG, "input connection created")
-        outAttrs.inputType = InputType.TYPE_NULL
+        outAttrs.inputType = inputType
         outAttrs.imeOptions = imeOptions
+        outAttrs.initialSelStart = 0
+        outAttrs.initialSelEnd = 0
+        val connectionGeneration = ++inputGeneration
         return object : BaseInputConnection(this@TerminalInputView, true) {
+            override fun getEditable(): Editable = this@TerminalInputView.text
+
             override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "commitText chars=${text?.length ?: 0}")
                 composition.commit(text?.toString().orEmpty())
+                super.commitText(text, newCursorPosition)
+                editable.clear()
                 return true
             }
 
             override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "setComposingText chars=${text?.length ?: 0}")
                 composition.update(text?.toString().orEmpty())
+                super.setComposingText(text, newCursorPosition)
                 return true
             }
 
             override fun finishComposingText(): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "finishComposingText")
                 composition.finish()
+                super.finishComposingText()
+                editable.clear()
                 return true
             }
 
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "deleteSurroundingText before=$beforeLength after=$afterLength")
-                composition.deleteBefore(beforeLength)
+                composition.deleteBefore(beforeLength, inCodePoints = false)
+                syncComposingEditable()
                 return true
             }
 
@@ -83,22 +100,33 @@ class TerminalInputView(context: Context) : EditText(context) {
                 beforeLength: Int,
                 afterLength: Int,
             ): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "deleteSurroundingTextInCodePoints before=$beforeLength after=$afterLength")
                 composition.deleteBefore(beforeLength)
+                syncComposingEditable()
                 return true
             }
 
             override fun sendKeyEvent(event: KeyEvent): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "sendKeyEvent action=${event.action} keyCode=${event.keyCode}")
                 if (event.action != KeyEvent.ACTION_DOWN) return true
                 return dispatchTerminalKey(event)
             }
 
             override fun performEditorAction(actionCode: Int): Boolean {
+                if (connectionGeneration != inputGeneration) return false
                 Log.d(TAG, "performEditorAction action=$actionCode")
                 finishComposingInput()
                 onEnter()
                 return true
+            }
+
+            private fun syncComposingEditable() {
+                BaseInputConnection.removeComposingSpans(editable)
+                editable.replace(0, editable.length, composition.pendingText)
+                Selection.setSelection(editable, editable.length)
+                if (editable.isNotEmpty()) super.setComposingRegion(0, editable.length)
             }
         }
     }
@@ -182,14 +210,32 @@ class TerminalInputView(context: Context) : EditText(context) {
      */
     fun finishComposingInput() {
         composition.finish()
+        BaseInputConnection.removeComposingSpans(text)
+        if (text.isNotEmpty()) text.clear()
         post {
-            BaseInputConnection.removeComposingSpans(text)
-            if (text.isNotEmpty()) text.clear()
             if (hasFocus()) {
                 (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.let { manager ->
                     manager.restartInput(this)
                     manager.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
                 }
+            }
+        }
+    }
+
+    fun pasteText(value: String) {
+        finishComposingInput()
+        dispatchText(value)
+    }
+
+    /** A cleared/replaced PTY must never receive the previous input connection's candidates. */
+    fun discardComposingInput() {
+        inputGeneration++
+        composition.discard()
+        BaseInputConnection.removeComposingSpans(text)
+        text.clear()
+        post {
+            if (hasFocus()) {
+                (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.restartInput(this)
             }
         }
     }
@@ -202,12 +248,22 @@ class TerminalInputView(context: Context) : EditText(context) {
 /** Mirrors IME composition changes to a terminal, including replacements made by autocorrection. */
 internal class TerminalCompositionState(
     private val sendText: (String) -> Unit,
+    private val onComposition: (String) -> Unit = {},
     private val sendBackspace: () -> Unit,
 ) {
     private var forwarded = ""
-    val isComposing: Boolean get() = forwarded.isNotEmpty()
+    private var pending = ""
+    val pendingText: String get() = pending
+    val isComposing: Boolean get() = pending.isNotEmpty()
 
     fun update(next: String) {
+        pending = next
+        val ascii = next.all { it.code in 0x20..0x7e }
+        forward(if (ascii) next else "")
+        onComposition(if (ascii) "" else next)
+    }
+
+    private fun forward(next: String) {
         val prefixLength = commonPrefixLength(forwarded, next)
         val removed = forwarded.substring(prefixLength).codePointCount(
             0,
@@ -219,18 +275,36 @@ internal class TerminalCompositionState(
     }
 
     fun commit(text: String) {
-        update(text)
+        forward(text)
         forwarded = ""
+        pending = ""
+        onComposition("")
     }
 
     fun finish() {
+        if (pending != forwarded) forward(pending)
         forwarded = ""
+        pending = ""
+        onComposition("")
     }
 
-    fun deleteBefore(count: Int) {
+    fun discard() {
+        forwarded = ""
+        pending = ""
+        onComposition("")
+    }
+
+    fun deleteBefore(count: Int, inCodePoints: Boolean = true) {
         if (count <= 0) return
-        repeat(count) { sendBackspace() }
-        forwarded = forwarded.dropLastCodePoints(count)
+        val composingCount = if (inCodePoints) pending.codePointCount(0, pending.length) else pending.length
+        val localCount = minOf(count, composingCount)
+        val next = if (inCodePoints) pending.dropLastCodePoints(localCount) else {
+            var end = pending.length - localCount
+            if (end > 0 && pending[end - 1].isHighSurrogate()) end--
+            pending.substring(0, end)
+        }
+        if (localCount > 0) update(next)
+        repeat((count - localCount).coerceAtLeast(0)) { sendBackspace() }
     }
 
     private fun commonPrefixLength(first: String, second: String): Int {

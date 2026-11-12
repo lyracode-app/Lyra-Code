@@ -35,6 +35,19 @@
     <queries>
         <package android:name="com.termux" />
         <package android:name="com.termux.api" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
     </queries>
 
     <application
@@ -53,6 +66,11 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-started authenticated web companion for live conversations and file uploads; stopped by the user" />
         </service>
+        <service android:name=".ai.AgentRunForegroundService" android:exported="false"
+            android:foregroundServiceType="specialUse" android:stopWithTask="true">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started agent run that keeps the current conversation working while the app is in the background; stopped by the user or when the run ends" />
+        </service>
         <service
             android:name=".interaction.overlay.ManualControlForegroundService"
             android:exported="false"
@@ -64,6 +82,10 @@
                 android:value="User-started visible floating assistant session; stopped explicitly by the user" />
         </service>
         <activity android:name=".interaction.overlay.FloatingWorkspaceActivity" android:theme="@style/Theme.LyraCode.PetSettings" android:exported="false" />
+        <activity android:name=".x11.LyraX11Activity" android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|navigation"
+            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
         <activity android:name=".interaction.pet.DesktopPetSettingsActivity" android:theme="@style/Theme.LyraCode.PetSettings" android:exported="false" android:enableOnBackInvokedCallback="true" />
         <activity
             android:name=".MainActivity"
@@ -127,6 +149,11 @@
         <receiver
             android:name=".filemanager.AndroidPackageInstallReceiver"
             android:exported="false" />
+        <receiver android:name=".data.UpdateCleanupReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".interaction.overlay.ManualControlActionReceiver"
             android:exported="false" />

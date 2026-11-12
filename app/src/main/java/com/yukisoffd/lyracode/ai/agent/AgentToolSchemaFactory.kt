@@ -253,7 +253,10 @@ internal class AgentToolSchemaFactory(
                 ),
             )
         }
-        if (prootAvailable()) definitions.put(prootCommandToolDefinition())
+        if (prootAvailable()) {
+            definitions.put(prootCommandToolDefinition())
+            definitions.put(linuxGuiToolDefinition())
+        }
         definitions
         .put(chartToolDefinition())
         .put(circuitSymbolsToolDefinition())
@@ -457,7 +460,7 @@ internal class AgentToolSchemaFactory(
             ),
         )
         if (allowSubAgents && settings.subAgentOrchestrationEnabled && settings.enabledSubAgents().isNotEmpty()) {
-            definitions.put(subAgentFunction())
+            definitions.put(buildSubAgentFunction(settings.subAgentMaxTasks))
         }
         MediaGenerationKind.entries.forEach { kind ->
             if (settings.mediaGenerationModelOrNull(kind) != null) {
@@ -555,56 +558,6 @@ internal class AgentToolSchemaFactory(
 
     private fun function(name: String, description: String, vararg properties: Pair<String, String>): JSONObject {
         return functionWithOptional(name, description, required = properties.toList(), optional = emptyList())
-    }
-
-    private fun subAgentFunction(): JSONObject {
-        val taskProperties = JSONObject()
-            .put("task", JSONObject().put("type", "string").put("description", "One independent, bounded subtask."))
-            .put("capability_hint", JSONObject().put("type", "string").put("description", "Optional specialization hint used for automatic agent selection."))
-            .put("expected_output", JSONObject().put("type", "string").put("description", "Evidence and result shape the parent needs for verification."))
-            .put("sub_agent_id", JSONObject().put("type", "string").put("description", "Optional exact enabled sub-agent id. Omit for automatic selection."))
-            .put("read_only", JSONObject().put("type", "boolean").put("description", "True when the task must not mutate workspace state."))
-            .put(
-                "write_paths",
-                JSONObject()
-                    .put("type", "array")
-                    .put("description", "Every exact workspace-relative file or directory this task may mutate. Empty for read-only tasks. Paths cannot overlap another task.")
-                    .put("items", JSONObject().put("type", "string")),
-            )
-        val taskSchema = JSONObject()
-            .put("type", "object")
-            .put("properties", taskProperties)
-            .put("required", JSONArray().put("task").put("read_only").put("write_paths"))
-            .put("additionalProperties", false)
-        return JSONObject()
-            .put("type", "function")
-            .put(
-                "function",
-                JSONObject()
-                    .put("name", "run_sub_agents")
-                    .put(
-                        "description",
-                        "Delegate independent subtasks only for complex work that benefits from separate research, review, validation, alternatives, or specialization. Mutating tasks must declare non-overlapping exact workspace paths. Sub-agents receive restricted tools, cannot delegate again, and return results for parent verification.",
-                    )
-                    .put(
-                        "parameters",
-                        JSONObject()
-                            .put("type", "object")
-                            .put(
-                                "properties",
-                                JSONObject().put(
-                                    "tasks",
-                                    JSONObject()
-                                        .put("type", "array")
-                                        .put("minItems", 1)
-                                        .put("maxItems", 6)
-                                        .put("items", taskSchema),
-                                ),
-                            )
-                            .put("required", JSONArray().put("tasks"))
-                            .put("additionalProperties", false),
-                    ),
-            )
     }
 
     private fun mediaGenerationFunction(kind: MediaGenerationKind): JSONObject {

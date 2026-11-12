@@ -30,7 +30,7 @@ There is no compiled package-specific or Termux fallback path. A missing loader
 produces an explicit error instead of silently attempting another package's
 private directory.
 
-## Dual-ABI build (Lyra .5)
+## Dual-ABI build (Lyra .6)
 
 From the checkout root:
 
@@ -86,7 +86,7 @@ The .4 build adds all nine October upstream commits to main, in order:
 
 Android CMake links the external ARM64 loader at the new LOADER_ADDRESS from
 src/arch.h; the x86_64 address is unchanged. The embedded runtime version is
-`5.1.107.100-lyra.5`. The Lyra external-loader lookup, API 24 baseline and
+`5.1.107.100-lyra.6`. The Lyra external-loader lookup, API 24 baseline and
 static talloc are preserved. No app launch arguments need to change.
 
 ## Lyra .5 upstream integration (2026-10-19)
@@ -104,6 +104,28 @@ rootfs metadata format and is outside this integration.
 Both ABI pairs retain the external-loader lookup, fixed loader addresses,
 API 24 baseline, static talloc and 16 KB ELF alignment. The loader sources are
 unchanged, so the rebuilt loader hashes are identical to the .4 packages.
+
+## Lyra .6 upstream integration (2026-10-29)
+
+The merge integrates all 40 upstream commits from `8bf810c` through
+`b27d81a`, inclusive. See UPSTREAM_COMMITS.md for their full ordered SHAs
+and the retained local contributor-policy file. Main and master have
+separate histories, so the merge applies the delta after the already
+integrated `e2d843e` baseline while recording master as the second parent.
+
+This fixes simulated hard-link error propagation, failed unlink/rename
+bookkeeping, broken chains, intermediate reservation, large link counts,
+symlink linking and directory entry types. It also fixes hidden directory
+listings, statx permission preservation under outer seccomp, command-path
+lookup, failed-startup cleanup, long Unix-socket alias cleanup, dead-child
+registration, PID reuse and execve from a non-leader thread.
+
+Version: `5.1.107.100-lyra.6`. External-loader discovery, both fixed loader
+addresses, Android API 24, static talloc, 16 KB alignment and disabled
+USERLAND/libandroid-shmem are preserved. Runtime sources match master
+except for the two pre-existing Lyra external-loader/Bionic adaptations.
+The Android harness now uses upstream helpers for threaded exec, statx,
+getdents, link, renameat2 and Unix sockets in both seccomp modes.
 
 ## Android runtime regression checks
 

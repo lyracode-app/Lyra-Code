@@ -1,0 +1,14 @@
+{
+  "versionCode": 89,
+  "versionName": "4.2.0",
+  "apkUrl": "https://example.com/releases/4.2.0/LyraCode-universal.apk",
+  "apkSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "apkUrlArm64": "https://example.com/releases/4.2.0/LyraCode-arm64-v8a.apk",
+  "apkSha256Arm64": "0000000000000000000000000000000000000000000000000000000000000000",
+  "apkUrlX86_64": "https://example.com/releases/4.2.0/LyraCode-x86_64.apk",
+  "apkSha256X86_64": "0000000000000000000000000000000000000000000000000000000000000000",
+  "releaseNotes": "本次更新说明",
+  "releaseNotesUrl": "",
+  "webUrl": "https://example.com/releases/4.2.0/",
+  "mandatory": false
+}

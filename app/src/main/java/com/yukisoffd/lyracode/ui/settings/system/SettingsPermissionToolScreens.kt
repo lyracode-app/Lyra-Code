@@ -526,6 +526,11 @@ internal fun ProotLinuxSettings() {
                         Text("Linux ID: ${linux.id}", color = KimiMuted, style = MaterialTheme.typography.labelSmall)
                     }
                     Switch(checked = linux.enabled, onCheckedChange = { runtime.setEnabled(linux.id, it) })
+                    IconButton(enabled = linux.enabled, onClick = {
+                        com.yukisoffd.lyracode.x11.LyraX11Activity.open(context, linux.id)
+                    }) {
+                        Icon(Icons.Default.DesktopWindows, contentDescription = stringResource(com.yukisoffd.lyra.x11.R.string.x11_title))
+                    }
                     IconButton(onClick = { deleteId = linux.id }) {
                         Icon(Icons.Default.Delete, contentDescription = uiText(R.string.proot_linux_delete_action), tint = MaterialTheme.colorScheme.error)
                     }
@@ -774,7 +779,7 @@ internal fun agentToolCatalog(): List<AgentToolInfo> = listOf(
     AgentToolInfo("import_backup", uiText(R.string.title_import_backup), uiText(R.string.tool_import_backup_desc)),
     AgentToolInfo("set_todo_list", uiText(R.string.tool_set_todo), uiText(R.string.tool_set_todo_desc)),
     AgentToolInfo("update_todo_item", uiText(R.string.tool_update_todo), uiText(R.string.tool_update_todo_desc)),
-) + prootAgentToolCatalog()
+) + prootAgentToolCatalog() + x11AgentToolCatalog()
 
 @Composable
 internal fun TermuxSetupGuide() {

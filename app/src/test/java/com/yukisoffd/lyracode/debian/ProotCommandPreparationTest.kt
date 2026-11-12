@@ -11,14 +11,11 @@ class ProotCommandPreparationTest {
         val wrapper = buildTrackedProotCommand(
             command = "nohup python3 server.py > server.log 2>&1 &",
             completionGuestPath = "/root/.lyracode/commands/42.status",
-            supervisorPidGuestPath = "/root/.lyracode/commands/42.pid",
             shellPath = "/bin/bash",
         )
 
         assertTrue(wrapper.contains("'/bin/bash' -lc"))
         assertTrue(wrapper.contains("42.status"))
-        assertTrue(wrapper.contains("42.pid"))
-        assertTrue(wrapper.contains("${'$'}PPID"))
         assertTrue(wrapper.contains("lyra_exit_code=${'$'}?"))
         assertTrue(wrapper.contains("exit \"${'$'}lyra_exit_code\""))
     }
@@ -28,7 +25,6 @@ class ProotCommandPreparationTest {
         val wrapper = buildTrackedProotCommand(
             command = "printf '%s' \"it's alive\"",
             completionGuestPath = "/root/.lyracode/commands/43.status",
-            supervisorPidGuestPath = "/root/.lyracode/commands/43.pid",
             shellPath = "/bin/sh",
         )
 

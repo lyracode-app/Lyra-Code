@@ -28,7 +28,7 @@
     <string name="new_api_sync">Sync Keys and models</string>
     <string name="new_api_refresh_user">Refresh user information</string>
     <string name="new_api_logout">Sign out of platform account</string>
-    <string name="new_api_logout_hint">Signing out clears the local account session. Model services and their Keys remain on this device; remove them in Model services if needed.</string>
+    <string name="new_api_logout_hint">Signing out turns off auto sign-in and clears the local session. Remembered credentials remain available for the next manual sign-in; configured model services and Keys remain until you remove them.</string>
     <string name="new_api_signed_out">Signed out.</string>
     <string name="new_api_request_failed">The platform request failed. Try again.</string>
     <string name="new_api_user_id">User ID</string>
@@ -39,7 +39,7 @@
     <string name="new_api_request_count">Request count</string>
     <string name="new_api_quota_hint">Platform quota unit: 500,000 = 1 梦汐币. New app Keys use unlimited quota, no model restriction and the automatic group. Unlimited Key quota does not increase the account balance.</string>
     <string name="new_api_close">Close</string>
-    <string name="new_api_account_data">梦汐 API accounts are optional and provided by api.huanyan.fun. Only when you register, sign in, sign out, refresh or sync does the app contact that platform, sending the username, password, email, verification code, optional invitation code, account access token or refresh cookie required by the selected operation. Passwords are not saved. User information, session cookies and API Keys are stored locally; account sessions are excluded from app backups and Android backup/transfer. Primary and secondary model Keys are exported only when you enable secrets in a backup. Account sync never uploads local conversations, attachments or other settings. When you use this model service, the model request content is sent directly to the platform under its own agreement and privacy policy. Signing out clears the local account session and attempts to revoke that session; model services and Keys remain until you remove them.</string>
+    <string name="new_api_account_data">梦汐 API accounts are optional and provided by api.huanyan.fun. The app contacts that platform when you register, sign in, sign out, refresh or sync, or when enabled auto sign-in checks or restores your session, sending the username, password, email, verification code, optional invitation code, account access token or refresh cookie required by the selected operation. Credentials are saved encrypted on this device only if you enable Remember credentials. Auto sign-in checks the session when the app starts and signs in again with saved credentials when the session expires; two-factor verification requires manual input. User information, session cookies and API Keys are stored locally; account sessions and remembered credentials are excluded from app backups and Android backup/transfer. Primary and secondary model Keys are exported only when you enable secrets in a backup. Account sync never uploads local conversations, attachments or other settings. When you use this model service, the model request content is sent directly to the platform under its own agreement and privacy policy. Signing out disables auto sign-in, retains remembered credentials for the next manual sign-in, clears the local account session and attempts to revoke that session; model services and Keys remain until you remove them.</string>
     <string name="new_api_email_address">Email</string>
     <string name="new_api_user_refreshed">User information refreshed.</string>
     <string name="mengxi_platform_name">梦汐 API</string>
@@ -52,4 +52,8 @@
     <string name="mengxi_open_website">Visit 梦汐 API website</string>
     <string name="mengxi_coin_amount">%1$s 梦汐币</string>
     <string name="provider_hold_to_reveal_key">Hold to show this API Key; release to hide</string>
+    <string name="new_api_remember_credentials">Remember credentials</string>
+    <string name="new_api_auto_login">Sign in automatically</string>
+    <string name="new_api_saved_login_hint">Remembered credentials are encrypted on this device and filled in next time. Auto sign-in requires remembered credentials. Signing out turns off auto sign-in; two-factor verification still requires your input.</string>
+    <string name="new_api_secure_storage_unavailable">Encrypted storage is unavailable on this device. You can sign in, but credentials cannot be remembered.</string>
 </resources>

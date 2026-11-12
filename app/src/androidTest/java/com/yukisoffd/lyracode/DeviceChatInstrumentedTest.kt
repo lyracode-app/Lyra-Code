@@ -440,7 +440,7 @@ class DeviceChatInstrumentedTest {
 
     @Test fun overlayProtocolPreservesLongHistoryOutsideBinder() {
         val context = instrumentation.targetContext
-        val chat = DeviceChatState(List(80) { DeviceChatMessage(it.toLong(), "assistant", "正文 $it " + "x".repeat(5000), thinking = "思考".repeat(4000)) },
+        val chat = DeviceChatState(List(80) { DeviceChatMessage(it.toLong(), "assistant", "正文 $it " + "x".repeat(5000), thinking = "思考".repeat(4000), toolInput = "参数".repeat(2000)) },
             running = true, status = "等待确认", providerLabel = "Provider · model")
         val state = ManualControlState(activeUntilEpochMillis = System.currentTimeMillis() + 30_000,
             agentTargetPackage = "example.app", chat = chat)

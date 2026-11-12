@@ -1,0 +1,10 @@
+{
+  "versionCode": 89,
+  "versionName": "4.2.0",
+  "apkUrl": "https://example.com/releases/4.2.0/LyraCode-universal.apk",
+  "apkSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "releaseNotes": "本次更新说明",
+  "releaseNotesUrl": "",
+  "webUrl": "https://example.com/releases/4.2.0/",
+  "mandatory": false
+}

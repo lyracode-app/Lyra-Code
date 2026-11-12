@@ -201,7 +201,7 @@ internal fun LyraCodeApp(
     var startupUpdateDownloading by remember { mutableStateOf(false) }
     var startupAccelerationUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var startupAccelerationReturnPage by rememberSaveable { mutableIntStateOf(PAGE_CHAT) }
-    var startupPendingApk by remember { mutableStateOf(updateManager.pendingDownloadedApk()) }
+    var startupPendingApk by remember { mutableStateOf<File?>(null) }
     val appSettingsRevision = controller.settingsRevision.intValue
     val skills = remember(skillsRevision, appSettingsRevision) { settings.installedSkills() }
     var settingsDetailTitle by rememberSaveable { mutableStateOf<String?>(null) }
@@ -225,13 +225,15 @@ internal fun LyraCodeApp(
         if (message.isNotBlank()) appNotice = message
     }
     val startupInstallPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val apk = updateManager.pendingDownloadedApk()
-        startupPendingApk = apk
-        if (apk != null && !updateManager.needsInstallPermission()) {
-            runCatching { context.startActivity(updateManager.installIntent(apk)) }
-                .onFailure { appNotice = it.message.orEmpty().ifBlank { context.getString(R.string.notice_cannot_open_installer) } }
-        } else if (apk != null) {
-            appNotice = context.getString(R.string.notice_auth_pending_install_later)
+        scope.launch {
+            val apk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
+            startupPendingApk = apk
+            if (apk != null && !updateManager.needsInstallPermission()) {
+                runCatching { context.startActivity(updateManager.installIntent(apk)) }
+                    .onFailure { appNotice = it.message.orEmpty().ifBlank { context.getString(R.string.notice_cannot_open_installer) } }
+            } else if (apk != null) {
+                appNotice = context.getString(R.string.notice_auth_pending_install_later)
+            }
         }
     }
     fun openStartupInstaller(apk: File) {
@@ -243,7 +245,18 @@ internal fun LyraCodeApp(
                 .onFailure { appNotice = it.message.orEmpty().ifBlank { context.getString(R.string.notice_cannot_open_installer) } }
         }
     }
+    LaunchedEffect(settings) {
+        val attempted = withContext(Dispatchers.IO) {
+            val account = settings.newApiAccount
+            if (account.savedLogin?.autoLogin == true) {
+                runCatching { account.refreshUser() }
+                true
+            } else false
+        }
+        if (attempted) controller.settingsRevision.intValue++
+    }
     LaunchedEffect(Unit) {
+        startupPendingApk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
         val info = withContext(Dispatchers.IO) {
             updateManager.checkDailyForUpdateIfNeeded().getOrNull() ?: updateManager.latestAvailableUpdate()
         }

@@ -24,7 +24,8 @@ $helpers = Join-Path $build 'runtime-tests'
 New-Item -ItemType Directory -Force $helpers | Out-Null
 $compiler = Join-Path $NdkPath 'toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe'
 $names = @('puts_proc_self_exe', 'execveat', 'open_nofollow', 'test-fork',
-    'test-upstream', 'test-latest', 'fork_regs', 'fchmodat2', 'open_tree', 'test-571fb953')
+    'test-upstream', 'test-latest', 'fork_regs', 'fchmodat2', 'open_tree', 'test-571fb953',
+    'test-f6b33793', 'getdents', 'link', 'renameat2', 'statx', 'unix_socket')
 foreach ($name in $names) {
     $inputFile = if ($name -in @('test-fork', 'test-upstream', 'test-latest')) { "$PSScriptRoot/$name.c" } else { "$source/tests/$name.c" }
     & $compiler "--target=$target" -O2 -fPIE -pie $inputFile -o "$helpers/$name"
@@ -73,9 +74,9 @@ if ($RunAs) {
     if ($copy.ExitCode -ne 0) { throw 'Copying runtime helpers into the application failed.' }
     $appFiles = (@($names) + @('test-runtime.sh') | ForEach-Object { "$appRemote/$_" }) -join ' '
     Invoke-Adb shell "run-as $RunAs chmod 755 $appFiles"
-    Invoke-Adb shell "run-as $RunAs env PROOT_EXEC=$nativeDir/libproot_exec.so PROOT_LOADER=$nativeDir/libproot_loader.so timeout 90 /system/bin/sh $appRemote/test-runtime.sh"
+    Invoke-Adb shell "run-as $RunAs env PROOT_EXEC=$nativeDir/libproot_exec.so PROOT_LOADER=$nativeDir/libproot_loader.so timeout 180 /system/bin/sh $appRemote/test-runtime.sh"
     Write-Output "Application runtime test files retained for inspection: $RunAs/$appRemote"
 } else {
-    Invoke-Adb shell "timeout 90 /system/bin/sh $remote/test-runtime.sh"
+    Invoke-Adb shell "timeout 180 /system/bin/sh $remote/test-runtime.sh"
 }
 Write-Output "Runtime test files retained for inspection: $remote"

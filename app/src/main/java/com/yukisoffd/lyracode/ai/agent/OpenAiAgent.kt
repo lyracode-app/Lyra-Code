@@ -9,6 +9,7 @@ import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.database.sqlite.transaction
 import com.yukisoffd.lyracode.DeviceInfoCollector
 import com.yukisoffd.lyracode.R
 import com.yukisoffd.lyracode.data.ApiProfile
@@ -16,12 +17,17 @@ import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.ChatMessage
 import com.yukisoffd.lyracode.data.ConversationStore
-import com.yukisoffd.lyracode.data.DeepSeekV3Tokenizer
+import com.yukisoffd.lyracode.data.DeepSeekV4Tokenizer
 import com.yukisoffd.lyracode.data.messageTokenCosts
 import com.yukisoffd.lyracode.data.McpServerConfig
 import com.yukisoffd.lyracode.data.McpToolDefinition
 import com.yukisoffd.lyracode.data.MediaGenerationKind
+import com.yukisoffd.lyracode.data.InterruptedWritePath
+import com.yukisoffd.lyracode.data.OpenSubAgentBatch
 import com.yukisoffd.lyracode.data.SubAgentConfig
+import com.yukisoffd.lyracode.data.SubAgentTaskRecord
+import com.yukisoffd.lyracode.data.SubAgentTaskSeed
+import com.yukisoffd.lyracode.data.SubAgentTaskStatus
 import com.yukisoffd.lyracode.debian.ProotCommandExecutor
 import com.yukisoffd.lyracode.filetransfer.FileTransferClient
 import com.yukisoffd.lyracode.email.EmailClient
@@ -38,12 +44,16 @@ import com.yukisoffd.lyracode.uiText
 import com.yukisoffd.lyracode.webdav.WebDavClient
 import com.yukisoffd.lyracode.workspace.GlobalFileManager
 import com.yukisoffd.lyracode.workspace.NativeFileManager
+import com.yukisoffd.lyracode.workspace.TextBackupStore
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -59,9 +69,32 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 import java.util.TimeZone
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+
+
+/**
+ * Parent conversations that currently have a run_sub_agents call in flight.
+ *
+ * Steering stays available while a sub-agent batch runs, but the steer can only be drained
+ * after the batch returns to the parent agent loop. Kept separate from the agent's tool
+ * registry so the state transition is unit-testable without Android dependencies.
+ */
+internal class SubAgentRunRegistry {
+    private val running = ConcurrentHashMap.newKeySet<Long>()
+
+    fun begin(conversationId: Long) {
+        running += conversationId
+    }
+
+    fun end(conversationId: Long) {
+        running -= conversationId
+    }
+
+    fun isRunning(conversationId: Long): Boolean = conversationId in running
+}
 
 
 class OpenAiAgent(
@@ -85,10 +118,17 @@ class OpenAiAgent(
     private val responseCache: AiResponseCache? = null,
 ) {
     private val prootCommandExecutor = ProotCommandExecutor(context)
+    private val linuxGuiTools = com.yukisoffd.lyracode.x11.LinuxGuiToolHandler(context)
 
     internal var scopedTools: ScopedAgentTools? = null
+    internal var steerSource: SteerSource = NoOpSteerSource
     internal fun cancelScopedRequests() { if (scopedTools != null) client.dispatcher.cancelAll() }
     private fun scopedToolsFor(conversationId: Long) = scopedTools?.takeIf { it.conversationId == conversationId }
+    private val subAgentRuns = SubAgentRunRegistry()
+    /** Notified when a sub-agent batch starts or ends so the composer can refresh its note. */
+    internal var subAgentRunStateChanged: (() -> Unit)? = null
+    /** True while [runSubAgents] is executing for this parent conversation. */
+    internal fun isSubAgentRunning(conversationId: Long): Boolean = subAgentRuns.isRunning(conversationId)
 
     var approvalHandler: suspend (ToolApprovalRequest) -> ToolApprovalDecision = { ToolApprovalDecision.Approved }
     var todoSetHandler: suspend (Long, List<TodoItem>) -> String = { _, _ -> "TODO list recorded." }
@@ -125,6 +165,7 @@ class OpenAiAgent(
         .addInterceptor(ChatGptAuthInterceptor { settings.chatGptAccount })
         .addInterceptor(ProviderKeyInterceptor())
         .addInterceptor(httpAudit.application)
+        .addInterceptor(GzipRequestInterceptor())
         .addNetworkInterceptor(httpAudit.network)
         .addNetworkInterceptor(ChatGptRouteGuard())
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -145,9 +186,36 @@ class OpenAiAgent(
         .readTimeout(20, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val tokenizer by lazy { DeepSeekV3Tokenizer.get(context) }
-    private val forcedSkillsByConversation = ConcurrentHashMap<Long, List<String>>()
+    private val tokenizer by lazy { DeepSeekV4Tokenizer.get(context) }
+    private class RunSkills(initialIds: List<String>) {
+        @Volatile
+        var ids: List<String> = emptyList()
+            private set
+
+        init { add(initialIds) }
+
+        fun add(skillIds: List<String>) {
+            if (skillIds.isEmpty()) return
+            ids = (ids + skillIds).map(String::trim).filter(String::isNotBlank).distinct()
+        }
+    }
+
+    private val forcedSkillsByConversation = ConcurrentHashMap<Long, RunSkills>()
     private val subAgentContexts = ConcurrentHashMap<Long, SubAgentExecutionContext>()
+    /**
+     * The batch a finished `run_sub_agents` call still owes a delivery to, by parent
+     * conversation. The row is closed only after the tool result reaches the parent's store,
+     * so a kill in between resumes the batch instead of re-running its writes.
+     */
+    private val pendingSubAgentBatchCloses = ConcurrentHashMap<Long, String>()
+    /**
+     * Started write rows the store closed when the user edited or regenerated the turn, by
+     * parent conversation. The next `run_sub_agents` call reports them: the edit itself cannot
+     * reach the model, and the new batch would otherwise write blind.
+     */
+    private val closedInterruptedWrites = ConcurrentHashMap<Long, List<SubAgentTaskRecord>>()
+    /** Batches whose abandoned-write overlap was already returned as an error this turn. */
+    private val abandonOverlapReported = ConcurrentHashMap.newKeySet<String>()
     private val subAgentWriteCoordinator = SubAgentWriteCoordinator()
     private val emailClient = EmailClient(context)
     private val fileTools = AgentFileToolHandler(
@@ -195,26 +263,18 @@ class OpenAiAgent(
         forcedSkillIds: List<String> = emptyList(),
         onUpdate: suspend (ChatUpdate) -> Unit,
     ) = withContext(Dispatchers.IO) {
-        val normalizedForcedSkillIds = forcedSkillIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
-        if (normalizedForcedSkillIds.isNotEmpty()) {
-            forcedSkillsByConversation[conversationId] = normalizedForcedSkillIds
+        conversationStore.setConversationMeta(
+            conversationId,
+            title = titleFor(conversationId, userInput),
+            status = ConversationStore.STATUS_RUNNING,
+            profileId = profile.id,
+            model = model,
+        )
+        if (!userMessagePersisted) {
+            conversationStore.addMessage(conversationId, "user", userInput, profileId = profile.id, model = model)
         }
-        try {
-            conversationStore.setConversationMeta(
-                conversationId,
-                title = titleFor(conversationId, userInput),
-                status = ConversationStore.STATUS_RUNNING,
-                profileId = profile.id,
-                model = model,
-            )
-            if (!userMessagePersisted) {
-                conversationStore.addMessage(conversationId, "user", userInput, profileId = profile.id, model = model)
-            }
-            onUpdate(ChatUpdate("", "", uiText(R.string.ui_sent)))
-            runLoop(conversationId, profile, model, onUpdate, propagateErrors)
-        } finally {
-            if (normalizedForcedSkillIds.isNotEmpty()) forcedSkillsByConversation.remove(conversationId)
-        }
+        onUpdate(ChatUpdate("", "", uiText(R.string.ui_sent)))
+        runLoop(conversationId, profile, model, onUpdate, propagateErrors, forcedSkillIds)
     }
 
     suspend fun summarizeConversationTopic(
@@ -236,7 +296,7 @@ class OpenAiAgent(
                     .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
                 client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
+                    if (!response.isSuccessful) error(response.withGzipFailureHint("话题总结请求失败 ${response.code}: ${body.take(300)}"))
                     val blocks = JSONObject(body).optJSONArray("content") ?: JSONArray()
                     buildString { for (index in 0 until blocks.length()) blocks.optJSONObject(index)?.takeIf { it.optString("type") == "text" }?.optString("text")?.let(::append) }
                 }
@@ -250,7 +310,7 @@ class OpenAiAgent(
                     .addHeader("Content-Type", "application/json").post(payload.toString().toRequestBody("application/json".toMediaType())).build()
                 client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error("话题总结请求失败 ${response.code}: ${body.take(300)}")
+                    if (!response.isSuccessful) error(response.withGzipFailureHint("话题总结请求失败 ${response.code}: ${body.take(300)}"))
                     val parts = JSONObject(body).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
                     buildString { for (index in 0 until parts.length()) parts.optJSONObject(index)?.takeUnless { it.optBoolean("thought") }?.optString("text")?.let(::append) }
                 }
@@ -441,7 +501,7 @@ class OpenAiAgent(
                 }
                 return call.useModelResponse { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error(historyCompressionHttpError(response.code, body))
+                    if (!response.isSuccessful) error(response.withGzipFailureHint(historyCompressionHttpError(response.code, body)))
                     extractCompressionSummary(JSONObject(body), profile)
                 }
             } catch (error: CompressionOutputLimitException) {
@@ -503,7 +563,7 @@ class OpenAiAgent(
             .build()
         return client.newCall(request.customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) error(errorMessage(response.code, body))
+            if (!response.isSuccessful) error(response.withGzipFailureHint(errorMessage(response.code, body)))
             extractModelResponseText(JSONObject(body), profile.apiFormat, profile.usesResponsesApi)
         }
     }
@@ -524,7 +584,7 @@ class OpenAiAgent(
         onUpdate: suspend (ChatUpdate) -> Unit,
     ) = withContext(Dispatchers.IO) {
         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_RUNNING, profileId = profile.id, model = model)
-        runLoop(conversationId, profile, model, onUpdate)
+        runLoop(conversationId, profile, model, onUpdate, replayPending = true)
     }
 
     private val reachabilityService = AgentReachabilityService(client, reachabilityClient)
@@ -542,26 +602,144 @@ class OpenAiAgent(
     fun checkModelReachability(profile: ApiProfile, model: String): ModelReachabilityResult =
         reachabilityService.checkModelReachability(profile, model)
 
+    private fun replayBatchMatches(conversationId: Long, batch: OpenSubAgentBatch, call: ToolCall): Boolean {
+        if (call.name != "run_sub_agents") return false
+        return try {
+            val args = JSONObject(call.rawArguments)
+            val count = args.optJSONArray("tasks")?.length() ?: return false
+            val tasks = parseSubAgentTasks(args)
+            if (count == 0 || count != tasks.size) return false
+            val requested = tasks.mapIndexed { index, task ->
+                SubAgentResume.RequestedTask(
+                    index, task.task, task.readOnly,
+                    task.writePaths.map(subAgentWriteCoordinator::normalizeWorkspacePath),
+                    task.expectedOutput, task.capabilityHint, task.preferredAgent,
+                )
+            }
+            val userMessageId = conversationStore.lastUserMessageId(conversationId)
+            SubAgentResume.selectResume(
+                batch, userMessageId, call.id, batch.batchId,
+                buildSubAgentResumePlan(batch, requested, userMessageId),
+            ) != null
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private suspend fun replayPendingToolCalls(
+        conversationId: Long,
+        profile: ApiProfile,
+        model: String,
+        onUpdate: suspend (ChatUpdate) -> Unit,
+    ) {
+        val messages = contextHistory(conversationId, -1L)
+        val group = PendingToolCallReplay.plan(messages) ?: return
+        val batch = conversationStore.openSubAgentBatch(conversationId)
+        // Match the originating call as well as the saved task and user-turn identity.
+        val matches = if (batch == null) emptyList() else group.calls.filter { replayBatchMatches(conversationId, batch, it) }
+        val matched = PendingToolCallReplay.uniqueUnansweredMatch(matches, group.answered)
+        val deliveredMatch = matches.singleOrNull()?.takeIf { it.id in group.answered }
+        if (batch != null && deliveredMatch != null) {
+            val delivered = messages.lastOrNull { it.role == "tool" && it.toolCallId == deliveredMatch.id }
+            val result = try {
+                val envelope = JSONObject(delivered?.content ?: "")
+                envelope.optBoolean("ok") &&
+                    JSONObject(envelope.optString("content")).optString("schema") == "lyra_sub_agent_results_v2"
+            } catch (_: Exception) { false }
+            if (result) conversationStore.markSubAgentBatchDelivered(conversationId, batch.batchId)
+        }
+        PendingToolCallReplay.run(
+            group = group,
+            replayId = matched?.id,
+            execute = { call ->
+                onUpdate(ChatUpdate("", "", runningToolStatus(call), forceReload = true))
+                executeReplaySubAgent(conversationId, call, batch!!.batchId) { status ->
+                    onUpdate(ChatUpdate("", "", status, forceReload = true))
+                }
+            },
+            interrupted = { call ->
+                ToolExecution(
+                    "ERROR: TOOL_INTERRUPTED\nThe tool call was interrupted and was not replayed. Its side effects may have occurred.",
+                    ok = false,
+                ).toToolOutputJson(call.name, ok = false)
+            },
+            persist = { call, output ->
+                conversationStore.addMessage(
+                    conversationId, "tool", PendingToolCallReplay.storedOutput(call.name, output, MAX_TOOL_RESULT_CHARS),
+                    profileId = profile.id, model = model, toolCallId = call.id,
+                )
+            },
+            close = { call -> flushDeliveredSubAgentBatch(conversationId, call.name) },
+            updated = { call ->
+                onUpdate(ChatUpdate("", "", uiText(R.string.ui_tool_complete) + call.name, forceReload = true))
+            },
+        )
+    }
+
+    private suspend fun executeReplaySubAgent(
+        conversationId: Long,
+        call: ToolCall,
+        expectedBatchId: String,
+        onStatus: suspend (String) -> Unit,
+    ): String {
+        pendingSubAgentBatchCloses.remove(conversationId)
+        if (settings.purePromptMode) {
+            return ToolExecution("ERROR: TOOLS_UNAVAILABLE_IN_PURE_MODE", ok = false)
+                .toToolOutputJson(call.name, ok = false)
+        }
+        if (call.name in settings.disabledTools()) {
+            return ToolExecution("ERROR: TOOL_DISABLED\n${call.name} is disabled by the user.", ok = false)
+                .toToolOutputJson(call.name, ok = false)
+        }
+        return try {
+            val result = runSubAgents(conversationId, call.arguments, onStatus, expectedBatchId, call.id)
+            ToolExecution(result, ok = !result.startsWith("ERROR:")).toToolOutputJson(call.name, ok = !result.startsWith("ERROR:"))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            ToolExecution("ERROR: ${error.message}\narguments: ${call.rawArguments}", ok = false)
+                .toToolOutputJson(call.name, ok = false)
+        }
+    }
+
     private suspend fun runLoop(
         conversationId: Long,
         profile: ApiProfile,
         model: String,
         onUpdate: suspend (ChatUpdate) -> Unit,
         propagateErrors: Boolean = false,
+        forcedSkillIds: List<String> = emptyList(),
+        replayPending: Boolean = false,
     ) {
         var activeAssistantId = 0L
+        val runSkills = RunSkills(forcedSkillIds)
+        forcedSkillsByConversation[conversationId] = runSkills
         try {
+            if (replayPending && !isSubAgentConversation(conversationId) && scopedToolsFor(conversationId) == null) {
+                replayPendingToolCalls(conversationId, profile, model, onUpdate)
+            }
             while (true) {
                 currentCoroutineContext().ensureActive()
                 scopedToolsFor(conversationId)?.let {
                     if (it.finished) {
+                        it.completionSummary?.takeIf(String::isNotBlank)?.let { summary ->
+                            val messageId = conversationStore.addMessage(
+                                conversationId, "assistant", summary, profileId = profile.id, model = model,
+                            )
+                            activeAssistantId = messageId
+                            onUpdate(ChatUpdate(summary, "", uiText(R.string.ui_model_completed), messageId, forceReload = true))
+                        }
                         conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_IDLE)
                         return
                     }
                     it.checkRound()
                 }
+                // Steer boundary A: only at the top of a round, after the previous round's tool
+                // results were appended and before the next assistant turn. Never inject a user
+                // message between an assistant tool_call and its tool results.
+                drainSteering(conversationId, profile, model, runSkills, onUpdate)
                 if (!isMediaGenerationModel(model)) {
-                    ensureRuntimeContextSnapshot(conversationId, profile, model)
+                    ensureRuntimeContextSnapshot(conversationId, profile, model, runSkills.ids)
                 }
                 val assistantId = conversationStore.addMessage(conversationId, "assistant", "", profileId = profile.id, model = model)
                 activeAssistantId = assistantId
@@ -621,27 +799,62 @@ class OpenAiAgent(
                         deepSeekCacheHitRate = result.deepSeekCacheHitRate,
                     ),
                 )
-                if (result.toolCalls.isEmpty()) {
+                // Steer boundary B: a steer can arrive while the final response streams. Drain
+                // only when this turn produced no tool calls, after every tool result of this run
+                // was appended, then let the shared decision end the run or continue the loop.
+                // With the default no-op source this is exactly the previous exit.
+                val steered = if (result.toolCalls.isEmpty()) {
+                    drainSteering(conversationId, profile, model, runSkills, onUpdate)
+                } else {
+                    false
+                }
+                if (runBoundaryAfterTurn(result.toolCalls.isNotEmpty(), steered) == RunBoundary.Return) {
                     conversationStore.setConversationMeta(conversationId, status = ConversationStore.STATUS_IDLE, profileId = profile.id, model = model)
                     return
                 }
                 result.toolCalls.forEach { call ->
                     currentCoroutineContext().ensureActive()
                     if (scopedToolsFor(conversationId)?.finished == true) return@forEach
+                    // Scoped tools may wait for foreground approval or be interrupted. Keep
+                    // their row in execution order before starting, and update that same row.
+                    val pendingToolId = if (scopedToolsFor(conversationId) != null) {
+                        conversationStore.addMessage(
+                            conversationId, "tool", runningToolStatus(call),
+                            profileId = profile.id, model = model, toolCallId = call.id,
+                        ).also {
+                            onUpdate(ChatUpdate("", "", runningToolStatus(call), forceReload = true))
+                        }
+                    } else null
                     onUpdate(ChatUpdate(result.content, result.thinking, runningToolStatus(call), assistantId))
-                    val toolResult = executeTool(conversationId, call) { toolStatus ->
-                        onUpdate(ChatUpdate(result.content, result.thinking, toolStatus, assistantId))
+                    val toolResult = try {
+                        val output = executeTool(conversationId, call) { toolStatus ->
+                            onUpdate(ChatUpdate(result.content, result.thinking, toolStatus, assistantId))
+                        }
+                        currentCoroutineContext().ensureActive()
+                        output
+                    } catch (error: Throwable) {
+                        pendingToolId?.let {
+                            conversationStore.updateMessage(it, content = uiText(R.string.ui_request_interrupted) + error.message.orEmpty())
+                        }
+                        throw error
                     }
-                    currentCoroutineContext().ensureActive()
-                    conversationStore.addMessage(
-                        conversationId,
-                        "tool",
-                        toolResult.take(MAX_TOOL_RESULT_CHARS),
-                        profileId = profile.id,
-                        model = model,
-                        toolCallId = call.id,
-                    )
-                    onUpdate(ChatUpdate(result.content, result.thinking, uiText(R.string.ui_tool_complete) + call.name, assistantId))
+                    if (pendingToolId != null) {
+                        conversationStore.updateMessage(pendingToolId, content = toolResult)
+                    } else {
+                        conversationStore.addMessage(
+                            conversationId, "tool", PendingToolCallReplay.storedOutput(call.name, toolResult, MAX_TOOL_RESULT_CHARS),
+                            profileId = profile.id, model = model, toolCallId = call.id,
+                        )
+                    }
+                    // Close the batch as soon as its result row is stored. The UI update below
+                    // suspends and can be cancelled, which must not leave a delivered batch open
+                    // for the next run to report as abandoned.
+                    flushDeliveredSubAgentBatch(conversationId, call.name)
+                    if (pendingToolId != null) {
+                        onUpdate(ChatUpdate("", "", uiText(R.string.ui_tool_complete) + call.name, forceReload = true))
+                    } else {
+                        onUpdate(ChatUpdate(result.content, result.thinking, uiText(R.string.ui_tool_complete) + call.name, assistantId))
+                    }
                 }
             }
         } catch (error: CancellationException) {
@@ -664,8 +877,11 @@ class OpenAiAgent(
                 .put("content", finalError)
                 .put(LOCAL_REQUEST_ERROR_KEY, true)
                 .toString()
+            val savedToolCalls = failedMessage?.rawJson?.let { raw ->
+                runCatching { JSONObject(raw).optJSONArray("tool_calls")?.length()?.let { it > 0 } == true }.getOrDefault(false)
+            } == true
             val errorMessageId = when {
-                failedMessage == null -> conversationStore.addMessage(
+                savedToolCalls || failedMessage == null -> conversationStore.addMessage(
                     conversationId,
                     "assistant",
                     finalError,
@@ -694,7 +910,40 @@ class OpenAiAgent(
             }
             onUpdate(ChatUpdate(finalError, "", finalError, errorMessageId))
             if (propagateErrors) throw error
+        } finally {
+            forcedSkillsByConversation.remove(conversationId, runSkills)
         }
+    }
+
+    /**
+     * Persists the composed user turn and adds its forced Skills to the next round's context.
+     *
+     * Scoped (foreground/sub-agent) runs own their conversation, so steering is refused there.
+     * With the default [NoOpSteerSource] this performs no store write, no update and no status change.
+     */
+    private suspend fun drainSteering(
+        conversationId: Long,
+        profile: ApiProfile,
+        model: String,
+        runSkills: RunSkills,
+        onUpdate: suspend (ChatUpdate) -> Unit,
+    ): Boolean {
+        if (!steeringAvailable(hasScopedTools = scopedToolsFor(conversationId) != null)) return false
+        val coroutineContext = currentCoroutineContext()
+        var drained = false
+        steerSource.drain(conversationId) { capture ->
+            coroutineContext.ensureActive()
+            conversationStore.writableDatabase.transaction {
+                val messageId = conversationStore.addMessage(
+                    conversationId, "user", capture.composedInput, profileId = profile.id, model = model,
+                )
+                check(messageId > 0L) { "Could not insert queued message into conversation" }
+            }
+            runSkills.add(capture.forcedSkillIds)
+            drained = true
+        }
+        if (drained) onUpdate(ChatUpdate("", "", uiText(R.string.status_message_steered), forceReload = true))
+        return drained
     }
 
     private fun runningToolStatus(call: ToolCall): String {
@@ -824,7 +1073,7 @@ class OpenAiAgent(
         val replayableItems = JSONArray()
         modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
-            if (!response.isSuccessful) throwModelRequestHttpError(response.code, source.string())
+            if (!response.isSuccessful) throwModelRequestHttpError(response, source.string())
             if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
                 val completed = JSONObject(source.string())
                 completed.optJSONObject("error")?.let { throw IOException(it.optString("message")) }
@@ -1013,7 +1262,7 @@ class OpenAiAgent(
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val text = source.string()
-                throwModelRequestHttpError(response.code, text)
+                throwModelRequestHttpError(response, text)
             }
             if (response.header("Content-Type").orEmpty().contains("application/json", true)) {
                 val root = JSONObject(source.string())
@@ -1171,7 +1420,7 @@ class OpenAiAgent(
             val source = response.body ?: throw IOException("响应为空")
             if (!response.isSuccessful) {
                 val body = source.string()
-                throwModelRequestHttpError(response.code, body)
+                throwModelRequestHttpError(response, body)
             }
             source.byteStream().bufferedReader().consumeModelStream { line ->
                 if (!line.startsWith("data:")) {
@@ -1302,7 +1551,7 @@ class OpenAiAgent(
         modelClient.newCall(request.customizedFor(profile, model, settings.purePromptMode)).useModelResponse { response ->
             val source = response.body ?: throw IOException("响应为空")
             val body = source.string()
-            if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
+            if (!response.isSuccessful) throwModelRequestHttpError(response, body)
             val root = runCatching { JSONObject(body) }.getOrElse { error ->
                 throw IOException("Gemini 响应不完整或不是有效 JSON", error)
             }
@@ -1335,8 +1584,8 @@ class OpenAiAgent(
         }
     }
 
-    private fun throwModelRequestHttpError(statusCode: Int, body: String): Nothing {
-        throw modelRequestHttpException(statusCode, body, uiText(R.string.ui_ai_request_failed).trim())
+    private fun throwModelRequestHttpError(response: okhttp3.Response, body: String): Nothing {
+        throw modelRequestHttpException(response.code, body, uiText(R.string.ui_ai_request_failed).trim(), response)
     }
 
     private fun assistantRawMessage(content: String, thinking: String, calls: List<ToolCall>): JSONObject {
@@ -1348,11 +1597,16 @@ class OpenAiAgent(
         return message
     }
 
-    private fun ensureRuntimeContextSnapshot(conversationId: Long, profile: ApiProfile, model: String) {
+    private fun ensureRuntimeContextSnapshot(
+        conversationId: Long,
+        profile: ApiProfile,
+        model: String,
+        forcedSkillIds: List<String>,
+    ) {
         if (settings.purePromptMode) return
         val conversation = conversationStore.conversation(conversationId)
         val messages = conversationStore.messages(conversationId)
-        val snapshot = runtimeContextSnapshot(conversationId)
+        val snapshot = runtimeContextSnapshot(conversationId, forcedSkillIds)
         if (!shouldAppendRuntimeContext(messages, conversation?.compressedThroughMessageId ?: 0L, snapshot)) return
         conversationStore.addMessage(
             conversationId = conversationId,
@@ -1363,11 +1617,14 @@ class OpenAiAgent(
         )
     }
 
-    private fun runtimeContextSnapshot(conversationId: Long): String {
+    private fun runtimeContextSnapshot(
+        conversationId: Long,
+        forcedSkillIds: List<String> = forcedSkillsByConversation[conversationId]?.ids.orEmpty(),
+    ): String {
         if (scopedToolsFor(conversationId)?.includesNativeTools == false) return "Foreground device task: use only the explicitly scoped device tools."
         return buildRuntimeContextSnapshot(
             memoryPrompt = settings.memoryPrompt(),
-            activeSkillsPrompt = settings.activeSkillsPrompt(forcedSkillIdsFor(conversationId)),
+            activeSkillsPrompt = settings.activeSkillsPrompt(forcedSkillIds),
             sessionContext = sessionContextPayload(),
             subAgentAssignment = subAgentAssignmentSystemMessage(conversationId)?.optString("content"),
         )
@@ -1382,11 +1639,30 @@ class OpenAiAgent(
         val messages = JSONArray()
         if (mediaGeneration) {
             mediaGenerationHistory(conversationId, excludeMessageId).forEach {
-                messages.put(it.toPromptJson(routeVisualAttachments = false))
+                messages.put(
+                    it.toPromptJson(
+                        routeVisualAttachments = false,
+                        renderAttachments = { content, messageId, routeVisualAttachments ->
+                            userPromptWithAttachments(content, messageId, routeVisualAttachments)
+                        },
+                    ),
+                )
             }
         } else {
             systemMessagesFor(conversationId).forEach(messages::put)
-            val history = openAiHistoryGroups(conversationId, excludeMessageId, profile)
+            val history = openAiHistoryGroups(
+                source = contextHistory(conversationId, excludeMessageId),
+                toPromptJson = { message ->
+                    message.toPromptJson(
+                        routeVisualAttachments = settings.isVisionSupplementRoutingEnabled(),
+                        renderAttachments = { content, messageId, routeVisualAttachments ->
+                            userPromptWithAttachments(content, messageId, routeVisualAttachments)
+                        },
+                    )
+                },
+                toToolPromptJson = { it.toToolPromptJson() },
+                adapt = { message, json -> chatGptHistoryForService(json, message.profileId, profile) },
+            )
             history.forEach { group ->
                 group.forEach { messages.put(it) }
             }
@@ -1577,36 +1853,17 @@ class OpenAiAgent(
 
     private fun contextHistory(conversationId: Long, excludeMessageId: Long): List<ChatMessage> {
         val conversation = conversationStore.conversation(conversationId)
-        val source = conversationStore.messages(conversationId)
-            .filter {
-                    it.id != excludeMessageId &&
-                    (!settings.purePromptMode || it.role != RUNTIME_CONTEXT_ROLE) &&
-                    it.id > (conversation?.compressedThroughMessageId ?: 0L) &&
-                    it.role != MEDIA_MESSAGE_ROLE &&
-                    !it.isLocalRequestErrorMessage() &&
-                    !it.isEmptyAssistantPlaceholder()
-            }
-        val summary = conversation?.compressedContext.orEmpty().trim()
-        if (summary.isBlank()) return source
-        val compressedContextMarker = if (summary.startsWith("LYRA_STRUCTURED_CONTEXT_V2")) {
-            "LYRA_COMPRESSED_CONVERSATION_CONTEXT_V2"
-        } else {
-            "LYRA_COMPRESSED_CONVERSATION_CONTEXT_V1"
-        }
-        return listOf(
-            ChatMessage(
-                id = conversation?.compressedThroughMessageId ?: 0L,
-                conversationId = conversationId,
-                role = "user",
-                content = "$compressedContextMarker\n$summary\n\nThe content above is a compressed summary of earlier conversation history. Treat it as prior conversation facts and continue the current task.",
-                thinking = "",
-                profileId = conversation?.profileId.orEmpty(),
-                model = conversation?.model.orEmpty(),
-                toolCallId = null,
-                rawJson = null,
-                createdAt = conversation?.updatedAt ?: System.currentTimeMillis(),
-            ),
-        ) + source
+        return selectContextHistory(
+            messages = conversationStore.messages(conversationId),
+            excludeMessageId = excludeMessageId,
+            compressedThroughMessageId = conversation?.compressedThroughMessageId ?: 0L,
+            compressedContext = conversation?.compressedContext.orEmpty(),
+            purePromptMode = settings.purePromptMode,
+            summaryConversationId = conversationId,
+            summaryProfileId = conversation?.profileId.orEmpty(),
+            summaryModel = conversation?.model.orEmpty(),
+            summaryCreatedAt = conversation?.updatedAt ?: System.currentTimeMillis(),
+        )
     }
 
     private fun anthropicMessages(
@@ -1616,51 +1873,16 @@ class OpenAiAgent(
         model: String,
         mediaGeneration: Boolean = false,
     ): JSONArray {
-        val output = JSONArray()
-        val source = providerHistory(conversationId, excludeMessageId, mediaGeneration)
-        var index = 0
-        while (index < source.size) {
-            val message = source[index]
-            when (message.role) {
-                "user", RUNTIME_CONTEXT_ROLE -> output.put(
-                    JSONObject().put("role", "user").put(
-                        "content",
-                        anthropicUserContent(
-                            message.content,
-                            message.id,
-                            routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
-                        ),
-                    ),
+        val output = buildAnthropicMessages(
+            source = providerHistory(conversationId, excludeMessageId, mediaGeneration),
+            userContent = { message ->
+                anthropicUserContent(
+                    message.content,
+                    message.id,
+                    routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
                 )
-                "assistant" -> {
-                    val toolUseIds = message.anthropicToolUseIds()
-                    if (toolUseIds.isEmpty()) {
-                        output.put(JSONObject().put("role", "assistant").put("content", anthropicAssistantContent(message)))
-                    } else {
-                        val toolResults = JSONArray()
-                        val returned = mutableSetOf<String>()
-                        var next = index + 1
-                        while (next < source.size && source[next].role == "tool") {
-                            val tool = source[next]
-                            val id = tool.toolCallId.orEmpty()
-                            if (id in toolUseIds) {
-                                toolResults.put(anthropicToolResult(tool))
-                                returned += id
-                            }
-                            next++
-                        }
-                        if (returned.containsAll(toolUseIds)) {
-                            output.put(JSONObject().put("role", "assistant").put("content", anthropicAssistantContent(message)))
-                            output.put(JSONObject().put("role", "user").put("content", toolResults))
-                        }
-                        index = next
-                        continue
-                    }
-                }
-                "tool" -> Unit
-            }
-            index++
-        }
+            },
+        )
         if (supportsDeepSeekFilesApi(profile, model)) deepSeekFilesApi.replaceAnthropicInlineImages(output, profile)
         return output
     }
@@ -1702,68 +1924,22 @@ class OpenAiAgent(
         }
     }
 
-    private fun anthropicAssistantContent(message: ChatMessage): JSONArray {
-        val raw = message.rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
-        return JSONArray().also { output ->
-            val text = cleanGeneratedText(message.content)
-            if (text.isNotBlank()) output.put(JSONObject().put("type", "text").put("text", text))
-            val calls = raw?.optJSONArray("tool_calls") ?: JSONArray()
-            for (index in 0 until calls.length()) {
-                val call = calls.optJSONObject(index) ?: continue
-                val function = call.optJSONObject("function") ?: JSONObject()
-                val args = runCatching { JSONObject(function.optString("arguments").ifBlank { "{}" }) }.getOrElse { JSONObject() }
-                output.put(
-                    JSONObject()
-                        .put("type", "tool_use")
-                        .put("id", call.optString("id").ifBlank { "tool_$index" })
-                        .put("name", function.optString("name"))
-                        .put("input", args),
-                )
-            }
-            if (output.length() == 0) output.put(JSONObject().put("type", "text").put("text", " "))
-        }
-    }
-
-    private fun anthropicToolResult(message: ChatMessage): JSONObject {
-        return JSONObject()
-            .put("type", "tool_result")
-            .put("tool_use_id", message.toolCallId.orEmpty())
-            .put("content", message.content)
-    }
-
-    private fun ChatMessage.anthropicToolUseIds(): Set<String> {
-        val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return emptySet()
-        val calls = raw.optJSONArray("tool_calls") ?: return emptySet()
-        return buildSet {
-            for (index in 0 until calls.length()) {
-                calls.optJSONObject(index)?.optString("id").orEmpty().takeIf { it.isNotBlank() }?.let { add(it) }
-            }
-        }
-    }
-
     private fun geminiContents(
         conversationId: Long,
         excludeMessageId: Long,
         mediaGeneration: Boolean = false,
     ): JSONArray {
-        val output = JSONArray()
-        providerHistory(conversationId, excludeMessageId, mediaGeneration).forEach { message ->
-            when (message.role) {
-                "user", RUNTIME_CONTEXT_ROLE -> output.put(
-                    JSONObject().put("role", "user").put(
-                        "parts",
-                        geminiUserParts(
-                            message.content,
-                            message.id,
-                            routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
-                        ),
-                    ),
+        return buildGeminiContents(
+            source = providerHistory(conversationId, excludeMessageId, mediaGeneration),
+            userParts = { message ->
+                geminiUserParts(
+                    message.content,
+                    message.id,
+                    routeVisualAttachments = settings.isVisionSupplementRoutingEnabled() && !mediaGeneration,
                 )
-                "assistant" -> output.put(JSONObject().put("role", "model").put("parts", geminiAssistantParts(cleanGeneratedText(message.content), message.rawJson)))
-                "tool" -> output.put(JSONObject().put("role", "user").put("parts", JSONArray().put(geminiFunctionResponse(message))))
-            }
-        }
-        return output
+            },
+            toolNameForToolResult = { message -> toolNameForToolResult(message) },
+        )
     }
 
     private fun geminiUserParts(
@@ -1800,16 +1976,6 @@ class OpenAiAgent(
         }
     }
 
-    private fun geminiFunctionResponse(message: ChatMessage): JSONObject {
-        return JSONObject()
-            .put(
-                "functionResponse",
-                JSONObject()
-                    .put("name", toolNameForToolResult(message))
-                    .put("response", JSONObject().put("content", message.content)),
-            )
-    }
-
     private fun toolNameForToolResult(message: ChatMessage): String {
         val previous = conversationStore.messages(message.conversationId)
             .takeWhile { it.id < message.id }
@@ -1829,88 +1995,6 @@ class OpenAiAgent(
     private fun parseDataUrlForProvider(dataUrl: String): Pair<String, String>? {
         val match = Regex("""^data:([^;,]+);base64,(.+)$""", RegexOption.IGNORE_CASE).matchEntire(dataUrl.trim()) ?: return null
         return match.groupValues[1] to match.groupValues[2]
-    }
-
-    private fun sanitizePromptMessageSequence(messages: JSONArray): JSONArray {
-        val output = mutableListOf<JSONObject>()
-        val pendingToolIds = linkedSetOf<String>()
-        var pendingAssistantIndex = -1
-
-        fun dropPendingAssistant() {
-            if (pendingAssistantIndex >= 0 && pendingAssistantIndex < output.size) {
-                while (output.size > pendingAssistantIndex) output.removeAt(output.lastIndex)
-            }
-            pendingAssistantIndex = -1
-            pendingToolIds.clear()
-        }
-
-        for (index in 0 until messages.length()) {
-            val message = messages.getJSONObject(index)
-            when (message.optString("role")) {
-                "tool" -> {
-                    val id = message.optString("tool_call_id")
-                    if (id.isNotBlank() && id in pendingToolIds) {
-                        output += message
-                        pendingToolIds -= id
-                    }
-                }
-                "assistant" -> {
-                    if (pendingToolIds.isNotEmpty()) dropPendingAssistant()
-                    output += message
-                    if (message.hasToolCalls()) {
-                        pendingAssistantIndex = output.lastIndex
-                        pendingToolIds += message.toolCallIds()
-                    } else {
-                        pendingAssistantIndex = -1
-                        pendingToolIds.clear()
-                    }
-                }
-                else -> {
-                    if (pendingToolIds.isNotEmpty()) dropPendingAssistant()
-                    output += message
-                    pendingAssistantIndex = -1
-                    pendingToolIds.clear()
-                }
-            }
-        }
-        if (pendingToolIds.isNotEmpty()) dropPendingAssistant()
-        return JSONArray().also { array -> output.forEach { array.put(it) } }
-    }
-
-    private fun openAiHistoryGroups(conversationId: Long, excludeMessageId: Long, profile: ApiProfile): List<List<JSONObject>> {
-        val source = contextHistory(conversationId, excludeMessageId)
-        val groups = mutableListOf<List<JSONObject>>()
-        var index = 0
-        while (index < source.size) {
-            val message = source[index]
-            if (message.role == "tool") {
-                index++
-                continue
-            }
-            val json = chatGptHistoryForService(message.toPromptJson(), message.profileId, profile)
-            if (json.hasToolCalls()) {
-                val requiredToolIds = json.toolCallIds()
-                val toolMessages = mutableListOf<JSONObject>()
-                var next = index + 1
-                while (next < source.size && source[next].role == "tool") {
-                    val tool = source[next]
-                    val toolCallId = tool.toolCallId.orEmpty()
-                    if (toolCallId in requiredToolIds) {
-                        toolMessages.add(tool.toToolPromptJson())
-                    }
-                    next++
-                }
-                val returnedToolIds = toolMessages.map { it.optString("tool_call_id") }.toSet()
-                if (requiredToolIds.isNotEmpty() && returnedToolIds.containsAll(requiredToolIds)) {
-                    groups.add(listOf(json) + toolMessages)
-                }
-                index = next
-            } else {
-                groups.add(listOf(json))
-                index++
-            }
-        }
-        return groups
     }
 
     private fun applyProviderCacheHints(requestJson: JSONObject, profile: ApiProfile, model: String, conversationId: Long) {
@@ -2176,6 +2260,7 @@ class OpenAiAgent(
                         if (result.ok) ToolExecution(result.message) else error(result.message)
                     }
                 }
+                "linux_gui" -> linuxGuiTools.execute(args).let { ToolExecution(it.toString(), ok = it.optBoolean("ok", true)) }
                 "proot_command" -> {
                     val command = args.toolCommandArgument()
                     if (fileTools.isFileSearchCommand(command)) {
@@ -2203,7 +2288,7 @@ class OpenAiAgent(
                 "create_chart" -> ToolExecution(com.yukisoffd.lyracode.charts.chartToolResult(args))
                 "get_circuit_symbols" -> ToolExecution(com.yukisoffd.lyracode.charts.circuitSymbolsToolResult(args))
                 "manage_app_config" -> ToolExecution(configTools.manageAppConfig(args))
-                "run_sub_agents" -> ToolExecution(runSubAgents(conversationId, args, onStatus))
+                "run_sub_agents" -> ToolExecution(runSubAgents(conversationId, args, onStatus, sourceToolCallId = call.id))
                 "ask_user" -> ToolExecution(
                     userQuestionHandler(parseUserQuestionRequest(conversationId, args)).toAgentJson(),
                 )
@@ -2543,7 +2628,7 @@ class OpenAiAgent(
         }
         return client.newCall(requestBuilder.build().customizedFor(profile, model, settings.purePromptMode)).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throwModelRequestHttpError(response.code, body)
+            if (!response.isSuccessful) throwModelRequestHttpError(response, body)
             extractModelResponseText(JSONObject(body), profile.apiFormat, profile.usesResponsesApi)
                 .trim()
                 .also { require(it.isNotBlank()) { "The visual supplement model returned no text." } }
@@ -2630,13 +2715,64 @@ class OpenAiAgent(
         }
     }
 
-    private suspend fun runSubAgents(parentConversationId: Long, args: JSONObject, onStatus: suspend (String) -> Unit = {}): String {
+    /**
+     * Remembers the started write rows an edit or Regenerate closed, so the next
+     * `run_sub_agents` call can report them to the model before it writes those paths again.
+     */
+    fun noteClosedInterruptedWrites(conversationId: Long, rows: List<SubAgentTaskRecord>) {
+        if (rows.isEmpty()) return
+        closedInterruptedWrites[conversationId] = rows
+    }
+
+    /** Keeps each interrupted write's backup under a name that no later write replaces. */
+    fun preserveInterruptedBackups(writes: Collection<InterruptedWritePath>) {
+        if (writes.isEmpty()) return
+        nativeFileManager.preserveInterruptedBackups(writes)
+    }
+
+    /**
+     * Covers a process restart: every started write of an open batch keeps its backup before a
+     * later write can replace it. Call from the controller's start, off the main thread.
+     */
+    fun preserveOpenBatchBackups() {
+        preserveInterruptedBackups(conversationStore.openSubAgentWriteTasks())
+    }
+
+    /** Started write rows of the replaced batch whose paths this batch writes again. */
+    private fun overlappingStartedWrites(
+        rows: List<SubAgentTaskRecord>,
+        requestedPaths: List<String>,
+    ): List<Pair<SubAgentTaskRecord, List<String>>> = rows.mapNotNull { row ->
+        val overlap = row.writePaths.filter { stored ->
+            requestedPaths.any { requested -> subAgentWriteCoordinator.pathsConflict(stored, requested) }
+        }
+        overlap.takeIf { it.isNotEmpty() }?.let { row to it }
+    }
+
+    private fun abandonOverlapMessage(overlaps: List<Pair<SubAgentTaskRecord, List<String>>>): String =
+        buildString {
+            append("ABANDONED_WRITE_OVERLAP: this batch writes paths an interrupted task from the replaced batch may have changed: ")
+            append(overlaps.joinToString("; ") { (row, paths) -> "task ${row.index + 1} (${paths.joinToString(", ")})" })
+            append(
+                ". Nothing ran. Inspect each path and its backup copy first, then call run_sub_agents again " +
+                    "to abandon the old batch and run this one.",
+            )
+        }
+
+    private suspend fun runSubAgents(parentConversationId: Long, args: JSONObject, onStatus: suspend (String) -> Unit = {}, expectedReplayBatchId: String? = null, sourceToolCallId: String = ""): String {
+        // A pending close left behind by an attempt whose tool row never landed is stale: this
+        // call owns the conversation's batch now, and must not close that older batch instead.
+        pendingSubAgentBatchCloses.remove(parentConversationId)
         require(!isSubAgentConversation(parentConversationId)) { "SUB_AGENT_RECURSION_BLOCKED: A sub-agent cannot delegate more sub-agents." }
         if (!settings.subAgentOrchestrationEnabled) return "ERROR: SUB_AGENT_DISABLED\nSub-agent orchestration is disabled by the user."
         val candidates = settings.enabledSubAgents()
         if (candidates.isEmpty()) return "ERROR: NO_SUB_AGENT_MODELS\nNo enabled sub-agent model is configured. Ask the user to configure one in Settings > Sub-agent orchestration."
-        val tasks = parseSubAgentTasks(args).take(MAX_SUB_AGENT_TASKS)
-        if (tasks.isEmpty()) return "ERROR: NO_SUB_AGENT_TASKS\ntasks must contain at least one subtask."
+        val requestedCount = args.optJSONArray("tasks")?.length() ?: 0
+        if (requestedCount == 0) return "ERROR: NO_SUB_AGENT_TASKS\ntasks must contain at least one subtask."
+        val batchSize = SubAgentLimits.evaluateBatchSize(requestedCount, settings.subAgentMaxTasks)
+        if (batchSize is SubAgentLimits.BatchSize.Rejected) return batchSize.error()
+        val tasks = parseSubAgentTasks(args)
+        SubAgentLimits.requireAllTasksParsed(requestedCount, tasks.size)
         tasks.forEachIndexed { index, task ->
             require(!(task.readOnly && task.writePaths.isNotEmpty())) {
                 "Sub-agent task ${index + 1} cannot set read_only=true with non-empty write_paths."
@@ -2646,97 +2782,479 @@ class OpenAiAgent(
             }
         }
         val owners = tasks.indices.associateWith { index -> SubAgentWriteOwner(parentConversationId, index) }
+        val normalizedWritePaths = tasks.map { task ->
+            task.writePaths.map(subAgentWriteCoordinator::normalizeWorkspacePath)
+        }
+        val requested = tasks.mapIndexed { index, task ->
+            SubAgentResume.RequestedTask(
+                index = index,
+                text = task.task,
+                readOnly = task.readOnly,
+                writePaths = normalizedWritePaths[index],
+                expectedOutput = task.expectedOutput,
+                capabilityHint = task.capabilityHint,
+                preferredAgent = task.preferredAgent,
+            )
+        }
+        // A batch answers the turn that opened it. A new user message changes the id, so an old
+        // batch can never be resumed into a later request.
+        val userMessageId = conversationStore.lastUserMessageId(parentConversationId)
+        // A batch that never delivered a result to this parent resumes when a call in the same
+        // turn asks for the same tasks, whatever its call id; a Continue replay resumes it only
+        // through the batch's own saved call. Anything else abandons the stale rows.
+        val openBatch = conversationStore.openSubAgentBatch(parentConversationId)
+        // Read before the resume re-points the call id or marks rows running: both move updated_at.
+        val interruptedAtMillis = openBatch?.let(SubAgentResume::interruptedAtMillis)
+        fun currentResumePlan() = openBatch?.let {
+            SubAgentResume.selectResume(
+                it, userMessageId, sourceToolCallId, expectedReplayBatchId,
+                buildSubAgentResumePlan(it, requested, userMessageId),
+            )
+        }
+        if (expectedReplayBatchId != null && currentResumePlan() == null) {
+            error("TOOL_INTERRUPTED: The saved sub-agent batch no longer matches. No new batch was started.")
+        }
+        // A write task that started in a batch this call replaces, or that an edit closed, may
+        // have changed files. Its `.bak` is the only copy from before that write, and every later
+        // write replaces it, so copy it to the never-replaced name before anything else runs.
+        val startedWriteRows = openBatch?.tasks.orEmpty()
+            .filter { it.childConversationId > 0 && it.writePaths.isNotEmpty() }
+        val closedWriteRows = closedInterruptedWrites[parentConversationId].orEmpty()
+        // Each copy is made in the workspace its conversation belongs to, and named after the
+        // batch whose write it preserves: a second interruption of the same path in a later
+        // batch must not find the first batch's copy already there.
+        val parentWorkspaceUri = conversationStore.conversation(parentConversationId)?.workspaceUri.orEmpty()
+        nativeFileManager.preserveInterruptedBackups(
+            (startedWriteRows + closedWriteRows).flatMap { row ->
+                row.writePaths.map { path ->
+                    InterruptedWritePath(path = path, batchId = row.batchId, workspaceUri = parentWorkspaceUri)
+                }
+            },
+        )
+        val plan = currentResumePlan()
+        if (expectedReplayBatchId != null && (plan?.batchId != expectedReplayBatchId ||
+                conversationStore.openSubAgentBatch(parentConversationId)?.batchId != expectedReplayBatchId ||
+                conversationStore.lastUserMessageId(parentConversationId) != userMessageId)) {
+            error("TOOL_INTERRUPTED: The saved sub-agent batch changed. No new batch was started.")
+        }
+        val batchId = plan?.batchId ?: UUID.randomUUID().toString()
+        // A reworded batch abandons the open one. Read tasks may safely run again, but a write
+        // task that had started may have changed files: refuse this call once and name the paths,
+        // so the model inspects them before the abandoning call runs the new children.
+        val abandonedWriteTasks = if (plan == null) startedWriteRows + closedWriteRows else emptyList()
+        // Keyed by conversation too: with no open batch the batch id is empty in every conversation.
+        val abandonOverlapKey = "$parentConversationId:${openBatch?.batchId.orEmpty()}"
+        if (plan == null && abandonedWriteTasks.isNotEmpty()) {
+            val overlaps = overlappingStartedWrites(abandonedWriteTasks, normalizedWritePaths.flatten())
+            if (overlaps.isNotEmpty() && abandonOverlapReported.add(abandonOverlapKey)) {
+                error(abandonOverlapMessage(overlaps))
+            }
+        }
+        if (plan == null) {
+            abandonOverlapReported.remove(abandonOverlapKey)
+            // The report below carries these facts; a second report would be stale.
+            closedInterruptedWrites.remove(parentConversationId)
+            openBatch?.let { conversationStore.markSubAgentBatchDelivered(parentConversationId, it.batchId) }
+            conversationStore.beginSubAgentBatch(
+                parentConversationId,
+                batchId,
+                userMessageId,
+                tasks.mapIndexed { index, task ->
+                    SubAgentTaskSeed(
+                        index,
+                        task.task,
+                        normalizedWritePaths[index],
+                        task.readOnly,
+                        task.expectedOutput,
+                        task.capabilityHint,
+                        task.preferredAgent,
+                    )
+                },
+                toolCallId = sourceToolCallId,
+            )
+        } else {
+            // A retry under a new call id now owns the batch: save that id before any child runs.
+            SubAgentResume.repointToolCallId(openBatch!!, sourceToolCallId, expectedReplayBatchId)?.let {
+                conversationStore.setSubAgentBatchToolCallId(parentConversationId, batchId, it)
+            }
+            onStatus(context.getString(R.string.status_sub_agent_resuming, plan.reusedIndices.size, tasks.size))
+        }
+        val actions = plan?.actions ?: tasks.indices.associateWith { SubAgentResume.Action.Run }
+        val runIndices = actions.filterValues { it is SubAgentResume.Action.Run }.keys.sorted()
+        subAgentRuns.begin(parentConversationId)
+        subAgentRunStateChanged?.invoke()
+        try {
+        // Reserve only the write paths of the tasks that will actually run. A reused task does
+        // not touch the workspace, and an interrupted write task is reported, never re-run.
         val batchReservation = subAgentWriteCoordinator.reserveBatch(
-            owners.entries.associate { (index, owner) -> owner to tasks[index].writePaths },
+            runIndices.associate { index -> owners.getValue(index) to tasks[index].writePaths },
         )
         try {
-            val results = JSONArray()
+            val results = arrayOfNulls<JSONObject>(tasks.size)
             val assignmentCounts = mutableMapOf<String, Int>()
-            tasks.forEachIndexed { index, task ->
-                currentCoroutineContext().ensureActive()
+            // Assignment runs in task order for every task, reused ones included, so a resumed
+            // batch assigns the same agent a fresh batch would have.
+            val assignments = tasks.mapIndexed { index, task ->
                 val agentConfig = chooseSubAgent(candidates, task, index, assignmentCounts)
                 assignmentCounts[agentConfig.id] = (assignmentCounts[agentConfig.id] ?: 0) + 1
-                onStatus(
-                    context.getString(
-                        R.string.status_sub_agent_progress_running,
-                        index,
-                        tasks.size,
-                        agentConfig.name,
-                    ),
-                )
-                val profile = settings.profiles().firstOrNull { it.id == agentConfig.profileId }
-                if (profile == null) {
-                    results.put(subAgentError(index, agentConfig, task, "Model profile does not exist: ${agentConfig.profileId}"))
-                    onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
-                    return@forEachIndexed
+                agentConfig
+            }
+            val maxConcurrency = SubAgentLimits.effectiveConcurrency(settings.subAgentMaxConcurrency, runIndices.size)
+            val progress = SubAgentBatchProgress()
+            val statusMutex = Mutex()
+            suspend fun emit(text: String) = statusMutex.withLock { onStatus(text) }
+            val statusFormatter = SubAgentProgressFormatter(
+                sequential = { completed, total, agent ->
+                    context.getString(R.string.status_sub_agent_progress_running, completed, total, agent)
+                },
+                sequentialDetail = { completed, total, agent, detail ->
+                    context.getString(R.string.status_sub_agent_progress_detail, completed, total, agent, detail)
+                },
+                concurrent = { completed, total, running ->
+                    context.getString(R.string.status_sub_agent_progress_concurrent, completed, total, running)
+                },
+                concurrentDetail = { completed, total, running, detail ->
+                    context.getString(R.string.status_sub_agent_progress_concurrent_detail, completed, total, running, detail)
+                },
+            )
+            suspend fun emitProgress() {
+                emit(context.getString(
+                    R.string.status_sub_agent_progress_concurrent,
+                    progress.completedCount,
+                    tasks.size,
+                    progress.runningCount,
+                ))
+            }
+            tasks.forEachIndexed { index, task ->
+                currentCoroutineContext().ensureActive()
+                results[index] = when (val action = actions.getValue(index)) {
+                    is SubAgentResume.Action.Reuse -> reusedSubAgentResult(index, task, action.childConversationId)
+                    is SubAgentResume.Action.InterruptedWrite -> interruptedSubAgentResult(index, task, assignments[index], action)
+                    SubAgentResume.Action.Run -> null
                 }
-                val model = agentConfig.model.ifBlank { profile.selectedModel }
-                val childConversationId = conversationStore.createConversation(
-                    profileId = profile.id,
-                    model = model,
-                    title = "子代理 ${index + 1}: ${task.task.take(32)}",
-                    mode = ConversationStore.MODE_SUBAGENT,
-                )
-                val normalizedWritePaths = task.writePaths
-                    .map(subAgentWriteCoordinator::normalizeWorkspacePath)
-                    .toSortedSet()
-                subAgentContexts[childConversationId] = SubAgentExecutionContext(
-                    owner = owners.getValue(index),
-                    agent = agentConfig,
-                    readOnly = task.readOnly,
-                    writePaths = normalizedWritePaths,
-                )
+                if (results[index] != null) progress.finished(index)
+            }
+            // Resume planning, reservations and durable task state belong to the batch layer.
+            // Only tasks selected to run consume permits; retained results keep their indices.
+            val outcomes = SubAgentBatchRunner(maxConcurrency, Dispatchers.IO).run(runIndices.size) { offset ->
+                val index = runIndices[offset]
+                progress.started(index, assignments[index].name)
                 try {
-                    val prompt = buildSubAgentPrompt(task)
-                    conversationStore.addMessage(childConversationId, "user", prompt, profileId = profile.id, model = model)
-                    runLoop(
-                        childConversationId,
-                        profile,
-                        model,
-                        onUpdate = { update ->
-                            if (update.status.isNotBlank()) {
-                                onStatus(
-                                    context.getString(
-                                        R.string.status_sub_agent_progress_detail,
-                                        index,
-                                        tasks.size,
-                                        agentConfig.name,
-                                        update.status,
-                                    ),
+                    runSubAgentTask(
+                        parentConversationId = parentConversationId,
+                        batchId = batchId,
+                        index = index,
+                        tasks = tasks,
+                        agentConfig = assignments[index],
+                        owner = owners.getValue(index),
+                        onStatus = { status ->
+                            if (currentCoroutineContext().isActive) {
+                                emit(statusFormatter.format(
+                                    maxConcurrency = maxConcurrency,
+                                    completed = progress.completedCount,
+                                    total = tasks.size,
+                                    running = progress.runningCount,
+                                    agentName = assignments[index].name,
+                                    detail = status,
+                                ))
+                            }
+                        },
+                    )
+                } finally {
+                    progress.finished(index)
+                    if (currentCoroutineContext().isActive) {
+                        if (maxConcurrency > 1) emitProgress()
+                        else emit(context.getString(R.string.status_sub_agent_progress, progress.completedCount, tasks.size))
+                    }
+                }
+            }
+            outcomes.forEachIndexed { offset, outcome ->
+                val index = runIndices[offset]
+                results[index] = when (outcome) {
+                    is SubAgentCallOutcome.Completed -> outcome.value
+                    is SubAgentCallOutcome.Failed -> subAgentError(
+                        index, assignments[index], tasks[index],
+                        outcome.error.message.orEmpty().ifBlank { outcome.error.toString() },
+                    )
+                }
+            }
+            emit(context.getString(R.string.status_sub_agent_progress, tasks.size, tasks.size))
+            val ordered = JSONArray()
+            results.forEachIndexed { index, result ->
+                ordered.put(
+                    result ?: subAgentError(index, assignments[index], tasks[index], "Sub-agent task produced no result."),
+                )
+            }
+            val payload = JSONObject()
+                .put("schema", "lyra_sub_agent_results_v2")
+                .put("parent_conversation_id", parentConversationId)
+                .put("results", ordered)
+            if (plan != null) {
+                val timing = SubAgentResume.resumeTiming(interruptedAtMillis, System.currentTimeMillis())
+                payload.put("resumed", true)
+                SubAgentResume.resumeTimingFields(timing).forEach { (key, value) -> payload.put(key, value) }
+                payload
+                    .put("reused_task_indexes", JSONArray(plan.reusedIndices.map { it + 1 }))
+                    .put("interrupted_task_indexes", JSONArray(plan.interruptedIndices.map { it + 1 }))
+                    .put(
+                        "resume_note",
+                        "This batch resumed after an interruption. Tasks in reused_task_indexes returned their " +
+                            "stored results and were not run again. Tasks in interrupted_task_indexes were NOT " +
+                            "re-run because they may have changed files; check each write path and its backup " +
+                            "before continuing. Every write replaces a path's .bak, so a .bak holds at most the " +
+                            "state before the latest write and can predate this task. If the app died while a " +
+                            ".bak was being written, that .bak can be partial. A path whose write was " +
+                            "interrupted keeps a copy that later writes never replace at " +
+                            "<path>.<batch>.interrupted.bak, where <batch> is the batch named in " +
+                            "backup_paths. That copy is only as complete as the .bak it was made from, so " +
+                            "compare any backup with the current file before restoring it. An empty " +
+                            "backup_paths list proves nothing, and delete_file_or_folder, rename_move and " +
+                            "create_folder make no backup. " + SubAgentResume.resumeTimingNote(timing),
+                    )
+            }
+            if (abandonedWriteTasks.isNotEmpty()) {
+                payload
+                    .put(
+                        "abandoned_write_tasks",
+                        JSONArray().apply {
+                            abandonedWriteTasks.forEach { row ->
+                                put(
+                                    JSONObject()
+                                        .put("index", row.index + 1)
+                                        .put("task", row.taskText)
+                                        .put("write_paths", JSONArray(row.writePaths))
+                                        .put("backup_paths", JSONArray(existingBackups(row)))
+                                        .put(
+                                            "status",
+                                            if (row.status == SubAgentTaskStatus.COMPLETED) "completed" else "interrupted",
+                                        ),
                                 )
                             }
                         },
-                        propagateErrors = false,
                     )
-                    val assistant = conversationStore.messages(childConversationId).lastOrNull { it.role == "assistant" }
-                    results.put(
-                        JSONObject()
-                            .put("index", index + 1)
-                            .put("agent", agentConfig.name)
-                            .put("profile_id", profile.id)
-                            .put("model", model)
-                            .put("task", task.task)
-                            .put("read_only", task.readOnly)
-                            .put("write_paths", JSONArray(normalizedWritePaths.toList()))
-                            .put("capability_hint", task.capabilityHint)
-                            .put("expected_output", task.expectedOutput)
-                            .put("result", assistant?.content.orEmpty())
-                            .put("status", conversationStore.conversation(childConversationId)?.status ?: "unknown"),
+                    .put(
+                        "abandoned_write_note",
+                        "These write tasks started in an earlier batch that this call replaced, or that an edit " +
+                            "or Regenerate closed. They were NOT re-run because they may have changed files. " +
+                            "Inspect each write path before writing it again. A task whose status is completed " +
+                            "returned its write before the batch was abandoned; a task whose status is " +
+                            "interrupted may have stopped anywhere inside its write. Every write replaces a " +
+                            "path's .bak, so read the <path>.<batch>.interrupted.bak listed in backup_paths: " +
+                            "later writes never replace that copy. It is only as complete as the .bak it was " +
+                            "made from, so compare it with the current file before restoring it.",
                     )
-                } finally {
-                    subAgentContexts.remove(childConversationId)
-                }
-                onStatus(context.getString(R.string.status_sub_agent_progress, index + 1, tasks.size))
             }
-            onStatus(context.getString(R.string.status_sub_agent_progress, tasks.size, tasks.size))
-            return stableJson(
-                JSONObject()
-                    .put("schema", "lyra_sub_agent_results_v2")
-                    .put("parent_conversation_id", parentConversationId)
-                    .put("results", results),
-            )
+            // The batch stays open until the tool result row is in the parent's store; see
+            // flushDeliveredSubAgentBatch. A kill before that leaves it resumable.
+            pendingSubAgentBatchCloses[parentConversationId] = batchId
+            return stableJson(payload)
         } finally {
             batchReservation.close()
+        }
+        } finally {
+            // Cancellation and tool failures must both clear the wait state; the batch rows
+            // stay open, so a same-turn run_sub_agents call with the same tasks, or a Continue
+            // replay of the batch's saved call, resumes them.
+            subAgentRuns.end(parentConversationId)
+            subAgentRunStateChanged?.invoke()
+        }
+    }
+
+    /**
+     * Builds the resume plan from the newest undelivered batch, or null when the model asked
+     * for a different set of tasks (in which case the open batch is abandoned, not merged).
+     */
+    private fun buildSubAgentResumePlan(
+        batch: OpenSubAgentBatch,
+        requested: List<SubAgentResume.RequestedTask>,
+        currentUserMessageId: Long,
+    ): SubAgentResume.Plan? {
+        val reusable = batch.tasks.mapNotNull { row ->
+            row.childConversationId.takeIf { it > 0 && childProducedResult(it) }
+        }.toSet()
+        val backupPaths = batch.tasks
+            .flatMap { row ->
+                row.writePaths.flatMap { path ->
+                    listOf(
+                        TextBackupStore.backupPath(path),
+                        TextBackupStore.interruptedBackupPath(path, batch.batchId),
+                    )
+                }
+            }
+            .filter { nativeFileManager.exists(it) }
+            .toSet()
+        return SubAgentResume.plan(
+            batchId = batch.batchId,
+            storedUserMessageId = batch.userMessageId,
+            currentUserMessageId = currentUserMessageId,
+            stored = batch.tasks,
+            requested = requested,
+            reusableChildIds = reusable,
+            backupPaths = backupPaths,
+        )
+    }
+
+    /** A child that returned normally is idle with a non-blank assistant answer; see [SubAgentResume.childFinished]. */
+    private fun childProducedResult(conversationId: Long): Boolean {
+        val conversation = conversationStore.conversation(conversationId) ?: return false
+        val last = conversationStore.messages(conversationId).lastOrNull()
+        return SubAgentResume.childFinished(conversation.status, last?.role, last?.content)
+    }
+
+    private fun reusedSubAgentResult(
+        index: Int,
+        task: SubAgentTask,
+        childConversationId: Long,
+    ): JSONObject {
+        val conversation = conversationStore.conversation(childConversationId)
+        val assistant = conversationStore.messages(childConversationId).lastOrNull { it.role == "assistant" }
+        return JSONObject()
+            .put("index", index + 1)
+            .put("agent", "unknown")
+            .put("profile_id", conversation?.profileId.orEmpty())
+            .put("model", conversation?.model.orEmpty())
+            .put("task", task.task)
+            .put("read_only", task.readOnly)
+            .put("write_paths", JSONArray(task.writePaths))
+            .put("capability_hint", task.capabilityHint)
+            .put("expected_output", task.expectedOutput)
+            .put("result", assistant?.content.orEmpty())
+            .put("status", conversation?.status ?: "unknown")
+            .put("reused", true)
+    }
+
+    private fun interruptedSubAgentResult(
+        index: Int,
+        task: SubAgentTask,
+        agentConfig: SubAgentConfig,
+        action: SubAgentResume.Action.InterruptedWrite,
+    ): JSONObject {
+        return JSONObject()
+            .put("index", index + 1)
+            .put("agent", agentConfig.name)
+            .put("task", task.task)
+            .put("read_only", false)
+            .put("write_paths", JSONArray(action.writePaths))
+            .put("backup_paths", JSONArray(action.backupPaths))
+            .put("status", "interrupted")
+            .put("interrupted", true)
+            .put(
+                "error",
+                "This write task was interrupted: the app died or the run was stopped before it finished. " +
+                    "It was not re-run because it may have changed files. Inspect every write path and its " +
+                    "backup copy before deciding what to do. Every write replaces a path's .bak, so a .bak " +
+                    "holds at most the state before the latest write, and it can be partial if the app died " +
+                    "while it was being written. A path whose write was interrupted keeps a copy that later " +
+                    "writes never replace at <path>.<batch>.interrupted.bak, where <batch> is the batch named " +
+                    "in backup_paths. That copy is only as complete as the .bak it was made from, so compare " +
+                    "any backup with the current file before restoring it. An empty backup_paths list proves " +
+                    "nothing.",
+            )
+    }
+
+    /** The backups that exist right now: the batch's interrupted-write copies first, then the ordinary `.bak`. */
+    private fun existingBackups(row: SubAgentTaskRecord): List<String> =
+        row.writePaths
+            .flatMap { path ->
+                listOf(
+                    TextBackupStore.interruptedBackupPath(path, row.batchId),
+                    TextBackupStore.backupPath(path),
+                )
+            }
+            .filter { nativeFileManager.exists(it) }
+
+    /**
+     * Closes the batch whose result was just written to the parent conversation. Called after
+     * the tool row, never before: a kill between the result and the row keeps the batch open,
+     * so the next run resumes it rather than re-running its writes.
+     */
+    private fun flushDeliveredSubAgentBatch(conversationId: Long, toolName: String) {
+        if (toolName != "run_sub_agents") return
+        pendingSubAgentBatchCloses.remove(conversationId)?.let { batchId ->
+            conversationStore.markSubAgentBatchDelivered(conversationId, batchId)
+        }
+    }
+
+    private suspend fun runSubAgentTask(
+        parentConversationId: Long,
+        batchId: String,
+        index: Int,
+        tasks: List<SubAgentTask>,
+        agentConfig: SubAgentConfig,
+        owner: SubAgentWriteOwner,
+        onStatus: suspend (String) -> Unit,
+    ): JSONObject {
+        val task = tasks[index]
+        onStatus("")
+        val profile = settings.profiles().firstOrNull { it.id == agentConfig.profileId }
+        if (profile == null) {
+            conversationStore.setSubAgentTaskStatus(parentConversationId, batchId, index, SubAgentTaskStatus.FAILED)
+            return subAgentError(index, agentConfig, task, "Model profile does not exist: ${agentConfig.profileId}")
+        }
+        val model = agentConfig.model.ifBlank { profile.selectedModel }
+        val childConversationId = conversationStore.createConversation(
+            profileId = profile.id,
+            model = model,
+            title = "子代理 ${index + 1}: ${task.task.take(32)}",
+            mode = ConversationStore.MODE_SUBAGENT,
+        )
+        conversationStore.attachSubAgentTaskChild(parentConversationId, batchId, index, childConversationId)
+        val normalizedWritePaths = task.writePaths
+            .map(subAgentWriteCoordinator::normalizeWorkspacePath)
+            .toSortedSet()
+        subAgentContexts[childConversationId] = SubAgentExecutionContext(
+            owner = owner,
+            agent = agentConfig,
+            readOnly = task.readOnly,
+            writePaths = normalizedWritePaths,
+        )
+        var persistedStatus = SubAgentTaskStatus.FAILED
+        try {
+            val prompt = buildSubAgentPrompt(task)
+            // A child is idle from creation until the loop ends. Mark it running before the
+            // loop so a process death mid-turn is visible to the resume planner: runLoop writes
+            // idle only after the final message, so idle then means finished and running means
+            // the child was interrupted before it could produce an answer.
+            conversationStore.setConversationMeta(childConversationId, status = ConversationStore.STATUS_RUNNING)
+            conversationStore.addMessage(childConversationId, "user", prompt, profileId = profile.id, model = model)
+            runLoop(
+                childConversationId,
+                profile,
+                model,
+                onUpdate = { update ->
+                    if (update.status.isNotBlank()) {
+                        onStatus(update.status)
+                    }
+                },
+                propagateErrors = false,
+            )
+            val assistant = conversationStore.messages(childConversationId).lastOrNull { it.role == "assistant" }
+            persistedStatus = when {
+                conversationStore.conversation(childConversationId)?.status == ConversationStore.STATUS_INTERRUPTED ->
+                    SubAgentTaskStatus.INTERRUPTED
+                assistant != null -> SubAgentTaskStatus.COMPLETED
+                else -> SubAgentTaskStatus.FAILED
+            }
+            return JSONObject()
+                .put("index", index + 1)
+                .put("agent", agentConfig.name)
+                .put("profile_id", profile.id)
+                .put("model", model)
+                .put("task", task.task)
+                .put("read_only", task.readOnly)
+                .put("write_paths", JSONArray(normalizedWritePaths.toList()))
+                .put("capability_hint", task.capabilityHint)
+                .put("expected_output", task.expectedOutput)
+                .put("result", assistant?.content.orEmpty())
+                .put("status", conversationStore.conversation(childConversationId)?.status ?: "unknown")
+        } catch (cancelled: CancellationException) {
+            // A cancelled child is interrupted, not failed: the resume must not treat its
+            // partial conversation as a finished task.
+            persistedStatus = SubAgentTaskStatus.INTERRUPTED
+            throw cancelled
+        } finally {
+            subAgentContexts.remove(childConversationId)
+            conversationStore.setSubAgentTaskStatus(parentConversationId, batchId, index, persistedStatus)
         }
     }
 
@@ -3144,6 +3662,11 @@ class OpenAiAgent(
             } else {
                 null
             }
+            "linux_gui" -> linuxGuiTools.commandForApproval(args)?.takeIf(fileTools::requiresCommandApproval)?.let { command ->
+                ToolApprovalRequest(conversationId, call.name, call.rawArguments,
+                    "在 PRoot Linux ${args.cleanString("linux_id")} 中启动 GUI: $command",
+                    "GUI 启动命令使用与 PRoot 命令相同的环境权限，可能修改文件、运行脚本或改变 Linux 环境。")
+            }
             "proot_command" -> if (fileTools.requiresCommandApproval(args.toolCommandArgument())) {
                 ToolApprovalRequest(
                     conversationId,
@@ -3297,33 +3820,6 @@ class OpenAiAgent(
         val existing = conversationStore.conversation(conversationId)?.title.orEmpty()
         if (existing != "新对话") return null
         return userInput.lineSequence().firstOrNull().orEmpty().take(36).ifBlank { "新对话" }
-    }
-
-    private fun ChatMessage.toPromptJson(
-        routeVisualAttachments: Boolean = settings.isVisionSupplementRoutingEnabled(),
-    ): JSONObject {
-        val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
-            ?.also {
-                sanitizeAssistantRaw(it)
-                it.remove(GEMINI_REPLAY_PARTS_KEY)
-            }
-        if (raw == null && role == "user" && hasUploadedAttachments(content)) {
-            return userPromptWithAttachments(content, id, routeVisualAttachments)
-        }
-        return raw ?: JSONObject()
-            .put("role", if (role == RUNTIME_CONTEXT_ROLE) "user" else role)
-            .put("content", if (role == "assistant") cleanGeneratedText(content) else content)
-            .apply {
-                if (role == "assistant" && thinking.isNotBlank()) {
-                    put("reasoning_content", cleanGeneratedText(thinking))
-                }
-            }
-    }
-
-    private fun hasUploadedAttachments(content: String): Boolean {
-        return content.contains("<lyra_attachment_v1>") ||
-            content.contains("用户上传媒体：") ||
-            content.contains("用户上传文件：")
     }
 
     private fun userPromptWithAttachments(
@@ -3516,34 +4012,6 @@ class OpenAiAgent(
         }
     }
 
-    private fun ChatMessage.toToolPromptJson(): JSONObject = JSONObject()
-        .put("role", "tool")
-        .put("tool_call_id", toolCallId)
-        .put("content", content)
-
-    private fun JSONObject.hasToolCalls(): Boolean {
-        return optString("role") == "assistant" && (optJSONArray("tool_calls")?.length() ?: 0) > 0
-    }
-
-    private fun JSONObject.toolCallIds(): Set<String> {
-        val calls = optJSONArray("tool_calls") ?: return emptySet()
-        return buildSet {
-            for (index in 0 until calls.length()) {
-                calls.optJSONObject(index)?.optString("id").orEmpty().takeIf { it.isNotBlank() }?.let { add(it) }
-            }
-        }
-    }
-
-    private fun sanitizeAssistantRaw(raw: JSONObject) {
-        if (raw.optString("role") != "assistant") return
-        if (raw.has("content") && !raw.isNull("content")) {
-            raw.put("content", cleanGeneratedText(raw.optString("content")))
-        }
-        if (raw.has("reasoning_content") && !raw.isNull("reasoning_content")) {
-            raw.put("reasoning_content", cleanGeneratedText(raw.optString("reasoning_content")))
-        }
-    }
-
     private fun sessionContextPayload(): JSONObject {
         return JSONObject()
             .put("schema", "lyra_session_context_v1")
@@ -3573,8 +4041,6 @@ class OpenAiAgent(
             "content",
             "LYRA_USER_SELECTED_SYSTEM_PROMPT_V1\n${settings.activeSystemPromptText().ifBlank { "(none; use the native Lyra protocol)" }}",
         )
-
-    private fun forcedSkillIdsFor(conversationId: Long): List<String> = forcedSkillsByConversation[conversationId].orEmpty()
 
     private fun estimatedPromptInputTokens(conversationId: Long, excludeMessageId: Long, model: String): Long {
         if (isMediaGenerationModel(model)) {
@@ -3738,6 +4204,7 @@ class OpenAiAgent(
             # Termux and Android commands
             ${if (prootCommandExecutor.isAvailable()) "proot_command is the default command tool. It executes a shell in an app-private PRoot Linux environment and does not require Termux. Installed Linux IDs: ${prootCommandExecutor.inventoryForAgent()}. Always pass the intended linux_id. When a directly accessible workspace is selected it is mounted at /workspace; otherwise the command defaults to /root and remains usable. ${if (prootCommandExecutor.hasAllFilesAccess()) "Android All files access is granted, so Android shared storage is mounted under /storage and primary storage is also available at /sdcard; workDir may point there." else "Android All files access is not granted, so shared storage outside the selected workspace is unavailable; absolute Linux-internal paths remain usable."} For a persistent service or watcher, set background=true; the service keeps its own PRoot supervisor and later proot_command calls do not stop it. Existing nohup/setsid commands that actually detach are also preserved. Do not run interactive processes." else "proot_command is unavailable in this session."}
             run_command executes Bash in the external Termux app as the Termux app user; it is not Android's Shizuku shell and is not root. Use it only when the user explicitly requests Termux or proot_command is unavailable. Before the first run_command call for a task, call ask_user to confirm that Termux is already running in the background, unless the user explicitly confirmed this in the current conversation. Tool availability, installation, and RUN_COMMAND permission do not count as confirmation. If ask_user is unavailable, ask the same question in assistant text and wait for the answer; do not call run_command before confirmation. It defaults to the selected workspace. Omit workDir for the root or pass a workspace-relative directory; never use cd merely to change the working directory. Use command_lines for multiline or indentation-sensitive commands.
+            ${if (prootCommandExecutor.isAvailable()) com.yukisoffd.lyra.x11.GuiToolSpec.SYSTEM_HINT else ""}
             Use execute_shell_command only for Android shell operations that actually require Shizuku, and execute_root_command only when root is necessary and the user-approved tool is present. Never escalate from Termux to Shizuku or root merely to make a failing command pass.
             Quote paths containing spaces or shell metacharacters. Use non-interactive flags. Join dependent steps with && so later steps stop on failure; keep unrelated commands separate or batch them as independent tool calls. Before a destructive command, resolve and inspect the exact target, minimize its scope, and prefer a recoverable operation when available.
             Do not run interactive processes. For a persistent service or watcher, set the selected command tool's background=true instead of manually composing nohup or a terminal ampersand. Background mode closes inherited input/output, returns launcher_pid and output_file promptly, and launch acceptance does not prove the service is healthy, so inspect the process or log in a separate foreground call before claiming success. proot_command also recognizes when a manually detached command shell has returned and keeps that command's PRoot supervisor alive. For foreground commands, choose a realistic timeout from 5 to 600 seconds. When stdout_original_length or stderr_original_length exceeds the visible text, rerun a narrower query or redirect bounded output to a workspace file and inspect it with native tools. Do not install a convenience utility solely because rg or another preferred command is missing.
@@ -3909,7 +4376,6 @@ class OpenAiAgent(
         private const val DEEPSEEK_ANTHROPIC_FILES_BETA = "files-api-2025-04-14"
         private const val LOG_ARGUMENT_CHARS = 1_000
         private const val MAX_TOOL_RESULT_CHARS = 500_000
-        private const val MAX_SUB_AGENT_TASKS = 6
         private const val MIN_HISTORY_COMPRESSION_CHUNKS = 1
         private const val MAX_HISTORY_COMPRESSION_CHUNKS = 16
         private const val HISTORY_COMPRESSION_MERGE_BATCH_SIZE = 4
@@ -3971,6 +4437,7 @@ class OpenAiAgent(
             "rename_move",
         )
         private val UNSCOPED_WORKSPACE_MUTATION_TOOLS = setOf(
+            "linux_gui",
             "run_command",
             "proot_command",
             "execute_shell_command",
@@ -3981,6 +4448,7 @@ class OpenAiAgent(
             "import_backup",
         )
         private val CONFIGURABLE_AGENT_TOOLS = listOf(
+            "linux_gui",
             "create_chart",
             "get_circuit_symbols",
             "list_directory",
@@ -4065,7 +4533,7 @@ internal fun ChatMessage.isLocalRequestErrorMessage(): Boolean {
     if (role != "assistant") return false
     val raw = rawJson?.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
     if (raw?.optBoolean(LOCAL_REQUEST_ERROR_KEY, false) == true) return true
-    if (raw != null) return false
+    if (!rawJson.isNullOrBlank()) return false
     val normalized = content.trimStart()
     return normalized.startsWith("Request interrupted") ||
         normalized.startsWith("请求中断：") ||
@@ -4074,10 +4542,6 @@ internal fun ChatMessage.isLocalRequestErrorMessage(): Boolean {
 
 internal fun ChatMessage.isEmptyAssistantPlaceholder(): Boolean {
     return role == "assistant" && content.isBlank() && thinking.isBlank() && rawJson.isNullOrBlank()
-}
-
-private fun cleanGeneratedText(text: String): String {
-    return text.replace(Regex("(?:null){4,}", RegexOption.IGNORE_CASE), "").trim()
 }
 
 fun ChatMessage.toRecord(): ChatRecord = ChatRecord(

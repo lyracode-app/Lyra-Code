@@ -175,6 +175,7 @@ internal fun SettingsScreen(
         "github_acceleration" -> if (externalGitHubAccelerationUrl != null) gitHubAccelerationReturnDetail else "about"
         "device" -> "about"
         "sponsor_development" -> "about"
+        "developer_wall" -> "about"
         CompliancePageIds.INDEX -> "about"
         CompliancePageIds.USER_AGREEMENT,
         CompliancePageIds.PRIVACY_POLICY,
@@ -286,6 +287,7 @@ internal fun SettingsScreen(
                             )
                         },
                         actions = {
+                            if (target == "developer_wall") DeveloperWallInformationAction()
                             if (target == "chatgpt_account") IconButton(onClick = { showChatGptInformation = true }) {
                                 Icon(Icons.Outlined.ErrorOutline, contentDescription = context.getString(R.string.chatgpt_information))
                             }
@@ -305,7 +307,7 @@ internal fun SettingsScreen(
             if (target != null) {
                 SettingsDetailPage(
                     inset = target != "model",
-                    scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "device", "font", "font_library", "github_acceleration", "floating_page"),
+                    scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "developer_wall", "device", "font", "font_library", "github_acceleration", "floating_page"),
                 ) {
                     when (target) {
                     "profile" -> ProfileSettingsSummary(settings, controller::reloadProfiles, { detail = "chatgpt_account" }) { notice ->
@@ -474,6 +476,7 @@ internal fun SettingsScreen(
                     "storage" -> StorageCacheSettings()
                     "prompts" -> PromptSettingsScreen(settings, controller.settingsRevision.intValue)
                     "memories" -> MemorySettingsScreen(settings)
+                    "composer" -> ComposerSettingsScreen(settings)
                     "skills" -> SkillsScreen(
                         skills = skills,
                         status = skillStatus,
@@ -490,6 +493,7 @@ internal fun SettingsScreen(
                         onOpenDeviceInfo = { detail = "device" },
                         onOpenServiceAgreements = { detail = CompliancePageIds.INDEX },
                         onOpenSponsorDevelopment = { detail = "sponsor_development" },
+                        onOpenDeveloperWall = { detail = "developer_wall" },
                         onOpenGitHubAcceleration = { url ->
                             gitHubAccelerationTestUrl = url
                             detail = "github_acceleration"
@@ -501,6 +505,7 @@ internal fun SettingsScreen(
                     "github_acceleration" -> GitHubAccelerationSettingsScreen(initialTestUrl = gitHubAccelerationTestUrl)
                     "device" -> DeviceInfoScreen()
                     "sponsor_development" -> SponsorDevelopmentScreen()
+                    "developer_wall" -> DeveloperWallScreen()
                     CompliancePageIds.INDEX -> ServiceAgreementScreen(onOpenDocument = { detail = it })
                     CompliancePageIds.USER_AGREEMENT,
                     CompliancePageIds.PRIVACY_POLICY,
@@ -551,6 +556,7 @@ internal fun SettingsScreen(
             SettingsMenuEntry(Icons.Default.EditNote, context.getString(R.string.menu_system_prompt), context.getString(R.string.menu_system_prompt_desc), "prompts"),
             SettingsMenuEntry(Icons.Default.Psychology, context.getString(R.string.menu_memory), context.getString(R.string.menu_memory_desc, settings.memories().count { it.enabled }), "memories"),
             SettingsMenuEntry(Icons.Default.School, context.getString(R.string.menu_skills), context.getString(R.string.menu_skills_desc, skills.size), "skills"),
+            SettingsMenuEntry(Icons.Default.Send, context.getString(R.string.menu_composer), context.getString(R.string.menu_composer_desc), "composer"),
         )
         val generalEntries = listOf(
             SettingsMenuEntry(Icons.Default.Construction, context.getString(R.string.menu_agent_tools), context.getString(R.string.menu_agent_tools_desc), "tools"),
@@ -654,6 +660,8 @@ internal fun SettingsScreen(
                             initialState == "github_acceleration" -> false
                             initialState == "device" && targetState == "about" -> false
                             initialState == "about" && targetState == "device" -> true
+                            initialState == "developer_wall" && targetState == "about" -> false
+                            initialState == "about" && targetState == "developer_wall" -> true
                             initialState == CompliancePageIds.INDEX && targetState == "about" -> false
                             initialState == "about" && targetState == CompliancePageIds.INDEX -> true
                             isComplianceDocument(initialState) && targetState == CompliancePageIds.INDEX -> false
@@ -769,11 +777,13 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "backup" -> context.getString(R.string.detail_backup)
     "prompts" -> context.getString(R.string.detail_prompts)
     "memories" -> context.getString(R.string.detail_memories)
+    "composer" -> context.getString(R.string.detail_composer)
     "skills" -> context.getString(R.string.detail_skills)
     "licenses" -> context.getString(R.string.detail_licenses)
     "about" -> context.getString(R.string.detail_about)
     "github_acceleration" -> context.getString(R.string.github_acceleration_title)
     "sponsor_development" -> context.getString(R.string.sponsor_development_title)
+    "developer_wall" -> context.getString(R.string.developer_wall_title)
     "device" -> context.getString(R.string.detail_device)
     CompliancePageIds.INDEX -> context.getString(R.string.compliance_service_agreements)
     CompliancePageIds.USER_AGREEMENT -> context.getString(R.string.compliance_user_agreement)

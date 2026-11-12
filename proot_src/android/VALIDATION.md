@@ -1,77 +1,89 @@
-# Lyra .5 validation (2026-10-19)
+# Lyra .6 validation (2026-10-29)
 
-## Source integration
+## Source integration and compatibility
 
-All 21 upstream master commits from 9688d01 through e2d843e, inclusive,
-are integrated on main in their original order. UPSTREAM_COMMITS.md records
-all full SHAs. All 22 files changed in that range match e2d843e exactly.
-The earlier Lyra external-loader lookup, static talloc dependency and loader
-address adaptations are retained.
+The merge records all 40 master commits from 8bf810c through b27d81a,
+inclusive, as upstream history. UPSTREAM_COMMITS.md lists their full SHAs.
+The delta is applied after e2d843e, the baseline already integrated on the
+separate main history. AGENTS.md retains its existing main content under
+the local contributor policy; its instruction-only upstream change is not
+applied. No upstream runtime or test change is omitted.
 
-USERLAND remains disabled. Its upstream metadata fixes are included in the
-source but are not active or runtime-tested in these Android packages.
+Runtime sources match b27d81a except for the two pre-existing Lyra patches:
+external-loader lookup in src/execve/enter.c and Bionic's string.h include
+in src/extension/ashmem_memfd/ashmem_memfd.c. The Android source list still
+covers every runtime translation unit. Launch arguments and rootfs storage
+are unchanged. USERLAND and libandroid-shmem remain disabled.
+
+The new upstream getdents helper needs an IFTODT fallback on Bionic; this
+is a test-only portability adaptation. The Android harness compiles the
+upstream threaded-exec, getdents, link, renameat2, statx and Unix-socket
+helpers, in addition to its existing fork, descriptor and IPC regressions.
+All 16 helper programs compile for both ABIs at test API 28.
 
 ## Android builds and source reproducibility
 
 Both arm64-v8a and x86_64 build with NDK 29.0.14206865, Clang 21,
 CMake 3.22.1, Ninja, Android API 24, -O2 and static talloc 2.5.0.
-Version: `5.1.107.100-lyra.5`; libandroid-shmem remains disabled.
+Version: `5.1.107.100-lyra.6`.
 
 ELF inspection confirms the expected ELF64 architectures, PIE executables
-using Bionic linker64, static freestanding loaders, non-executable stacks,
-and 16 KB LOAD alignment. Loader entry points remain 0x5400000000 on ARM64
-and 0x600000000000 on x86_64. The rebuilt loaders have unchanged hashes.
+using Bionic linker64 with only libc.so as a dynamic dependency, static
+freestanding loaders, non-executable stacks and 16 KB LOAD alignment.
+Loader entry points remain 0x5400000000 on ARM64 and 0x600000000000 on
+x86_64. Loader hashes are unchanged from the .5 packages.
 
 Fresh, separate builds from the Git-free proot_src mirror reproduce all
 four packaged files byte-for-byte:
 
-- arm64-v8a/libproot_exec.so: be2fbd3a0e88c0d159ef6cd044392720ea3f0bc1ee524bf67879d49f5e9b9eb4
+- arm64-v8a/libproot_exec.so: 8cd986e8e9505f20ef263095037d59ece8756b230e5730315dc142332a8032e2
 - arm64-v8a/libproot_loader.so: 825d0362db3319c2b3ed3b75fe300287c0f9eeb7f2427ceb05a4a004ad33ed12
-- x86_64/libproot_exec.so: 5f4dc068cb80fa23713573f14105d597c225e8d56ace3b4d0a77c87824710dad
+- x86_64/libproot_exec.so: e3c6a7bde6a8e4851b2ddc36965b5a6c3fe71b5e630731aa7869e046cce82a72
 - x86_64/libproot_loader.so: 61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869
 
-The new descriptor/shared-memory helper and upstream fork_regs helper also
-compile for both ABIs. ARM64 has no raw fork syscall and fork_regs reports
-125 there by design.
+## Runtime and application checks
 
-## Android runtime
+The installed Lyra debug APK passes test-runtime.ps1 -RunAs on an x86_64
+Android API 37 emulator, kernel 6.12.58, with 16 KB pages. Installed native
+library hashes are checked against dist before execution. Both seccomp and
+no-seccomp modes finish with LYRA6_UPSTREAM_REGRESSIONS_OK; sibling-loader
+discovery finishes with SIBLING_LOADER_OK.
 
-The installed Lyra debug APK was tested with test-runtime.ps1 -RunAs in an
-x86_64 Android API 37 emulator, kernel 6.12.58, with 16 KB pages. Both
-installed native-library hashes were checked against dist before execution.
-The full script exits successfully in both seccomp and no-seccomp modes:
+The existing hard-link execution, execveat, O_NOFOLLOW/O_PATH, fork/vfork,
+threaded posix_spawn, raw-fork register, fake-ID, descriptor, SysV shared
+memory, fd-mount, fchmodat2 and Unix datagram regressions pass again.
+New checks cover non-leader-thread execve, failed link/rename bookkeeping,
+symlink linking, failed guest translation leaving host files untouched,
+link counts across 10000, getdents/getdents64 hard-link types, hidden names,
+ENOTDIR listings, statx target modes, socket-alias cleanup, failed-startup
+binding preservation and command lookup through overlapping bindings.
 
-- Simulated hard-link execution, symlinks, execveat, O_NOFOLLOW/O_PATH,
-  fork/vfork/system and 80 concurrent posix_spawn calls across four threads.
-- Upstream fork_regs: raw fork preserves the argument registers of both
-  parent and child, including with an explicit outer SECCOMP_RET_TRAP filter.
-- Full-width fake IDs 0:0 and 123456:234567, regular-file read-only reopens,
-  guest-cwd empty paths, statx, and cross-instance SO_PEERCRED.
-- Descriptor queries through fstat, fstatat(AT_EMPTY_PATH) and statx for
-  pipes, sockets and deleted files; successful anonymous eventfd queries.
-- Simulated hard-link counts through stat and fstat, including unlink.
-- SysV shared memory through two mappings and an inherited fork mapping,
-  with writes visible across mappings/processes, detach and IPC_RMID.
-- All seven fd-mount APIs and OPEN_TREE_CLONE returning ENOSYS, open_tree
-  path translation and fchmodat2 permissions including symlink targets.
-- Upstream Unix datagram sendto/sendmsg/sendmmsg tests, partial batches,
-  reply addresses and signal-interrupted restarted sends.
-- Sibling-loader discovery with PROOT_LOADER unset.
+Explicit skips: the emulator lacks user namespaces and denies memfd
+reopening. SysV shared memory backed by memfd still passes. In no-seccomp
+mode only, artificially trapped statx returns ENOSYS (helper exit 125),
+so that combination is skipped as in the upstream test. Normal statx in
+both modes and trapped statx in seccomp mode pass; target permissions are
+also checked after the skipped call. Negative startup tests intentionally
+print exec errors. Minimal-rootfs linker-configuration warnings are benign.
 
-The emulator lacks user namespaces, so namespace-map reads are explicitly
-skipped. Its application security context denies memfd reopening, which is
-also explicitly skipped; memfd-backed SysV shared memory succeeds.
-Bionic emits linker-configuration warnings in the minimal regression rootfs;
-they do not fail the checks.
+An adb-shell run passes the threaded-exec and fork checks, then cannot
+bind a Unix socket under the shell SELinux policy. It is not counted as
+a full passing run; the application-sandbox run above is the runtime result.
 
-No ARM64 Android device was available. ARM64 runtime behavior, its large
-mmap reservations and device-specific lost ptrace event messages have not
-been exercised. No new Linux-host runtime results are claimed here.
+:app:verifyBundledProotRuntime and :app:assembleDebug pass. All four native
+files extracted from the APK have exactly the pinned package hashes, and
+adb installation succeeds. Version, hashes and source provenance are updated
+in the Gradle checks, runtime README, license text and third-party notices.
 
-## Application integration
+The full application unit suite runs 683 tests: 676 pass, 4 fail, 3 skip.
+The failures are in the unchanged PendingInputAttachmentReaperTest (two)
+and PendingInputFileStoreTest (two). Their unchanged localPath/hasScheme
+logic treats Windows drive-letter paths as URI schemes, so attachment
+existence/deletion assertions fail on this host. These unrelated app
+files and tests are not modified by the PRoot integration. The complete
+unit suite is therefore not reported as passing.
 
-:app:verifyBundledProotRuntime, :app:testDebugUnitTest and :app:assembleDebug
-pass. The JUnit reports contain 448 tests: 445 passed, 3 skipped, 0 failures
-and 0 errors. APK installation with adb install -r succeeds. Both ABI pairs
-are packaged, with hashes/version updated in Gradle, the runtime README,
-the in-app license text and third-party notices.
+No ARM64 Android device is connected. ARM64 runtime behavior and the
+32-bit tracee paths are not covered. USERLAND remains disabled and its
+optional metadata behavior is not runtime-tested. No Linux-host runtime
+results are claimed.

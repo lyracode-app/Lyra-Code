@@ -5,6 +5,16 @@ import org.junit.Test
 
 class TerminalCompositionStateTest {
     @Test
+    fun `clearing a PTY discards old candidates without sending them to the new shell`() {
+        val events = mutableListOf<String>()
+        val state = TerminalCompositionState(events::add) { events += "BACKSPACE" }
+        state.update("中文候选")
+        state.discard()
+        state.finish()
+        state.commit("new")
+        assertEquals(listOf("new"), events)
+    }
+    @Test
     fun `appended composing text is sent once`() {
         val events = mutableListOf<String>()
         val state = TerminalCompositionState(events::add) { events += "BACKSPACE" }
@@ -61,5 +71,39 @@ class TerminalCompositionStateTest {
         state.update("w")
 
         assertEquals(listOf("body", ":", "w"), events)
+    }
+
+    @Test
+    fun `Korean and Japanese candidates remain local until committed`() {
+        val events = mutableListOf<String>()
+        val state = TerminalCompositionState(events::add) { events += "BACKSPACE" }
+        state.update("ㅎ")
+        state.update("하")
+        state.update("한")
+        assertEquals(emptyList<String>(), events)
+        state.commit("한")
+        state.update("にほん")
+        state.commit("日本")
+        assertEquals(listOf("한", "日本"), events)
+    }
+
+    @Test
+    fun `pinyin ASCII is replaced exactly once on Chinese commit`() {
+        val events = mutableListOf<String>()
+        val state = TerminalCompositionState(events::add) { events += "BACKSPACE" }
+        state.update("ni")
+        state.commit("你")
+        assertEquals(listOf("ni", "BACKSPACE", "BACKSPACE", "你"), events)
+    }
+
+    @Test
+    fun `local candidate deletion does not erase remote text or split surrogate pairs`() {
+        val events = mutableListOf<String>()
+        val state = TerminalCompositionState(events::add) { events += "BACKSPACE" }
+        state.update("你𠀀")
+        state.deleteBefore(2, inCodePoints = false)
+        assertEquals(emptyList<String>(), events)
+        state.finish()
+        assertEquals(listOf("你"), events)
     }
 }

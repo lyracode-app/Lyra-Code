@@ -4,6 +4,19 @@ PROOT  = $(DIR)/../src/proot
 CC     = gcc
 PROOT_RAW = $(PROOT)
 
+# The temporary files of the tests, of the tools they run and of PRoot
+# itself all go there, so that the suite writes nothing outside of the
+# repository.  The path is canonical: tests compare paths below it with
+# those the kernel reports.
+TMP_DIR := $(or $(realpath $(DIR)),$(error can't resolve $(DIR)))/tmp
+$(shell mkdir -p $(TMP_DIR))
+export TMPDIR = $(TMP_DIR)
+export PROOT_TMP_DIR = $(TMP_DIR)
+
+# gdb would otherwise compile its Python modules in the system directory
+# they lie in, when the suite runs as root.
+export PYTHONDONTWRITEBYTECODE = 1
+
 CHECK_TESTS = $(patsubst %,check-%, $(wildcard test-*.sh) $(wildcard test-*.c))
 
 .PHONY: check clean_failure check_failure setup check-%
@@ -38,8 +51,10 @@ check-test-bdc90417.c: test-bdc90417
 check-test-5bed7141.c: test-5bed7141
 	$(call check_c,$<,$(PROOT) ./$<)
 
+# The first run renames a directory of the guest rootfs, the second one
+# a directory of the host.
 check-test-5bed7143.c: test-5bed7143
-	$(call check_c,$<,$(PROOT) -r $(ROOTFS) -b . ./$<)
+	$(call check_c,$<,env TMPDIR=/tmp $(PROOT) -r $(ROOTFS) -b . ./$<)
 	$(call check_c,$<,$(PROOT) ./$<)
 
 check-test-16573e73.c: test-16573e73
@@ -56,8 +71,10 @@ check-test-kkkkkkkk.c: test-kkkkkkkk
 check-test-25069c12.c: test-25069c12
 	$(call check_c,$<,$(PROOT) ./$<)
 
+# The execve(2) wrapper of libtermux-exec, that Termux preloads, crashes
+# on the NULL argv this test passes.
 check-test-25069c13.c: test-25069c13
-	$(call check_c,$<,$(PROOT) ./$<)
+	$(call check_c,$<,env -u LD_PRELOAD $(PROOT) ./$<)
 
 check-test-1ffc8309.c: test-1ffc8309
 	$(call check_c,$<,env PROOT_FORCE_KOMPAT=1 $(PROOT) -k $(shell uname -r) ./$<)
@@ -68,23 +85,27 @@ check-test-c5a7a0f0.c: test-c5a7a0f0
 
 check-test-a3e68988.c: test-a3e68988
 	@which gdb >/dev/null 2>&1 || rm -f $<
-	$(call check_c,$<,$(PROOT) gdb -return-child-result -ex run -ex quit ./$<)
+	$(call check_c,$<,$(PROOT) gdb -batch -n -return-child-result -ex run ./$<)
 
 check-test-c47aeb7d.c: test-c47aeb7d
 	@which gdb >/dev/null 2>&1 || rm -f $<
-	$(call check_c,$<,$(PROOT) gdb -return-child-result -ex run -ex quit ./$<)
+	$(call check_c,$<,$(PROOT) gdb -batch -n -return-child-result -ex run ./$<)
 
 check-test-fdf487a0.c: test-fdf487a0
 	$(call check_c,$<,echo test | $(PROOT) ./$<)
 
 check-test-iiiiiiii.c: test-iiiiiiii
-	$(call check_c,$<,echo test | env PROOT_DONT_POLLUTE_ROOTFS=1 $(PROOT) -b /bin:/this_shall_not_exist_outside_proot ./$<)
+	$(call check_c,$<,echo test | env PROOT_DONT_POLLUTE_ROOTFS=1 $(PROOT) -b $(TMP_DIR):/this_shall_not_exist_outside_proot ./$<)
 
 check-test-9c07fad8.c: test-9c07fad8
 	$(call check_c,$<,$(PROOT) ./$<)
 
 check-test-fa205b56.c: test-fa205b56
 	$(call check_c,$<,$(PROOT) ./$<)
+
+check-test-f6b33793.c: test-f6b33793
+	$(call check_c,$<,$(PROOT) ./$<)
+	$(call check_c,$<,env PROOT_NO_SECCOMP=1 $(PROOT) ./$<)
 
 check_c = $(Q)if [ -e $< ]; then			\
 		$(2) $(silently); $(call check,$(1))	\
@@ -112,7 +133,8 @@ ROOTFS_BIN = $(ROOTFS)/bin/true $(ROOTFS)/bin/false    				 \
        $(ROOTFS)/bin/exec-suid $(ROOTFS)/bin/exec-sgid $(ROOTFS)/bin/exec-m32-suid \
        $(ROOTFS)/bin/exec-m32-sgid $(ROOTFS)/bin/getresuid $(ROOTFS)/bin/getresgid \
        $(ROOTFS)/bin/open_nofollow $(ROOTFS)/bin/fchmodat2 \
-       $(ROOTFS)/bin/open_tree $(ROOTFS)/bin/fork_regs
+       $(ROOTFS)/bin/open_tree $(ROOTFS)/bin/fork_regs $(ROOTFS)/bin/statx \
+       $(ROOTFS)/bin/statx-m32 $(ROOTFS)/bin/unix_socket
 
 ROOTFS_DIR = $(ROOTFS)/bin $(ROOTFS)/tmp
 
@@ -132,13 +154,16 @@ $(ROOTFS)/bin/rel-true:
 $(ROOTFS)/bin/exec-m32: exec.c
 	$(Q)$(CC) -m32 -static $^ -o $@ $(silently) || true
 
+$(ROOTFS)/bin/statx-m32: statx.c
+	$(Q)$(CC) -m32 -static $^ -o $@ $(silently) || true
+
 $(ROOTFS)/bin/exec-suid: $(ROOTFS)/bin/exec
-	$(Q)cp $^ $@
-	$(Q)chmod u+s $@
+	$(Q)cp $^     $@ $(silently) || true
+	$(Q)chmod u+s $@ $(silently) || true
 
 $(ROOTFS)/bin/exec-sgid: $(ROOTFS)/bin/exec
-	$(Q)cp $^ $@
-	$(Q)chmod g+s $@
+	$(Q)cp $^ $@      $(silently) || true
+	$(Q)chmod g+s $@  $(silently) || true
 
 $(ROOTFS)/bin/exec-m32-suid: $(ROOTFS)/bin/exec-m32
 	$(Q)cp $^     $@ $(silently) || true
@@ -203,6 +228,9 @@ test-fa205b56: test-fa205b56.c
 	$(Q)$(CC) $< -pthread -o $@ $(silently) || true
 
 test-c47aeb7d: test-c47aeb7d.c
+	$(Q)$(CC) $< -pthread -o $@ $(silently) || true
+
+test-f6b33793: test-f6b33793.c
 	$(Q)$(CC) $< -pthread -o $@ $(silently) || true
 
 ######################################################################

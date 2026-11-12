@@ -91,6 +91,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.ai.ModelReachabilityResult
 import com.yukisoffd.lyracode.ai.ProviderReachabilityResult
+import com.yukisoffd.lyracode.ai.SubAgentLimits
 import com.yukisoffd.lyracode.data.ApiProfile
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.MediaGenerationKind
@@ -706,6 +707,12 @@ internal fun ModelServiceSettings(
     var enabledModels by remember(editKey) { mutableStateOf(current?.enabledModels.orEmpty().toSet()) }
     var showEnabledModelsDialog by remember(editKey) { mutableStateOf(false) }
     var useResponsesApi by remember(editKey) { mutableStateOf(current?.usesResponsesApi == true) }
+    var gzipRequestBodies by remember(editKey) { mutableStateOf(current?.gzipRequestBodies ?: ApiProfile.defaultGzipRequestBodies(apiFormat)) }
+    var gzipRequestBodiesChanged by remember(editKey) { mutableStateOf(false) }
+    fun selectApiFormat(format: String) {
+        if (apiFormat != format && !gzipRequestBodiesChanged) gzipRequestBodies = ApiProfile.defaultGzipRequestBodies(format)
+        apiFormat = format
+    }
     var advancedExpanded by remember(editKey) { mutableStateOf(draftNewProfile == null || draftPresetId == null) }
     var selectedReachabilityModels by remember(editKey) { mutableStateOf<Set<String>>(emptySet()) }
     var providerReachabilityResult by remember(editKey) { mutableStateOf<ProviderReachabilityResult?>(null) }
@@ -768,6 +775,7 @@ internal fun ModelServiceSettings(
             savedModels = models.filter { it.isNotBlank() }.distinct(),
             enabledModels = enabled,
             useResponsesApi = apiFormat == ApiProfile.API_FORMAT_OPENAI && useResponsesApi,
+            gzipRequestBodies = gzipRequestBodies,
             modelRequestOverrides = requestOverrides,
         )
     }
@@ -1094,34 +1102,22 @@ internal fun ModelServiceSettings(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(uiText(R.string.label_api_format), style = MaterialTheme.typography.titleSmall)
-                            Row(
-                                Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                ApiFormatOption("OpenAI SDK", ApiProfile.API_FORMAT_OPENAI, apiFormat) {
-                                    apiFormat = it
+                            MaterialButtonGroup(
+                                options = listOf(
+                                    ApiProfile.API_FORMAT_OPENAI to "OpenAI",
+                                    ApiProfile.API_FORMAT_ANTHROPIC to "Anthropic",
+                                    ApiProfile.API_FORMAT_GEMINI to "Gemini",
+                                ),
+                                selected = apiFormat,
+                                onSelect = {
+                                    selectApiFormat(it)
+                                    if (it != ApiProfile.API_FORMAT_OPENAI) useResponsesApi = false
                                     if (draftNewProfile?.id == editingProfileId) {
                                         if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
                                         if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
                                     }
-                                }
-                                ApiFormatOption("Anthropic Messages", ApiProfile.API_FORMAT_ANTHROPIC, apiFormat) {
-                                    apiFormat = it
-                                    useResponsesApi = false
-                                    if (draftNewProfile?.id == editingProfileId) {
-                                        if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
-                                        if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
-                                    }
-                                }
-                                ApiFormatOption("Gemini GenerateContent", ApiProfile.API_FORMAT_GEMINI, apiFormat) {
-                                    apiFormat = it
-                                    useResponsesApi = false
-                                    if (draftNewProfile?.id == editingProfileId) {
-                                        if (baseUrl.isBlank() || baseUrl in knownProviderBaseUrls()) baseUrl = defaultBaseUrlForApiFormat(it)
-                                        if (chatPath.isBlank() || chatPath in knownProviderChatPaths()) chatPath = ApiProfile.defaultChatPath(it)
-                                    }
-                                }
-                            }
+                                },
+                            )
                             Text(
                                 apiFormatDescription(apiFormat),
                                 color = KimiMuted,
@@ -1143,6 +1139,23 @@ internal fun ModelServiceSettings(
                                     onCheckedChange = { useResponsesApi = it },
                                 )
                             }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    uiText(R.string.gzip_request_bodies_enabled),
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                Switch(checked = gzipRequestBodies, onCheckedChange = { gzipRequestBodies = it; gzipRequestBodiesChanged = true })
+                            }
+                            Text(
+                                uiText(R.string.gzip_request_bodies_hint),
+                                color = KimiMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                             OutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_base_url)) }, singleLine = true)
                             OutlinedTextField(
                                 value = chatPath,
@@ -1526,6 +1539,40 @@ internal fun ScreenCenterNotice(
     }
 }
 @Composable
+private fun SubAgentLimitRow(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onChange: (Int) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        IconButton(
+            enabled = value > range.first,
+            onClick = { onChange((value - 1).coerceIn(range.first, range.last)) },
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.action_decrease),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) {
+            Text("$value", style = MaterialTheme.typography.bodyMedium)
+        }
+        IconButton(
+            enabled = value < range.last,
+            onClick = { onChange((value + 1).coerceIn(range.first, range.last)) },
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.action_increase),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+@Composable
 internal fun SubAgentSettings(settings: AppSettings, controller: ChatController) {
     var revision by remember { mutableIntStateOf(0) }
     var agents by remember(revision, controller.settingsRevision.intValue) { mutableStateOf(settings.subAgents()) }
@@ -1555,6 +1602,35 @@ internal fun SubAgentSettings(settings: AppSettings, controller: ChatController)
                             controller.settingsRevision.intValue++
                             revision++
                         },
+                    )
+                }
+            }
+            KimiCardBox {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SubAgentLimitRow(
+                        label = stringResource(R.string.label_sub_agent_max_tasks),
+                        value = settings.subAgentMaxTasks,
+                        range = 1..SubAgentLimits.HARD_MAX_TASKS,
+                        onChange = {
+                            settings.subAgentMaxTasks = it
+                            controller.settingsRevision.intValue++
+                            revision++
+                        },
+                    )
+                    SubAgentLimitRow(
+                        label = stringResource(R.string.label_sub_agent_max_concurrency),
+                        value = settings.subAgentMaxConcurrency,
+                        range = 1..settings.subAgentMaxTasks,
+                        onChange = {
+                            settings.subAgentMaxConcurrency = it
+                            controller.settingsRevision.intValue++
+                            revision++
+                        },
+                    )
+                    Text(
+                        stringResource(R.string.sub_agent_limits_hint),
+                        color = KimiMuted,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
@@ -1758,11 +1834,6 @@ internal fun <T> SubAgentDropdownPicker(
         }
     }
 }
-@Composable
-internal fun ApiFormatOption(label: String, value: String, selected: String, onSelect: (String) -> Unit) {
-    MaterialChoiceButton(label = label, selected = selected == value, onClick = { onSelect(value) })
-}
-
 @Composable
 internal fun MaterialChoiceButton(
     label: String,

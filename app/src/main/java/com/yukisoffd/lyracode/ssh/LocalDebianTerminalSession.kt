@@ -102,7 +102,12 @@ class LocalProotTerminalConnection internal constructor(
                     active.process.destroyForcibly()
                     return@launch
                 }
-                interactiveShell = active
+                synchronized(terminal) {
+                    if (generation.get() != myGeneration || requestedClose) return@launch
+                    interactiveShell = active
+                    terminal.resetForNewSession()
+                    _screen.value = terminal.snapshot()
+                }
                 resizeQueue.trySend(TerminalResize(cols, rows))
                 _state.value = SshTerminalState(
                     SshTerminalStatus.CONNECTED,
@@ -115,8 +120,11 @@ class LocalProotTerminalConnection internal constructor(
                         val count = input.read(buffer)
                         if (count < 0) break
                         if (count > 0) {
-                            terminal.accept(buffer.copyOf(count))
-                            _screen.value = terminal.snapshot()
+                            synchronized(terminal) {
+                                if (generation.get() != myGeneration || requestedClose || interactiveShell !== active) return@launch
+                                terminal.accept(buffer.copyOf(count))
+                                _screen.value = terminal.snapshot()
+                            }
                         }
                     }
                 }
@@ -144,6 +152,11 @@ class LocalProotTerminalConnection internal constructor(
 
     override fun write(text: String): Boolean = write(text.toByteArray(Charsets.UTF_8))
 
+    override fun clear() = synchronized(terminal) {
+        terminal.clear()
+        _screen.value = terminal.snapshot()
+    }
+
     @Synchronized
     override fun resize(newCols: Int, newRows: Int, widthPx: Int, heightPx: Int) {
         val targetCols = newCols.coerceIn(2, 500)
@@ -151,8 +164,10 @@ class LocalProotTerminalConnection internal constructor(
         if (targetCols == cols && targetRows == rows) return
         cols = targetCols
         rows = targetRows
-        terminal.resize(targetCols, targetRows)
-        _screen.value = terminal.snapshot()
+        synchronized(terminal) {
+            terminal.resize(targetCols, targetRows)
+            _screen.value = terminal.snapshot()
+        }
         if (interactiveShell?.process?.isAlive == true) {
             resizeQueue.trySend(TerminalResize(targetCols, targetRows))
         }

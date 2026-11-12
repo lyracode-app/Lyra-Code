@@ -123,7 +123,7 @@ internal object ManualControlOverlayProtocol {
             putString("chat_transcript", DeviceChatTranscriptStore.write(context, state.chat.messages))
         } else {
             putParcelableArrayList("chat_messages", ArrayList(state.chat.messages.map { message ->
-                Bundle().apply { putLong("id", message.id); putString("role", message.role); putString("text", message.text); putString("thinking", message.thinking); putString("tool_name", message.toolName); putLong("created_at", message.createdAt) }
+                Bundle().apply { putLong("id", message.id); putString("role", message.role); putString("text", message.text); putString("thinking", message.thinking); putString("tool_name", message.toolName); putString("tool_input", message.toolInput); putLong("created_at", message.createdAt) }
             }))
         }
         putLong(EXTRA_ACTIVE_UNTIL, state.activeUntilEpochMillis)
@@ -196,7 +196,7 @@ internal object ManualControlOverlayProtocol {
     @Suppress("DEPRECATION")
     private fun decodeMessages(bundle: Bundle) = bundle.getParcelableArrayList<Bundle>("chat_messages").orEmpty()
         .map { com.yukisoffd.lyracode.interaction.session.DeviceChatMessage(
-            it.getLong("id"), it.getString("role").orEmpty(), it.getString("text").orEmpty(), it.getString("thinking").orEmpty(), it.getString("tool_name").orEmpty(), it.getLong("created_at", System.currentTimeMillis()),
+            it.getLong("id"), it.getString("role").orEmpty(), it.getString("text").orEmpty(), it.getString("thinking").orEmpty(), it.getString("tool_name").orEmpty(), it.getLong("created_at", System.currentTimeMillis()), it.getString("tool_input").orEmpty(),
         ) }
 
     fun reportServiceState(context: Context, running: Boolean) {

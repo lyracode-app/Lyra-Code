@@ -188,6 +188,8 @@ const webTranslations = [
   ['停止回复','Stop response','停止回覆'],
   ['发送消息','Send message','傳送訊息'],
   ['发送','Send','傳送'],
+  ['已排队，等待当前回复结束','Queued. It will send when the current response finishes','已排隊，等待目前回覆結束'],
+  ['· {count} 条排队','· {count} queued','· {count} 條排隊'],
   ['发送 · Shift Enter 换行','to send · Shift Enter for a new line','傳送 · Shift Enter 換行'],
   ['与手机同步','Synced with phone','與手機同步'],
   ['关闭设置','Close settings','關閉設定'],

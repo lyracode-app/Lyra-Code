@@ -36,6 +36,39 @@ class StorageUsageTraversalTest {
     }
 
     @Test
+    fun overlappingCleanableRootsAreNotCountedTwice() {
+        val root = Files.createTempDirectory("lyra-storage-overlap").toFile()
+        try {
+            val apk = root.resolve("old.apk").apply { writeBytes(ByteArray(1024)) }
+            assertEquals(StorageTreeUsage(1024L, 1), safeTreeUsage(listOf(root, apk, root)))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun apkFileTotalExcludesNativeDirectoriesAndDuplicateApkPaths() {
+        val root = Files.createTempDirectory("lyra-installed-apk-size").toFile()
+        try {
+            val base = root.resolve("base.apk").apply { writeBytes(ByteArray(1024)) }
+            val split = root.resolve("split.apk").apply { writeBytes(ByteArray(512)) }
+            val native = root.resolve("lib").apply { mkdirs(); resolve("runtime.so").writeBytes(ByteArray(8192)) }
+            assertEquals(1536L, installedApkFileBytes(listOf(base, split, base, native)))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun cleanupReportsUnreadableDirectoryInsteadOfClaimingSuccess() {
+        val root = Files.createTempDirectory("lyra-unreadable-cache").toFile()
+        try {
+            val child = root.resolve("keep.bin").apply { writeText("not deleted") }
+            val unreadable = object : File(root.absolutePath) {
+                override fun listFiles(): Array<File>? = null
+            }
+            assertTrue(deleteCacheTarget(unreadable).isFailure)
+            assertTrue(child.exists())
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun systemStorageStatsWinWithoutEvaluatingInflatedRecursiveFallback() {
         var fallbackCalled = false
         val totals = resolveStorageTotals(

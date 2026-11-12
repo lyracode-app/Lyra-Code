@@ -1,4 +1,4 @@
-if [ -z "$(which bash)" ] || [ -z "$(which mcookie)" ] || [ ! -e /proc/self/fd/0 ]; then
+if [ -z "$(which bash)" ] || [ -z "$(which mcookie)" ] || [ ! -e /proc/self/fd/0 ] || [ ! -e /dev/fd ]; then
     exit 125;
 fi
 
@@ -7,7 +7,7 @@ fi
 # close the pipe read end before the child writes; proot's shadow pipe
 # mechanism keeps the read end alive so the write does not get EPIPE.
 
-ERR=/tmp/$(mcookie).err
+ERR=${TMPDIR:?}/$(mcookie).err
 ${PROOT} -b /proc/self/fd:/dev/fd \
     bash -c 'echo <(echo a)' 2>"${ERR}"
 STATUS=$?

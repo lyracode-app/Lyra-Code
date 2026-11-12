@@ -128,6 +128,8 @@ internal class ProotLinuxManager private constructor(context: Context) {
     fun setEnabled(id: String, enabled: Boolean) {
         instance(id)
         preferences.edit().putBoolean(enabledKey(id), enabled).apply()
+        // Withdraw disabled instances before synchronous consumers close their sessions.
+        refresh()
         if (!enabled) {
             stopBackgroundCommands(id)
             beforeDeleteListeners.forEach { it(id) }
@@ -368,6 +370,8 @@ internal class ProotLinuxManager private constructor(context: Context) {
         command: String,
         executionId: Long,
         background: Boolean,
+        extraBinds: List<Pair<File, String>> = emptyList(),
+        mergeError: Boolean = false,
     ): ProotCommandProcess {
         val target = requireEnabled(id)
         prepareRootfs(target.rootfsDir)
@@ -375,7 +379,13 @@ internal class ProotLinuxManager private constructor(context: Context) {
             check(isDirectory || mkdirs()) { "Unable to create the PRoot command state directory." }
         }
         val completionFile = File(commandStateDir, "$executionId.status")
-        val supervisorPidFile = File(commandStateDir, "$executionId.pid")
+        // Publish the host PID before PRoot starts: cancellation must not depend on a guest
+        // login shell reaching the tracked command (or on guest files remaining present).
+        val supervisorPidFile = File(appContext.cacheDir, "proot-command-pids/$executionId.pid").apply {
+            check(parentFile?.let { it.isDirectory || it.mkdirs() } == true) {
+                "Unable to create the PRoot supervisor state directory."
+            }
+        }
         completionFile.delete()
         supervisorPidFile.delete()
         val commandToRun = if (background) {
@@ -386,7 +396,6 @@ internal class ProotLinuxManager private constructor(context: Context) {
         val trackedCommand = buildTrackedProotCommand(
             command = commandToRun,
             completionGuestPath = "/root/.lyracode/commands/$executionId.status",
-            supervisorPidGuestPath = "/root/.lyracode/commands/$executionId.pid",
             shellPath = target.shellPath,
         )
         return ProotCommandProcess(
@@ -395,8 +404,10 @@ internal class ProotLinuxManager private constructor(context: Context) {
                 workspaceRoot,
                 guestWorkDir,
                 listOf(target.shellPath, "-lc", trackedCommand),
-                mergeError = false,
+                mergeError = mergeError,
                 killOnExit = false,
+                supervisorPidFile = supervisorPidFile,
+                extraBinds = extraBinds,
             ),
             completionFile = completionFile,
             supervisorPidFile = supervisorPidFile,
@@ -429,6 +440,8 @@ internal class ProotLinuxManager private constructor(context: Context) {
         guestCommand: List<String>,
         mergeError: Boolean = true,
         killOnExit: Boolean = true,
+        supervisorPidFile: File? = null,
+        extraBinds: List<Pair<File, String>> = emptyList(),
     ): Process {
         val args = mutableListOf(
             prootFile().absolutePath,
@@ -438,6 +451,31 @@ internal class ProotLinuxManager private constructor(context: Context) {
         )
         if (killOnExit) args.add(2, "--kill-on-exit")
         if (workspace != null) args += listOf("-b", "${workspace.absolutePath}:/workspace")
+        // Stable per-environment bridge: terminals and AI commands see new GUI
+        // sessions without having to restart their PRoot supervisor.
+        val runtimeBridge = runtimeBridgeDirectory(target.id)
+        val runtimeMount = File(target.rootfsDir, "run/lyra")
+        check(runtimeMount.canonicalFile.toPath().startsWith(target.rootfsDir.canonicalFile.toPath())) {
+            "Linux /run/lyra must resolve inside its rootfs"
+        }
+        check(runtimeMount.isDirectory || runtimeMount.mkdirs()) { "Unable to create Linux runtime mount point" }
+        args += listOf("-b", "${runtimeBridge.absolutePath}:/run/lyra")
+        // Standard X11 ABI for every terminal/AI process, including sessions started later.
+        val displaySockets = File(runtimeBridge, ".X11-unix")
+        val displayMount = File(target.rootfsDir, "tmp/.X11-unix")
+        // GUI support is optional: an unusual /tmp must not prevent ordinary Linux commands.
+        val displayMountReady = runCatching {
+            displayMount.canonicalFile.toPath().startsWith(target.rootfsDir.canonicalFile.toPath()) &&
+                (displaySockets.isDirectory || displaySockets.mkdir()) &&
+                (displayMount.isDirectory || displayMount.mkdirs())
+        }.getOrDefault(false)
+        if (displayMountReady) {
+            args += listOf("-b", "${displaySockets.absolutePath}:/tmp/.X11-unix")
+        }
+        extraBinds.forEach { (host, guest) ->
+            require(host.isDirectory && guest.startsWith('/') && ':' !in guest && '\u0000' !in guest)
+            args += listOf("-b", "${host.absolutePath}:$guest")
+        }
         if (hasAllFilesAccess()) {
             args += listOf("-b", "${sharedStorageContainer().absolutePath}:/storage")
             args += listOf("-b", "${sharedStorageRoot().absolutePath}:/sdcard")
@@ -454,7 +492,17 @@ internal class ProotLinuxManager private constructor(context: Context) {
         )
         args += guestCommand
         val processTemp = File(appContext.cacheDir, "proot-linux-tmp/${target.id}").apply { mkdirs() }
-        return ProcessBuilder(args)
+        // Android runtime threads block SIGQUIT. The system shell restores its signal mask
+        // before exec, so PRoot can receive the shutdown signal used to kill its tracees.
+        // exec keeps the Java Process and the PRoot supervisor on the same PID.
+        val launchScript = if (supervisorPidFile != null) {
+            "echo \"${'$'}${'$'}\" > \"${'$'}1\" || exit; shift; exec \"${'$'}@\""
+        } else {
+            "exec \"${'$'}@\""
+        }
+        val launchArgs = listOf("/system/bin/sh", "-c", launchScript, "lyracode-proot") +
+            listOfNotNull(supervisorPidFile?.absolutePath) + args
+        return ProcessBuilder(launchArgs)
             .directory(appContext.filesDir)
             .redirectErrorStream(mergeError)
             .apply {
@@ -671,6 +719,17 @@ internal class ProotLinuxManager private constructor(context: Context) {
         runCatching { Os.chmod(File(rootfs, "var/tmp").absolutePath, 0x3ff) }
     }
 
+    /** Generic private runtime files shared by processes of one Linux instance. */
+    fun runtimeBridgeDirectory(id: String): File {
+        instance(id)
+        val key = java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray())
+            .take(10).joinToString("") { "%02x".format(it.toInt() and 255) }
+        return File(appContext.cacheDir, "lrt/$key").apply {
+            check(isDirectory || mkdirs()) { "Unable to create Linux runtime bridge" }
+            Os.chmod(absolutePath, 0x1c0)
+        }
+    }
+
     private fun hasShell(rootfs: File): Boolean =
         Files.exists(File(rootfs, "bin/bash").toPath(), LinkOption.NOFOLLOW_LINKS) ||
             Files.exists(File(rootfs, "bin/sh").toPath(), LinkOption.NOFOLLOW_LINKS)
@@ -741,15 +800,12 @@ internal class ProotLinuxManager private constructor(context: Context) {
 internal fun buildTrackedProotCommand(
     command: String,
     completionGuestPath: String,
-    supervisorPidGuestPath: String,
     shellPath: String,
 ): String {
     val quotedShell = shellSingleQuoteForProot(shellPath)
     val quotedCommand = shellSingleQuoteForProot(command)
     val quotedCompletionPath = shellSingleQuoteForProot(completionGuestPath)
-    val quotedSupervisorPidPath = shellSingleQuoteForProot(supervisorPidGuestPath)
     return """
-        printf '%s\n' "${'$'}PPID" > $quotedSupervisorPidPath
         $quotedShell -lc $quotedCommand
         lyra_exit_code=${'$'}?
         printf '%s\n' "${'$'}lyra_exit_code" > $quotedCompletionPath

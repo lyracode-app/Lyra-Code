@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-4.1.3-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-4.2.-blue" />
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <a href="https://github.com/termux/proot"><img alt="PRoot Linux" src="https://img.shields.io/badge/PRoot-Linux-FCC624?logo=linux&logoColor=black" /></a>
   <a href="https://github.com/termux/termux-app"><img alt="Termux" src="https://img.shields.io/badge/Termux-integrated-000000" /></a>
@@ -99,13 +99,15 @@ mkdir -p ~/.termux && (grep -qxF 'allow-external-apps=true' ~/.termux/termux.pro
 
 APK 会生成到 `app/build/outputs/apk/debug/`。Release 签名应仅在本地配置，请勿提交签名密钥、keystore、API Key、`.env`、`local.properties` 或其他隐私文件。
 
+默认仅生成通用 APK；release 开启 R8 和资源裁剪。后续可通过 `-Plyra.abiSplits=true` 重新启用按架构分包。构建参数、体积分析和发布兼容说明见[安装包体积优化](docs/APK_SIZE.md)。
+
 ## 安全说明
 
 Lyra Code 可以执行命令、修改文件、启动服务器并连接第三方服务。请审查 Agent 工具调用，为远程端点使用 HTTPS/TLS 或可信网络，妥善保管含密钥的备份，并且只安装可信的 rootfs、Skills、脚本和 MCP Server。PRoot 进程拥有 Lyra Code 的 Android 权限，不能视为与应用隔离。
 
 ## 参与贡献
 
-本项目接受组织成员的 PR；如需加入，可联系管理员。欢迎 AI 辅助贡献，但提交者必须完成实际测试与人工审查、对结果负责，并在 PR 中说明测试范围。
+本项目接受任何人提交的 PR；频繁贡献的开发者可申请加入组织。欢迎 AI 辅助贡献，但提交者必须完成实际测试与人工审查、对结果负责，并在 PR 中说明测试范围。
 
 ## 许可证
 

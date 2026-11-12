@@ -9,6 +9,8 @@ internal interface ScopedAgentTools {
     val systemPrompt: String
     val includesNativeTools: Boolean get() = false
     val finished: Boolean
+    /** User-facing result, persisted after the finishing tool's result. */
+    val completionSummary: String? get() = null
     fun definitions(): JSONArray
     fun checkRound()
     suspend fun execute(name: String, arguments: JSONObject): String

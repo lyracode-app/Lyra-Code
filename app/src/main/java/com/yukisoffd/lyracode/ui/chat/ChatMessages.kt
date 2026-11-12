@@ -168,9 +168,11 @@ internal fun chatRenderItems(
             flushPendingProcess()
             return
         }
-        val finalAnswerIndex = turn.indexOfLast {
-            it.role == "assistant" && it.content.isNotBlank()
-        }
+        // Prose followed by tools is still intermediate output, including interrupted
+        // device tasks. Moving it after those tools changes the recorded chronology.
+        val finalAnswerIndex = turn.lastIndex.takeIf {
+            turn[it].role == "assistant" && turn[it].content.isNotBlank()
+        } ?: -1
         val process = buildList {
             turn.forEachIndexed { index, message ->
                 if (index == finalAnswerIndex) {
@@ -197,6 +199,9 @@ internal fun chatRenderItems(
     }
 
     messages.forEach { message ->
+        // A tool-call-only assistant row carries protocol metadata, not a visible
+        // reasoning step. Keep it stored without adding empty gaps to the timeline.
+        if (message.role == "assistant" && message.content.isBlank() && message.thinking.isBlank()) return@forEach
         if (message.role == "user" || message.role == MEDIA_MESSAGE_ROLE) {
             // Completed turns must keep the same item structure while a later
             // turn is streaming. Re-expanding all history invalidates the
@@ -986,7 +991,7 @@ internal fun MessageCard(
                             }
                             if (message.thinking.isNotBlank()) {
                                 CollapsedStatusLine(
-                                    text = if (showThinking) uiText(R.string.thinking_details_expanded) else if (message.content.isBlank()) "thinking..." else uiText(R.string.label_thinking_done),
+                                    text = if (showThinking) uiText(R.string.thinking_details_expanded) else if (isStreaming) "thinking..." else uiText(R.string.label_thinking_done),
                                     expanded = showThinking,
                                     onClick = { showThinking = !showThinking },
                                 )

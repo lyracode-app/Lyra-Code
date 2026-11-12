@@ -11,6 +11,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.util.concurrent.TimeUnit
 
 data class AppUpdateInfo(
@@ -44,6 +47,15 @@ data class UpdateDownloadProgress(
 class UpdateManager(private val context: Context) {
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE)
+    internal val apkStorage by lazy {
+        val primary = appContext.getExternalFilesDir(null)
+        UpdateApkStorage(primary, updateArtifactRoots(
+            appContext.cacheDir,
+            appContext.filesDir,
+            appContext.externalCacheDirs.filterNotNull(),
+            (listOfNotNull(primary) + appContext.getExternalFilesDirs(null).filterNotNull()).distinct(),
+        ))
+    }
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -54,6 +66,23 @@ class UpdateManager(private val context: Context) {
         client.newBuilder().readTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(false).build(),
         "LyraCode/${currentVersionCode()} AndroidUpdateClient",
     )
+
+    init {
+        // A cached universal URL from older clients must not bypass the new ABI selection.
+        val deviceAbis = Build.SUPPORTED_ABIS.filter { it in distributedUpdateAbis }.joinToString(",")
+        fun needsRefresh() = prefs.getInt(KEY_APK_SELECTION_POLICY, 0) != APK_SELECTION_POLICY ||
+            prefs.getString(KEY_APK_SELECTION_ABIS, null) != deviceAbis
+        if (needsRefresh()) {
+            synchronized(UpdateDownloadFiles.lock) {
+                if (needsRefresh()) {
+                    clearLatestAvailableUpdate()
+                    prefs.edit().remove(KEY_LAST_DAILY_CHECK_DATE)
+                        .putInt(KEY_APK_SELECTION_POLICY, APK_SELECTION_POLICY)
+                        .putString(KEY_APK_SELECTION_ABIS, deviceAbis).apply()
+                }
+            }
+        }
+    }
 
     fun manifestUrl(): String = com.yukisoffd.lyracode.BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim()
 
@@ -85,12 +114,14 @@ class UpdateManager(private val context: Context) {
                 parseReleaseUpdateInfo(
                     json = fetchJson(GITHUB_LATEST_RELEASE_API),
                     fallbackWebUrl = GITHUB_RELEASES_URL,
+                    supportedAbis = Build.SUPPORTED_ABIS.toList(),
                 )
             })
             add("Gitee" to {
                 parseReleaseUpdateInfo(
                     json = fetchJson(GITEE_LATEST_RELEASE_API),
                     fallbackWebUrl = GITEE_RELEASES_URL,
+                    supportedAbis = Build.SUPPORTED_ABIS.toList(),
                 )
             })
         }
@@ -193,24 +224,39 @@ class UpdateManager(private val context: Context) {
     ): Result<File> = runCatching {
         require(info.apkUrl.startsWith("https://") || info.apkUrl.startsWith("http://")) { "安装包下载地址无效" }
         val version = info.versionName.ifBlank { info.versionCode.toString() }.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val output = File(updateDownloadDir(), "LyraCode-$version.apk")
-        val file = apkDownloader.download(
-            targets = githubDownloadTargets(info.apkUrl, accelerationSettings.load()),
-            output = output,
-            expectedSha256 = info.apkSha256,
-        ) { target, downloaded, total ->
-            val status = target.acceleratorName?.let {
-                context.getString(R.string.github_acceleration_download_via, it)
-            } ?: context.getString(R.string.github_acceleration_download_direct)
-            onProgress(UpdateDownloadProgress(downloaded, total, status))
+        val directory = requireNotNull(apkStorage.downloadDirectory) { "外部应用文件目录不可用，无法保存更新安装包" }
+        val output = File(directory, "LyraCode-$version.apk")
+        synchronized(UpdateDownloadFiles.lock) {
+            check(UpdateDownloadFiles.activeFile == null) { "已有更新安装包正在下载" }
+            UpdateDownloadFiles.activeFile = output
         }
-        pruneCachedUpdateArtifacts(keepFile = file)
-        savePendingApk(file, info)
-        onProgress(UpdateDownloadProgress(file.length(), file.length(), context.getString(R.string.github_acceleration_download_complete)))
-        file
+        try {
+            // Also removes abandoned downloads from previous app versions/volumes.
+            pendingDownloadedApk()
+            val file = apkDownloader.download(
+                targets = githubDownloadTargets(info.apkUrl, accelerationSettings.load()),
+                output = output,
+                expectedSha256 = info.apkSha256,
+            ) { target, downloaded, total ->
+                val status = target.acceleratorName?.let {
+                    context.getString(R.string.github_acceleration_download_via, it)
+                } ?: context.getString(R.string.github_acceleration_download_direct)
+                onProgress(UpdateDownloadProgress(downloaded, total, status))
+            }
+            synchronized(UpdateDownloadFiles.lock) {
+                savePendingApk(file, info)
+                pruneCachedUpdateArtifacts(keepFile = file)
+            }
+            onProgress(UpdateDownloadProgress(file.length(), file.length(), context.getString(R.string.github_acceleration_download_complete)))
+            file
+        } finally {
+            synchronized(UpdateDownloadFiles.lock) { UpdateDownloadFiles.activeFile = null }
+        }
     }
 
-    fun pendingDownloadedApk(): File? {
+    fun pendingDownloadedApk(): File? = synchronized(UpdateDownloadFiles.lock) { pendingDownloadedApkLocked() }
+
+    private fun pendingDownloadedApkLocked(): File? {
         val path = prefs.getString(KEY_PENDING_APK_PATH, null).orEmpty()
         if (path.isBlank()) {
             pruneCachedUpdateArtifacts()
@@ -229,19 +275,17 @@ class UpdateManager(private val context: Context) {
             return null
         }
         val file = File(path)
-        if (!file.exists() || file.length() <= 0L || !isZipApk(file)) {
+        val valid = runCatching {
+            apkStorage.owns(file) && Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                file.length() > 0L && isZipApk(file) &&
+                prefs.getString(KEY_PENDING_APK_SHA256, "").orEmpty().let { expected ->
+                    expected.isBlank() || apkSha256(file).equals(expected, ignoreCase = true)
+                }
+        }.getOrDefault(false)
+        if (!valid) {
             clearPendingApk()
             pruneCachedUpdateArtifacts()
             return null
-        }
-        val expected = prefs.getString(KEY_PENDING_APK_SHA256, "").orEmpty()
-        if (expected.isNotBlank()) {
-            val valid = runCatching { apkSha256(file).equals(expected, ignoreCase = true) }.getOrDefault(false)
-            if (!valid) {
-                clearPendingApk()
-                pruneCachedUpdateArtifacts()
-                return null
-            }
         }
         pruneCachedUpdateArtifacts(keepFile = file)
         return file
@@ -252,11 +296,16 @@ class UpdateManager(private val context: Context) {
         return if (version.isNotBlank()) "继续安装 $version" else "继续安装已下载更新"
     }
 
-    fun clearPendingApk(deleteFile: Boolean = true) {
+    fun clearPendingApk(deleteFile: Boolean = true): Unit = synchronized(UpdateDownloadFiles.lock) {
         if (deleteFile) {
             prefs.getString(KEY_PENDING_APK_PATH, null)
                 ?.takeIf { it.isNotBlank() }
-                ?.let { runCatching { File(it).delete() } }
+                ?.let { path ->
+                    val file = File(path)
+                    synchronized(UpdateDownloadFiles.lock) {
+                        if (apkStorage.owns(file) && file != UpdateDownloadFiles.activeFile) runCatching { file.delete() }
+                    }
+                }
         }
         prefs.edit()
             .remove(KEY_PENDING_APK_PATH)
@@ -264,6 +313,15 @@ class UpdateManager(private val context: Context) {
             .remove(KEY_PENDING_VERSION_NAME)
             .remove(KEY_PENDING_VERSION_CODE)
             .apply()
+    }
+
+    fun clearDownloadedApks(): Result<Unit> = synchronized(UpdateDownloadFiles.lock) {
+        val result = apkStorage.cleanup()
+        val pending = prefs.getString(KEY_PENDING_APK_PATH, null)?.let(::File)
+        if (pending == null || !pending.exists()) clearPendingApk(deleteFile = false)
+        if (result.failedFiles.isEmpty()) Result.success(Unit) else Result.failure(
+            IOException("无法清理更新安装包：${result.failedFiles.joinToString { it.absolutePath }}"),
+        )
     }
 
     fun needsInstallPermission(): Boolean {
@@ -292,35 +350,13 @@ class UpdateManager(private val context: Context) {
         return installIntent(apkFile)
     }
 
-    private fun parseUpdateInfo(json: JSONObject): AppUpdateInfo {
-        val versionCode = json.optLong("versionCode").takeIf { it > 0 }
-            ?: json.optLong("version_code").takeIf { it > 0 }
-            ?: error("更新清单缺少 versionCode")
-        val apkUrl = json.optString("apkUrl").ifBlank { json.optString("apk_url") }
-        require(apkUrl.startsWith("https://") || apkUrl.startsWith("http://")) { "更新清单缺少有效的 apkUrl" }
-        val releaseNotesUrl = json.optString("releaseNotesUrl").ifBlank { json.optString("release_notes_url") }
-        val inlineNotes = json.optString("releaseNotes").ifBlank { json.optString("release_notes") }
-        val releaseNotes = if (inlineNotes.isNotBlank() || releaseNotesUrl.isBlank()) {
-            inlineNotes
-        } else {
-            runCatching {
-                val request = Request.Builder().url(releaseNotesUrl).get().build()
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) response.body?.string().orEmpty() else ""
-                }
-            }.getOrDefault("")
+    private fun parseUpdateInfo(json: JSONObject): AppUpdateInfo =
+        parseWebsiteUpdateInfo(json, Build.SUPPORTED_ABIS.toList()) { url ->
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
         }
-        return AppUpdateInfo(
-            versionName = json.optString("versionName").ifBlank { json.optString("version_name") },
-            versionCode = versionCode,
-            apkUrl = apkUrl,
-            apkSha256 = json.optString("apkSha256").ifBlank { json.optString("apk_sha256").ifBlank { json.optString("sha256") } },
-            releaseNotes = releaseNotes.ifBlank { "发现新版本，暂无更新说明。" },
-            releaseNotesUrl = releaseNotesUrl,
-            webUrl = json.optString("webUrl").ifBlank { json.optString("web_url") },
-            mandatory = json.optBoolean("mandatory", false),
-        )
-    }
 
     private fun fetchJson(url: String): JSONObject {
         val request = Request.Builder()
@@ -346,17 +382,14 @@ class UpdateManager(private val context: Context) {
             .apply()
     }
 
-    private fun updateDownloadDir(): File = File(appContext.externalCacheDir ?: appContext.cacheDir, "updates")
-
     private fun pruneCachedUpdateArtifacts(keepFile: File? = null) {
-        buildList {
-            add(File(appContext.cacheDir, "updates"))
-            appContext.externalCacheDir?.let { add(File(it, "updates")) }
-        }.distinctBy { it.safeCanonicalPath() }
-            .forEach { deleteCachedUpdateArtifacts(it, keepFile) }
+        apkStorage.cleanup(keepFile)
     }
 
     private companion object {
+        const val APK_SELECTION_POLICY = 1
+        const val KEY_APK_SELECTION_POLICY = "apk_selection_policy"
+        const val KEY_APK_SELECTION_ABIS = "apk_selection_abis"
         const val KEY_PENDING_APK_PATH = "pending_apk_path"
         const val KEY_PENDING_APK_SHA256 = "pending_apk_sha256"
         const val KEY_PENDING_VERSION_NAME = "pending_version_name"
@@ -380,15 +413,34 @@ class UpdateManager(private val context: Context) {
     }
 }
 
-internal fun parseReleaseUpdateInfo(json: JSONObject, fallbackWebUrl: String): AppUpdateInfo {
+internal fun parseReleaseUpdateInfo(
+    json: JSONObject,
+    fallbackWebUrl: String,
+    supportedAbis: List<String> = emptyList(),
+): AppUpdateInfo {
     val tagName = json.optString("tag_name").trim()
     require(versionComponents(tagName) != null) { "Release 缺少可识别的版本号" }
     val assets = json.optJSONArray("assets") ?: error("Release 缺少安装包")
-    val apkAsset = (0 until assets.length())
+    val apkAssets = (0 until assets.length())
         .asSequence()
         .mapNotNull { assets.optJSONObject(it) }
-        .firstOrNull { asset -> asset.optString("name").endsWith(".apk", ignoreCase = true) }
-    val apkUrl = apkAsset?.optString("browser_download_url").orEmpty()
+        .filter { asset -> asset.optString("name").endsWith(".apk", ignoreCase = true) }
+        .filter { asset ->
+            val url = asset.optString("browser_download_url")
+            url.startsWith("https://") || url.startsWith("http://")
+        }
+        .toList()
+    val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+    fun assetAbi(asset: JSONObject): String? = knownAbis.firstOrNull { abi ->
+        Regex("(?:^|[-_.])${Regex.escape(abi)}(?=[-_.]|$)", RegexOption.IGNORE_CASE)
+            .containsMatchIn(asset.optString("name"))
+    }
+    // Respect the device's preference order; never offer another architecture's APK.
+    val apkAsset = supportedAbis.filter { it in distributedUpdateAbis }.firstNotNullOfOrNull { abi ->
+        apkAssets.firstOrNull { assetAbi(it).equals(abi, ignoreCase = true) }
+    } ?: apkAssets.firstOrNull { assetAbi(it) == null }
+        ?: error("Release 缺少兼容当前设备的 APK：${supportedAbis.joinToString()}")
+    val apkUrl = apkAsset.optString("browser_download_url")
     require(apkUrl.startsWith("https://") || apkUrl.startsWith("http://")) {
         "Release 缺少 APK 的 browser_download_url"
     }
@@ -398,7 +450,7 @@ internal fun parseReleaseUpdateInfo(json: JSONObject, fallbackWebUrl: String): A
         versionName = versionName,
         versionCode = 0L,
         apkUrl = apkUrl,
-        apkSha256 = apkAsset?.takeUnless { it.isNull("digest") }?.optString("digest").orEmpty(),
+        apkSha256 = apkAsset.takeUnless { it.isNull("digest") }?.optString("digest").orEmpty(),
         releaseNotes = json.optString("body").ifBlank { "发现新版本，暂无更新说明。" },
         releaseNotesUrl = webUrl,
         webUrl = webUrl,
@@ -428,18 +480,5 @@ private fun versionComponents(value: String): List<Long>? {
 }
 
 internal fun deleteCachedUpdateArtifacts(directory: File, keepFile: File? = null): Int {
-    val keepPath = keepFile?.safeCanonicalPath()
-    return directory.listFiles().orEmpty().count { candidate ->
-        val isUpdateArtifact = candidate.isFile && (
-            candidate.name.endsWith(".apk", ignoreCase = true) ||
-                candidate.name.endsWith(".part", ignoreCase = true)
-            )
-        if (!isUpdateArtifact || candidate.safeCanonicalPath() == keepPath) {
-            false
-        } else {
-            runCatching { candidate.delete() }.getOrDefault(false)
-        }
-    }
+    return cleanUpdateArtifacts(listOf(UpdateArtifactRoot(directory, dedicated = true)), listOfNotNull(keepFile)).deletedCount
 }
-
-private fun File.safeCanonicalPath(): String = runCatching { canonicalPath }.getOrDefault(absolutePath)

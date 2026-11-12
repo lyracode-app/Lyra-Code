@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.yukisoffd.lyracode.R
+import com.yukisoffd.lyracode.ai.SubAgentLimits
 import com.yukisoffd.lyracode.mcp.McpJsonConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -346,6 +347,26 @@ class AppSettings(context: Context) {
         get() = plainPrefs.getString(KEY_CODE_FONT_NAME, null)
         private set(value) = plainPrefs.edit().putString(KEY_CODE_FONT_NAME, value).apply()
 
+    var terminalFontPath: String?
+        get() = plainPrefs.getString(KEY_TERMINAL_FONT_PATH, null)?.takeIf { File(it).isFile }
+        private set(value) = plainPrefs.edit().putString(KEY_TERMINAL_FONT_PATH, value).apply()
+
+    val terminalFontName: String?
+        get() = terminalFontPath?.let { plainPrefs.getString(KEY_TERMINAL_FONT_NAME, null) }
+
+    var terminalFontSize: Float
+        get() = plainPrefs.getFloat(KEY_TERMINAL_FONT_SIZE, 13f).coerceIn(8f, 28f)
+        set(value) = plainPrefs.edit().putFloat(KEY_TERMINAL_FONT_SIZE, value.coerceIn(8f, 28f)).apply()
+
+    var terminalColorScheme: String
+        get() = plainPrefs.getString(KEY_TERMINAL_COLOR_SCHEME, "campbell").orEmpty()
+        set(value) = plainPrefs.edit().putString(KEY_TERMINAL_COLOR_SCHEME, value).apply()
+
+    fun selectTerminalFont(item: FontLibraryItem?) {
+        terminalFontPath = item?.path
+        plainPrefs.edit().putString(KEY_TERMINAL_FONT_NAME, item?.name).apply()
+    }
+
     fun fontLibrary(): List<FontLibraryItem> {
         val saved = runCatching {
             val array = JSONArray(plainPrefs.getString(KEY_FONT_LIBRARY, "[]").orEmpty())
@@ -366,8 +387,12 @@ class AppSettings(context: Context) {
         val legacy = listOfNotNull(
             textFontPath?.let { FontLibraryItem("legacy_text", textFontName ?: File(it).name, it) },
             codeFontPath?.let { FontLibraryItem("legacy_code", codeFontName ?: File(it).name, it) },
+            terminalFontPath?.let { FontLibraryItem("legacy_terminal", terminalFontName ?: File(it).name, it) },
         )
-        return (saved + legacy).distinctBy { it.path }
+        val library = (saved + legacy).distinctBy { it.path }
+        // Keep legacy imports in the library when their last active use is toggled off.
+        if (library != saved) saveFontLibrary(library)
+        return library
     }
 
     fun importFonts(uris: List<Uri>): Result<List<FontLibraryItem>> = runCatching {
@@ -418,6 +443,7 @@ class AppSettings(context: Context) {
     fun deleteFont(item: FontLibraryItem) {
         if (textFontPath == item.path) selectFont(null, codeFont = false)
         if (codeFontPath == item.path) selectFont(null, codeFont = true)
+        if (terminalFontPath == item.path) selectTerminalFont(null)
         saveFontLibrary(fontLibrary().filterNot { it.path == item.path })
         runCatching { File(item.path).delete() }
     }
@@ -639,6 +665,9 @@ class AppSettings(context: Context) {
         get() = plainPrefs.getBoolean(KEY_HIDE_TERMUX_PERMISSION_HINT, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_HIDE_TERMUX_PERMISSION_HINT, value).apply()
 
+    internal var composerDeliveryEnabled: Boolean
+        get() = plainPrefs.getBoolean(KEY_COMPOSER_DELIVERY_ENABLED, true)
+        set(value) = plainPrefs.edit().putBoolean(KEY_COMPOSER_DELIVERY_ENABLED, value).apply()
 
     fun disabledTools(): Set<String> = plainPrefs.getStringSet(KEY_DISABLED_TOOLS, emptySet()).orEmpty()
 
@@ -726,6 +755,34 @@ class AppSettings(context: Context) {
     var subAgentOrchestrationEnabled: Boolean
         get() = plainPrefs.getBoolean(KEY_SUB_AGENT_ORCHESTRATION_ENABLED, false)
         set(value) = plainPrefs.edit().putBoolean(KEY_SUB_AGENT_ORCHESTRATION_ENABLED, value).apply()
+
+    /** Largest batch of sub-agent tasks the tool schema offers and the runtime accepts. */
+    var subAgentMaxTasks: Int
+        get() = SubAgentLimits.normalizeTaskLimit(
+            plainPrefs.getInt(KEY_SUB_AGENT_MAX_TASKS, SubAgentLimits.DEFAULT_MAX_TASKS),
+        )
+        set(value) {
+            // Store the clamped concurrency too, so lowering the limit and raising it again
+            // cannot resurrect a concurrency the user never chose at this limit.
+            val tasks = SubAgentLimits.normalizeTaskLimit(value)
+            plainPrefs.edit()
+                .putInt(KEY_SUB_AGENT_MAX_TASKS, tasks)
+                .putInt(
+                    KEY_SUB_AGENT_MAX_CONCURRENCY,
+                    SubAgentLimits.normalizeConcurrency(subAgentMaxConcurrency, tasks),
+                )
+                .apply()
+        }
+
+    /** How many sub-agent tasks may run at once. 1 keeps the sequential behaviour. */
+    var subAgentMaxConcurrency: Int
+        get() = SubAgentLimits.normalizeConcurrency(
+            plainPrefs.getInt(KEY_SUB_AGENT_MAX_CONCURRENCY, SubAgentLimits.DEFAULT_MAX_CONCURRENCY),
+            subAgentMaxTasks,
+        )
+        set(value) = plainPrefs.edit()
+            .putInt(KEY_SUB_AGENT_MAX_CONCURRENCY, SubAgentLimits.normalizeConcurrency(value, subAgentMaxTasks))
+            .apply()
 
     fun subAgents(): List<SubAgentConfig> {
         val raw = plainPrefs.getString(KEY_SUB_AGENT_CONFIGS, null).orEmpty()
@@ -934,6 +991,7 @@ class AppSettings(context: Context) {
     internal val newApiAccount: NewApiAccountClient by lazy {
         val accountPrefs = createSecurePrefs("lyra_new_api_account")
         NewApiAccountClient(object : NewApiAccountStore {
+            override val supportsRememberedLogin = accountPrefs is EncryptedSharedPreferences
             override var state: String
                 get() = accountPrefs.getString("session", "").orEmpty()
                 set(value) { check(accountPrefs.edit().putString("session", value).commit()) { "Unable to save account session" } }
@@ -1479,6 +1537,8 @@ class AppSettings(context: Context) {
             .put("refreshRateMode", refreshRateMode)
             .put("fontScaleMode", fontScaleMode)
             .put("customFontScale", customFontScale.toDouble())
+            .put("terminalFontSize", terminalFontSize.toDouble())
+            .put("terminalColorScheme", terminalColorScheme)
             .put("requestRootAccess", requestRootAccess)
             .put("requestShellAccess", requestShellAccess)
             .put("customSuCommand", customSuCommand)
@@ -1489,6 +1549,7 @@ class AppSettings(context: Context) {
             .put("chatBackgroundPath", chatBackgroundPath.orEmpty())
             .put("chatBackgroundMaskOpacity", chatBackgroundMaskOpacity.toDouble())
             .put("hideTermuxPermissionHint", hideTermuxPermissionHint)
+            .put("composerDeliveryEnabled", composerDeliveryEnabled)
             .put("purePromptMode", purePromptMode)
             .put("selectedSystemPromptId", selectedSystemPromptId)
             .put("customSystemPrompts", JSONObject(plainPrefs.getString(KEY_CUSTOM_SYSTEM_PROMPTS, "{}").orEmpty().ifBlank { "{}" }))
@@ -1599,6 +1660,7 @@ class AppSettings(context: Context) {
             })
             .put("miniServer", miniServerConfigJson(miniServerConfig(), includeSecrets))
             .put("localMcpServer", localMcpServerConfigJson(localMcpServerConfig(), includeSecrets))
+            .also { SubAgentLimits.writeExport(it, subAgentMaxTasks, subAgentMaxConcurrency) }
     }
 
     fun importSettingsJson(root: JSONObject, mode: String): String {
@@ -1614,6 +1676,8 @@ class AppSettings(context: Context) {
         root.optString("refreshRateMode").takeIf { it.isNotBlank() }?.let { refreshRateMode = it }
         root.optString("fontScaleMode").takeIf { it.isNotBlank() }?.let { fontScaleMode = it }
         if (root.has("customFontScale")) customFontScale = root.optDouble("customFontScale", 1.0).toFloat()
+        if (root.has("terminalFontSize")) terminalFontSize = root.optDouble("terminalFontSize", 13.0).toFloat()
+        root.optString("terminalColorScheme").takeIf { it.isNotBlank() }?.let { terminalColorScheme = it }
         if (root.has("requestRootAccess")) requestRootAccess = root.optBoolean("requestRootAccess")
         if (root.has("requestShellAccess")) requestShellAccess = root.optBoolean("requestShellAccess")
         root.optString("customSuCommand").takeIf { it.isNotBlank() }?.let { customSuCommand = it }
@@ -1633,6 +1697,7 @@ class AppSettings(context: Context) {
             ).toFloat()
         }
         if (root.has("hideTermuxPermissionHint")) hideTermuxPermissionHint = root.optBoolean("hideTermuxPermissionHint")
+        if (root.has("composerDeliveryEnabled")) composerDeliveryEnabled = root.optBoolean("composerDeliveryEnabled")
         if (root.has("purePromptMode")) purePromptMode = root.optBoolean("purePromptMode")
         root.optString("selectedSystemPromptId").takeIf { it.isNotBlank() }?.let { selectedSystemPromptId = it }
         root.optJSONObject("customSystemPrompts")?.let { imported ->
@@ -1696,6 +1761,10 @@ class AppSettings(context: Context) {
             messages += "媒体生成模型 ${array.length()} 项"
         }
         if (root.has("subAgentOrchestrationEnabled")) subAgentOrchestrationEnabled = root.optBoolean("subAgentOrchestrationEnabled")
+        SubAgentLimits.readImport(root)?.let { imported ->
+            subAgentMaxTasks = imported.maxTasks
+            subAgentMaxConcurrency = imported.maxConcurrency
+        }
         root.optJSONArray("subAgents")?.let { array ->
             val imported = parseSubAgents(array)
             saveSubAgents(if (supplement) mergeBy(subAgents(), imported) { it.id } else imported)
@@ -2362,6 +2431,10 @@ class AppSettings(context: Context) {
         private const val KEY_CODE_FONT_PATH = "code_font_path"
         private const val KEY_TEXT_FONT_NAME = "text_font_name"
         private const val KEY_CODE_FONT_NAME = "code_font_name"
+        private const val KEY_TERMINAL_FONT_PATH = "terminal_font_path"
+        private const val KEY_TERMINAL_FONT_NAME = "terminal_font_name"
+        private const val KEY_TERMINAL_FONT_SIZE = "terminal_font_size"
+        private const val KEY_TERMINAL_COLOR_SCHEME = "terminal_color_scheme"
         private const val KEY_FONT_LIBRARY = "font_library"
         private const val KEY_REQUEST_ROOT_ACCESS = "request_root_access"
         private const val KEY_REQUEST_SHELL_ACCESS = "request_shell_access"
@@ -2377,6 +2450,7 @@ class AppSettings(context: Context) {
         private const val KEY_CHAT_BACKGROUND_MASK_OPACITY = "chat_background_mask_opacity"
         private const val DEFAULT_CHAT_BACKGROUND_MASK_OPACITY = 0.58f
         private const val KEY_HIDE_TERMUX_PERMISSION_HINT = "hide_termux_permission_hint"
+        private const val KEY_COMPOSER_DELIVERY_ENABLED = "composer_delivery_enabled"
         private const val KEY_DISABLED_TOOLS = "disabled_tools"
         private const val KEY_HIDDEN_TODO_SIGNATURE_PREFIX = "hidden_todo_signature_"
         private const val KEY_CHAT_INPUT_DRAFT_PREFIX = "chat_input_draft_"
@@ -2387,6 +2461,8 @@ class AppSettings(context: Context) {
         private const val KEY_SYSTEM_PROMPT_CONFIGS = "system_prompt_configs"
         private const val KEY_REASONING_DEPTH = "reasoning_depth"
         private const val KEY_SUB_AGENT_ORCHESTRATION_ENABLED = "sub_agent_orchestration_enabled"
+        private const val KEY_SUB_AGENT_MAX_TASKS = "sub_agent_max_tasks"
+        private const val KEY_SUB_AGENT_MAX_CONCURRENCY = "sub_agent_max_concurrency"
         private const val KEY_SUB_AGENT_CONFIGS = "sub_agent_configs"
         private const val KEY_WEB_SEARCH_BLACKLIST = "web_search_blacklist"
         private const val KEY_DEEPSEEK_SEARCH_CONFIG = "deepseek_search_config"

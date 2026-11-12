@@ -1,11 +1,74 @@
 package com.yukisoffd.lyracode.data
 
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdateManagerReleaseTest {
+    private fun releaseWithApks(vararg names: String) = JSONObject()
+        .put("tag_name", "v4.1.4")
+        .put("assets", JSONArray().apply {
+            names.forEach { name ->
+                put(JSONObject().put("name", name)
+                    .put("browser_download_url", "https://example.com/$name")
+                    .put("digest", "sha256:$name"))
+            }
+        })
+
+    @Test
+    fun selectsDeviceAbiEvenWhenAnotherArchitectureIsListedFirst() {
+        val info = parseReleaseUpdateInfo(
+            releaseWithApks("app-x86_64-release.apk", "app-universal-release.apk", "app-arm64-v8a-release.apk"),
+            "https://example.com/releases", listOf("arm64-v8a", "armeabi-v7a"),
+        )
+        assertEquals("https://example.com/app-arm64-v8a-release.apk", info.apkUrl)
+        assertEquals("sha256:app-arm64-v8a-release.apk", info.apkSha256)
+    }
+
+    @Test
+    fun respectsDeviceAbiPreferenceOrder() {
+        val info = parseReleaseUpdateInfo(
+            releaseWithApks("app-armeabi-v7a-release.apk", "app-arm64-v8a-release.apk"),
+            "https://example.com/releases", listOf("arm64-v8a", "armeabi-v7a"),
+        )
+        assertEquals("https://example.com/app-arm64-v8a-release.apk", info.apkUrl)
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun doesNotDistribute32BitReleaseAssets() {
+        parseReleaseUpdateInfo(
+            releaseWithApks("app-x86_64-release.apk", "app-x86-release.apk"),
+            "https://example.com/releases", listOf("x86"),
+        )
+    }
+
+    @Test
+    fun fallsBackToUniversalWhenDeviceAbiIsMissing() {
+        val info = parseReleaseUpdateInfo(
+            releaseWithApks("app-arm64-v8a-release.apk", "app-universal-release.apk"),
+            "https://example.com/releases", listOf("x86_64"),
+        )
+        assertEquals("https://example.com/app-universal-release.apk", info.apkUrl)
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun rejectsReleaseWithOnlyIncompatibleApks() {
+        parseReleaseUpdateInfo(
+            releaseWithApks("app-x86_64-release.apk"),
+            "https://example.com/releases", listOf("arm64-v8a"),
+        )
+    }
+
+    @Test
+    fun skipsMatchingAssetsWithMissingDownloadUrl() {
+        val release = releaseWithApks("app-arm64-v8a-release.apk", "app-universal-release.apk")
+        release.getJSONArray("assets").getJSONObject(0).remove("browser_download_url")
+        val info = parseReleaseUpdateInfo(release, "https://example.com/releases", listOf("arm64-v8a"))
+        assertEquals("https://example.com/app-universal-release.apk", info.apkUrl)
+    }
+
     @Test
     fun preservesGithubAssetDigestForAcceleratedDownloadVerification() {
         val digest = "sha256:" + "a".repeat(64)
