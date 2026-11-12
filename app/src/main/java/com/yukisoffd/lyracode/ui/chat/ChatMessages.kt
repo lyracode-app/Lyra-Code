@@ -117,6 +117,10 @@ private const val ANSWER_MIN_BODY_LENGTH = 400
 // Block-level Markdown openers that start formatted answer text.
 private val PROSE_MARKDOWN_OPENERS = listOf("#", ">", "|", "```", "- ", "* ", "1. ")
 
+// A process card reports its duration only when the span is at least this long, matching
+// formatProcessDuration's one-second resolution: anything shorter would render as "0s".
+private const val MIN_VISIBLE_PROCESS_DURATION_MS = 1_000L
+
 // A paragraph break separates written text from a one-line status note, and the openers
 // above are ASCII in every language, so this test does not depend on the language the
 // answer is written in.
@@ -296,11 +300,16 @@ internal fun AgentProcessSummary(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ProcessDurationHeader(
-                startedAt = startedAt,
-                finishedAt = finishedAt,
-                active = active,
-            )
+            // A turn split by a written answer leaves a trailing card holding only the tool
+            // call after it, whose records share one timestamp. Hide a duration the formatter
+            // would render as "0s"; an in-flight card always shows its elapsed time.
+            if (active || finishedAt - startedAt >= MIN_VISIBLE_PROCESS_DURATION_MS) {
+                ProcessDurationHeader(
+                    startedAt = startedAt,
+                    finishedAt = finishedAt,
+                    active = active,
+                )
+            }
             CollapsedStatusLine(
                 text = collapsedText,
                 expanded = expanded,
