@@ -73,7 +73,8 @@ internal class DeviceChatTranscript(context: Context) : FrameLayout(context), Li
                     val rows = com.yukisoffd.lyracode.chatRenderItems(chat.messages.map { message ->
                         ChatRecord(id = message.id, role = message.role, content = message.text, thinking = message.thinking,
                             toolName = message.toolName, toolInput = message.toolInput, createdAt = message.createdAt)
-                    }, isStreaming = chat.running, collapseStreamingProse = true)
+                    }, isStreaming = chat.running, collapseStreamingProse = true,
+                        foldedReplies = settings.foldedReplies)
                     val list = rememberLazyListState()
                     var follow by remember { mutableStateOf(true) }
                     LaunchedEffect(list) {

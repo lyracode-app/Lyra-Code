@@ -653,6 +653,11 @@ class AppSettings(context: Context) {
             plainPrefs.getString(KEY_STREAMING_ANIMATION_MODE, STREAMING_ANIMATION_TYPEWRITER).orEmpty(),
         )
         set(value) = plainPrefs.edit().putString(KEY_STREAMING_ANIMATION_MODE, normalizeStreamingAnimationMode(value)).apply()
+    var foldedReplies: String
+        get() = normalizeFoldedReplies(
+            plainPrefs.getString(KEY_FOLDED_REPLIES, FOLDED_REPLIES_ANSWERS).orEmpty(),
+        )
+        set(value) = plainPrefs.edit().putString(KEY_FOLDED_REPLIES, normalizeFoldedReplies(value)).apply()
     var chatBackgroundPath: String?
         get() = plainPrefs.getString(KEY_CHAT_BACKGROUND_PATH, null)
         set(value) = plainPrefs.edit().putString(KEY_CHAT_BACKGROUND_PATH, value).apply()
@@ -1546,6 +1551,7 @@ class AppSettings(context: Context) {
             .put("userAvatarPath", userAvatarPath.orEmpty())
             .put("memories", JSONArray().also { array -> memories().forEach { array.put(memoryJson(it)) } })
             .put("streamingAnimationMode", streamingAnimationMode)
+            .put("foldedReplies", foldedReplies)
             .put("chatBackgroundPath", chatBackgroundPath.orEmpty())
             .put("chatBackgroundMaskOpacity", chatBackgroundMaskOpacity.toDouble())
             .put("hideTermuxPermissionHint", hideTermuxPermissionHint)
@@ -1689,6 +1695,7 @@ class AppSettings(context: Context) {
             messages += appContext.getString(R.string.backup_import_memories, imported.size)
         }
         root.optString("streamingAnimationMode").takeIf { it.isNotBlank() }?.let { streamingAnimationMode = it }
+        root.optString("foldedReplies").takeIf { it.isNotBlank() }?.let { foldedReplies = it }
         root.optString("chatBackgroundPath").takeIf { it.isNotBlank() }?.let { chatBackgroundPath = it }
         if (root.has("chatBackgroundMaskOpacity")) {
             chatBackgroundMaskOpacity = root.optDouble(
@@ -2447,6 +2454,7 @@ class AppSettings(context: Context) {
         private const val MAX_MEMORY_PROMPT_CHARS = 24_000
         private const val KEY_CHAT_BACKGROUND_PATH = "chat_background_path"
         private const val KEY_STREAMING_ANIMATION_MODE = "streaming_animation_mode"
+        private const val KEY_FOLDED_REPLIES = "folded_replies"
         private const val KEY_CHAT_BACKGROUND_MASK_OPACITY = "chat_background_mask_opacity"
         private const val DEFAULT_CHAT_BACKGROUND_MASK_OPACITY = 0.58f
         private const val KEY_HIDE_TERMUX_PERMISSION_HINT = "hide_termux_permission_hint"
@@ -2488,6 +2496,13 @@ class AppSettings(context: Context) {
         fun normalizeStreamingAnimationMode(value: String): String = when (value.trim().lowercase()) {
             STREAMING_ANIMATION_FADE -> STREAMING_ANIMATION_FADE
             else -> STREAMING_ANIMATION_TYPEWRITER
+        }
+        const val FOLDED_REPLIES_ANSWERS = "answers"
+        const val FOLDED_REPLIES_ALL = "all"
+
+        fun normalizeFoldedReplies(value: String): String = when (value.trim().lowercase()) {
+            FOLDED_REPLIES_ALL -> FOLDED_REPLIES_ALL
+            else -> FOLDED_REPLIES_ANSWERS
         }
         const val THEME_SYSTEM = "system"
         const val THEME_LIGHT = "light"

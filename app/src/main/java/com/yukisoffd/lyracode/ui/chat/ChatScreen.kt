@@ -287,8 +287,8 @@ internal fun ChatScreen(
     @Suppress("UNUSED_VARIABLE")
     val deviceChatRunning = deviceControlState.chat.running
     val runActiveForComposer = controller.isActiveConversationBusy()
-    val renderItems = remember(messageSnapshot, isRunning) {
-        chatRenderItems(messageSnapshot, isStreaming = isRunning)
+    val renderItems = remember(messageSnapshot, isRunning, controller.settingsRevision.intValue) {
+        chatRenderItems(messageSnapshot, isStreaming = isRunning, foldedReplies = settings.foldedReplies)
     }
     val hasWorkspace = controller.hasWorkspace()
     var forcedSkillIds by rememberSaveable { mutableStateOf(emptyList<String>()) }

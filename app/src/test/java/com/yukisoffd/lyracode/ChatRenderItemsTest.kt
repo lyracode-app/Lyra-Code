@@ -2,6 +2,7 @@ package com.yukisoffd.lyracode
 
 import com.yukisoffd.lyracode.ai.ChatRecord
 import com.yukisoffd.lyracode.ai.MEDIA_MESSAGE_ROLE
+import com.yukisoffd.lyracode.data.AppSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -144,5 +145,163 @@ class ChatRenderItemsTest {
         )
         assertEquals(MEDIA_MESSAGE_ROLE, items[2].message?.role)
         assertTrue(items[2].process.isEmpty())
+    }
+
+    /** The transcript shape from the reported bug: a status line, an answer, a trailing tool call, a closing line. */
+    private fun workedTurn(
+        answer: String,
+        question: String = "freebsd docker?",
+        status: String = "I will check the current landscape.",
+        statusThinking: String = "plan",
+        closing: String = "Sources are linked above.",
+    ) = listOf(
+        ChatRecord(id = 1L, role = "user", content = question, createdAt = 1_000L),
+        ChatRecord(id = 2L, role = "assistant", content = status, thinking = statusThinking, createdAt = 2_000L),
+        ChatRecord(id = 3L, role = "tool", content = "search results", createdAt = 3_000L),
+        ChatRecord(id = 4L, role = "assistant", content = answer, thinking = "long reasoning", createdAt = 4_000L),
+        ChatRecord(id = 5L, role = "tool", content = "sources marked", createdAt = 5_000L),
+        ChatRecord(id = 6L, role = "assistant", content = closing, createdAt = 6_000L),
+    )
+
+    /** The same six records, with only the answer and the closing line readable. */
+    private val workedTurnKeys = listOf("message-1", "process-2", "message-4", "process-5", "message-6")
+
+    /** A four-record turn whose single body either folds or stays, depending on the rule. */
+    private fun plainTurn(body: String) = listOf(
+        ChatRecord(id = 1L, role = "user", content = "ask", createdAt = 1_000L),
+        ChatRecord(id = 2L, role = "assistant", content = body, createdAt = 2_000L),
+        ChatRecord(id = 3L, role = "tool", content = "result", createdAt = 3_000L),
+        ChatRecord(id = 4L, role = "assistant", content = "Done.", createdAt = 4_000L),
+    )
+
+    private val bodyFoldedKeys = listOf("message-1", "process-2", "message-4")
+    private val bodyVisibleKeys = listOf("message-1", "message-2", "process-3", "message-4")
+
+    @Test
+    fun `keeps a written answer visible when tool work follows it`() {
+        val answer = """
+            ## Short answer
+
+            Yes, Podman plus Buildah is the Docker equivalent.
+
+            - Containerfile builds
+            - Official base images
+        """.trimIndent()
+        val items = chatRenderItems(workedTurn(answer = answer))
+
+        assertEquals(workedTurnKeys, items.map { it.key })
+        // Status prose and the answer's own reasoning stay in the log, text intact.
+        assertEquals(listOf(2L, 3L, -4L), items[1].process.map { it.id })
+        assertTrue(items[1].process.any { it.content == "I will check the current landscape." })
+        assertEquals(answer, items[2].message?.content)
+        assertEquals("", items[2].message?.thinking)
+        assertEquals(listOf(5L), items[3].process.map { it.id })
+        assertEquals("Sources are linked above.", items[4].message?.content)
+        // A card spans its own records, not the whole turn: this one ends at the answer's
+        // reasoning copy rather than running on to the closing line.
+        assertEquals(2_000L, items[1].processStartedAt)
+        assertEquals(4_000L, items[1].processFinishedAt)
+        assertEquals(5_000L, items[3].processStartedAt)
+        assertEquals(5_000L, items[3].processFinishedAt)
+    }
+
+    @Test
+    fun `folds a one-sentence status line but keeps multi-block prose`() {
+        val twoBlocks = """
+            First block.
+
+            Second block.
+        """.trimIndent()
+        val items = chatRenderItems(
+            workedTurn(
+                answer = twoBlocks,
+                status = "Checking the handbook first.",
+                statusThinking = "",
+                closing = "Done.",
+            ),
+        )
+
+        assertEquals(workedTurnKeys, items.map { it.key })
+        assertTrue(items[1].process.any { it.content == "Checking the handbook first." })
+        assertEquals(twoBlocks, items[2].message?.content)
+    }
+
+    @Test
+    fun `keeps a long answer visible when a short closing line follows it`() {
+        val answer = "## Short answer\n\n" + "Podman plus Buildah is the Docker equivalent. ".repeat(40).trim()
+        val items = chatRenderItems(workedTurn(answer = answer))
+
+        assertEquals(workedTurnKeys, items.map { it.key })
+        assertEquals(answer, items[2].message?.content)
+    }
+
+    @Test
+    fun `folds a short aside that only looks like prose`() {
+        val aside = "No DNS changes. You literally just go to that address.\n\nQuick confirmation that it's still serving:"
+        val answer = "It ships its own package manager and prefix. ".repeat(15).trim()
+        val items = chatRenderItems(
+            workedTurn(
+                answer = answer,
+                question = "how do I reach it?",
+                status = aside,
+                statusThinking = "",
+                closing = "Asked and answered.",
+            ),
+        )
+
+        assertEquals(workedTurnKeys, items.map { it.key })
+        // The aside has a blank line, so the shape test alone would surface it. A larger
+        // body follows it, so it stays in the log with its text intact.
+        assertTrue(items[1].process.any { it.content == aside })
+        assertEquals(answer, items[2].message?.content)
+    }
+
+    @Test
+    fun `keeps a short CJK answer visible because no larger body follows it`() {
+        val answer = """
+            简短回答：Podman 配合 Buildah 就是 FreeBSD 上的容器方案。
+
+            它支持 OCI 镜像规范和 Containerfile 构建，官方基础镜像也已经可用。
+        """.trimIndent()
+
+        // CJK carries about a word per character, so this answer is short by character
+        // count and long by meaning. It must not depend on the character threshold.
+        assertTrue(answer.length < 400)
+
+        val items = chatRenderItems(
+            workedTurn(
+                answer = answer,
+                question = "freebsd 上怎么跑容器？",
+                status = "我先确认一下最新的版本情况。",
+                statusThinking = "计划",
+                closing = "来源链接见上方。",
+            ),
+        )
+
+        assertEquals(workedTurnKeys, items.map { it.key })
+        assertTrue(items[1].process.any { it.content == "我先确认一下最新的版本情况。" })
+        assertEquals(answer, items[2].message?.content)
+    }
+
+    @Test
+    fun `switches on the answer length at its boundary`() {
+        // A single unbroken line, so only the length carries the body.
+        assertEquals(bodyFoldedKeys, chatRenderItems(plainTurn("a".repeat(399))).map { it.key })
+        assertEquals(bodyVisibleKeys, chatRenderItems(plainTurn("a".repeat(400))).map { it.key })
+    }
+
+    @Test
+    fun `shows every reply when folded replies is all`() {
+        val items = chatRenderItems(
+            plainTurn("Checking the handbook first."),
+            foldedReplies = AppSettings.FOLDED_REPLIES_ALL,
+        )
+
+        assertEquals(bodyVisibleKeys, items.map { it.key })
+        // The status line that folds under the default stays visible, and the tool row
+        // still sits in a process card.
+        assertEquals("Checking the handbook first.", items[1].message?.content)
+        assertEquals(listOf(3L), items[2].process.map { it.id })
+        assertEquals("Done.", items[3].message?.content)
     }
 }

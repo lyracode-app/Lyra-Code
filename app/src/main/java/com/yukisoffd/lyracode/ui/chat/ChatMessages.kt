@@ -109,10 +109,91 @@ internal data class ChatRenderItem(
 
 private fun sourceMessageId(id: Long): Long = if (id < 0L) -id else id
 
+// A body this long is a written answer rather than a status line such as
+// "Let me verify X". Calibrated on English transcripts, where the longest status line
+// measured 347 characters and the shortest written answer 408.
+private const val ANSWER_MIN_BODY_LENGTH = 400
+
+// Block-level Markdown openers that start formatted answer text.
+private val PROSE_MARKDOWN_OPENERS = listOf("#", ">", "|", "```", "- ", "* ", "1. ")
+
+// A process card reports its duration only when the span is at least this long, matching
+// formatProcessDuration's one-second resolution: anything shorter would render as "0s".
+private const val MIN_VISIBLE_PROCESS_DURATION_MS = 1_000L
+
+// A paragraph break separates written text from a one-line status note, and the openers
+// above are ASCII in every language, so this test does not depend on the language the
+// answer is written in.
+private fun isProseShape(content: String): Boolean {
+    val trimmed = content.trim()
+    if (trimmed.isEmpty()) return false
+    if (trimmed.contains("\n\n")) return true
+    val firstLine = trimmed.lineSequence().first().trimStart()
+    return PROSE_MARKDOWN_OPENERS.any { firstLine.startsWith(it) }
+}
+
+// Bodies that stay visible once the turn is complete. Size alone folded every short
+// answer; shape alone surfaced one-line asides that merely happened to contain a blank
+// line, and hid the real answer behind them. So a shaped body also stays visible when no
+// larger body follows it in the same turn: CJK text carries about a word per character,
+// and this relative test keeps a short Chinese answer readable without reviving the
+// asides. Comparing against the turn's largest body instead is too brittle, because two
+// short bodies can differ by a single character.
+private fun visibleAnswerIndexes(turn: List<ChatRecord>, foldedReplies: String): Set<Int> {
+    val bodies = turn.indices.filter { index ->
+        turn[index].role == "assistant" && turn[index].content.isNotBlank()
+    }
+    if (bodies.isEmpty()) return emptySet()
+    // "all" is the escape hatch for readers who want every reply kept in the transcript
+    // instead of folding short status lines into the process log.
+    if (foldedReplies == AppSettings.FOLDED_REPLIES_ALL) return bodies.toSet()
+    val finalAnswerIndex = turn.lastIndex.takeIf {
+        turn[it].role == "assistant" && turn[it].content.isNotBlank()
+    } ?: -1
+    // Sizes are trimmed before they are compared. Surrounding whitespace must not decide
+    // whether a body clears the size threshold, or which of two bodies is the larger one.
+    val sizes = turn.map { it.content.trim().length }
+    return bodies.filterTo(mutableSetOf()) { index ->
+        index == finalAnswerIndex ||
+            sizes[index] >= ANSWER_MIN_BODY_LENGTH ||
+            (isProseShape(turn[index].content) &&
+                bodies.none { later -> later > index && sizes[later] > sizes[index] })
+    }
+}
+
+// One collapsed card for a run of adjacent thinking and tool records. The list is copied
+// because the caller clears its buffer as soon as this returns.
+private fun processItem(process: List<ChatRecord>): ChatRenderItem {
+    val records = process.toList()
+    return ChatRenderItem(
+        key = "process-${sourceMessageId(records.first().id)}",
+        process = records,
+        processStartedAt = records.minOfOrNull { it.createdAt },
+        processFinishedAt = records.maxOfOrNull { it.createdAt },
+    )
+}
+
+// Collects folded records and emits them as one process card when a visible body
+// interrupts them.
+private class ProcessCardBuffer(private val items: MutableList<ChatRenderItem>) {
+    private val pending = mutableListOf<ChatRecord>()
+
+    fun add(message: ChatRecord) {
+        pending += message
+    }
+
+    fun flush() {
+        if (pending.isEmpty()) return
+        items += processItem(pending)
+        pending.clear()
+    }
+}
+
 internal fun chatRenderItems(
     messages: List<ChatRecord>,
     isStreaming: Boolean = false,
     collapseStreamingProse: Boolean = false,
+    foldedReplies: String = AppSettings.FOLDED_REPLIES_ANSWERS,
 ): List<ChatRenderItem> {
     val result = mutableListOf<ChatRenderItem>()
     val assistantTurn = mutableListOf<ChatRecord>()
@@ -122,80 +203,40 @@ internal fun chatRenderItems(
         val turn = assistantTurn.toList()
         assistantTurn.clear()
         if (streamTurn && collapseStreamingProse) {
-            result += ChatRenderItem(key = "process-${turn.first().id}", process = turn,
-                processStartedAt = turn.minOfOrNull { it.createdAt }, processFinishedAt = turn.maxOfOrNull { it.createdAt })
+            result += processItem(turn)
             return
         }
-        if (streamTurn) {
-            val pendingProcess = mutableListOf<ChatRecord>()
-
-            fun flushPendingProcess() {
-                if (pendingProcess.isEmpty()) return
-                val process = pendingProcess.toList()
-                pendingProcess.clear()
-                val firstSourceId = sourceMessageId(process.first().id)
+        // A record either stays readable in the transcript or folds into the process log.
+        // Both turn shapes walk their records the same way and differ only in which bodies
+        // count as visible, so the walk takes that decision as a parameter.
+        fun emitTurn(isVisible: (Int, ChatRecord) -> Boolean) {
+            val process = ProcessCardBuffer(result)
+            turn.forEachIndexed { index, message ->
+                if (!isVisible(index, message)) {
+                    process.add(message)
+                    return@forEachIndexed
+                }
+                // The visible body owns its answer; its reasoning stays with the log.
+                if (message.thinking.isNotBlank()) {
+                    process.add(message.copy(id = -message.id, content = ""))
+                }
+                // A visible body is a boundary: the records before it close as one card.
+                process.flush()
                 result += ChatRenderItem(
-                    key = "process-$firstSourceId",
-                    process = process,
-                    processStartedAt = process.minOfOrNull { it.createdAt },
-                    processFinishedAt = process.maxOfOrNull { it.createdAt },
+                    key = "message-${message.id}",
+                    message = message.copy(thinking = ""),
                 )
             }
-
-            turn.forEach { message ->
-                if (message.role == "assistant") {
-                    if (message.thinking.isNotBlank() || message.content.isBlank()) {
-                        val processMessage = if (message.content.isNotBlank()) {
-                            message.copy(id = -message.id, content = "")
-                        } else {
-                            message
-                        }
-                        pendingProcess += processMessage
-                    }
-                    if (message.content.isNotBlank()) {
-                        // Intermediate prose is a visual boundary: all following
-                        // thinking/tool activity starts a new process card.
-                        flushPendingProcess()
-                        result += ChatRenderItem(
-                            key = "message-${message.id}",
-                            message = message.copy(thinking = ""),
-                        )
-                    }
-                } else {
-                    pendingProcess += message
-                }
-            }
-            flushPendingProcess()
+            process.flush()
+        }
+        if (streamTurn) {
+            emitTurn { _, message -> message.role == "assistant" && message.content.isNotBlank() }
             return
         }
-        // Prose followed by tools is still intermediate output, including interrupted
-        // device tasks. Moving it after those tools changes the recorded chronology.
-        val finalAnswerIndex = turn.lastIndex.takeIf {
-            turn[it].role == "assistant" && turn[it].content.isNotBlank()
-        } ?: -1
-        val process = buildList {
-            turn.forEachIndexed { index, message ->
-                if (index == finalAnswerIndex) {
-                    if (message.thinking.isNotBlank()) {
-                        add(message.copy(id = -message.id, content = ""))
-                    }
-                } else {
-                    add(message)
-                }
-            }
-        }
-        if (process.isNotEmpty()) {
-            result += ChatRenderItem(
-                key = "process-${turn.first().id}",
-                process = process,
-                processStartedAt = turn.minOfOrNull { it.createdAt },
-                processFinishedAt = turn.maxOfOrNull { it.createdAt },
-            )
-        }
-        if (finalAnswerIndex >= 0) {
-            val finalAnswer = turn[finalAnswerIndex].copy(thinking = "")
-            result += ChatRenderItem("message-${finalAnswer.id}", message = finalAnswer)
-        }
+        // Interrupted device tasks keep their prose in the log, and a visible body always
+        // flushes the records collected before it, so folding never reorders the turn.
+        val answerIndexes = visibleAnswerIndexes(turn, foldedReplies)
+        emitTurn { index, _ -> index in answerIndexes }
     }
 
     messages.forEach { message ->
@@ -259,11 +300,16 @@ internal fun AgentProcessSummary(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ProcessDurationHeader(
-                startedAt = startedAt,
-                finishedAt = finishedAt,
-                active = active,
-            )
+            // A turn split by a written answer leaves a trailing card holding only the tool
+            // call after it, whose records share one timestamp. Hide a duration the formatter
+            // would render as "0s"; an in-flight card always shows its elapsed time.
+            if (active || finishedAt - startedAt >= MIN_VISIBLE_PROCESS_DURATION_MS) {
+                ProcessDurationHeader(
+                    startedAt = startedAt,
+                    finishedAt = finishedAt,
+                    active = active,
+                )
+            }
             CollapsedStatusLine(
                 text = collapsedText,
                 expanded = expanded,

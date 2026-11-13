@@ -1363,6 +1363,11 @@
     <string name="streaming_fade_title">Fade in</string>
     <string name="streaming_fade_desc">New content smoothly fades from transparent to clear</string>
     <string name="streaming_selected">Selected</string>
+    <string name="folded_replies_title">Replies shown</string>
+    <string name="folded_replies_answers_title">Answers only</string>
+    <string name="folded_replies_answers_desc">Only substantive answers stay in the chat; short status lines fold into the process log.</string>
+    <string name="folded_replies_all_title">All replies</string>
+    <string name="folded_replies_all_desc">Every assistant reply stays visible in the chat.</string>
     <!-- Chat composer -->
     <string name="label_sub_agent_short">Sub-agent</string>
     <string name="action_fullscreen_input">Fullscreen input</string>

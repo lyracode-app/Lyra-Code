@@ -194,7 +194,7 @@ internal fun SettingsScreen(
         "topic_summary_model_media_video",
         "topic_summary_model_media_music",
         "topic_summary_model_media_audio" -> "topic_summary_model"
-        "theme_mode", "font", "refresh_rate", "chat_background", "streaming_output", "app_icon" -> "theme"
+        "theme_mode", "font", "refresh_rate", "chat_background", "streaming_output", "folded_replies", "app_icon" -> "theme"
         "mini_server_logs" -> "mini_server"
         else -> null
     }
@@ -383,6 +383,7 @@ internal fun SettingsScreen(
                         onOpenChatBackgroundSettings = { detail = "chat_background" },
                         onOpenAppIconSettings = { detail = "app_icon" },
                         onOpenStreamingOutputSettings = { detail = "streaming_output" },
+                        onOpenFoldedRepliesSettings = { detail = "folded_replies" },
                     )
                     "theme_mode" -> ThemeModeSettings(
                         settings = settings,
@@ -403,6 +404,7 @@ internal fun SettingsScreen(
                     "chat_background" -> ChatBackgroundSettings(settings)
                     "app_icon" -> AppIconSettings(settings)
                     "streaming_output" -> StreamingOutputSettings(settings, controller)
+                    "folded_replies" -> FoldedRepliesSettings(settings, controller)
                     "font" -> FontSizeSettings(
                         settings = settings,
                         controller = controller,
@@ -676,8 +678,8 @@ internal fun SettingsScreen(
                             initialState == "device_interaction_control" && targetState == "floating_page" -> true
                             initialState in ADDITIONAL_MODEL_DETAIL_IDS && targetState == "topic_summary_model" -> false
                             initialState == "topic_summary_model" && targetState in ADDITIONAL_MODEL_DETAIL_IDS -> true
-                            initialState in setOf("theme_mode", "font", "refresh_rate", "chat_background", "streaming_output", "app_icon") && targetState == "theme" -> false
-                            initialState == "theme" && targetState in setOf("theme_mode", "font", "refresh_rate", "chat_background", "streaming_output", "app_icon") -> true
+                            initialState in setOf("theme_mode", "font", "refresh_rate", "chat_background", "streaming_output", "folded_replies", "app_icon") && targetState == "theme" -> false
+                            initialState == "theme" && targetState in setOf("theme_mode", "font", "refresh_rate", "chat_background", "streaming_output", "folded_replies", "app_icon") -> true
                             initialState == "mini_server_logs" && targetState == "mini_server" -> false
                             initialState == "mini_server" && targetState == "mini_server_logs" -> true
                             targetState == null -> false
@@ -754,6 +756,7 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "chat_background" -> context.getString(R.string.detail_chat_background)
     "app_icon" -> context.getString(R.string.app_icon_title)
     "streaming_output" -> context.getString(R.string.detail_streaming_output)
+    "folded_replies" -> uiText(R.string.folded_replies_title)
     "permissions" -> context.getString(R.string.detail_permissions)
     "system_permissions" -> context.getString(R.string.detail_system_permissions)
     "device_interaction" -> context.getString(R.string.detail_device_interaction)
