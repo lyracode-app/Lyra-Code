@@ -123,31 +123,31 @@ class UpdateManagerReleaseTest {
     }
 
     @Test
-    fun selectsApkFromGiteeAssetsAndUsesFallbackReleasePage() {
+    fun selectsApkFromGitHubAssetsAndUsesFallbackReleasePage() {
         val info = parseReleaseUpdateInfo(
             JSONObject(
                 """
                 {
                   "tag_name": "v3.10.0",
-                  "body": "Gitee details",
+                  "body": "GitHub details",
                   "assets": [
                     {
                       "name": "v3.10.0.zip",
-                      "browser_download_url": "https://gitee.com/example/archive/v3.10.0.zip"
+                      "browser_download_url": "https://github.com/example/app/archive/v3.10.0.zip"
                     },
                     {
                       "name": "lyracode-3.10.0.apk",
-                      "browser_download_url": "https://gitee.com/example/lyracode-3.10.0.apk"
+                      "browser_download_url": "https://github.com/example/app/releases/download/v3.10.0/lyracode-3.10.0.apk"
                     }
                   ]
                 }
                 """.trimIndent(),
             ),
-            fallbackWebUrl = "https://gitee.com/yukisoffd/lyra-code/releases",
+            fallbackWebUrl = "https://github.com/example/app/releases",
         )
 
-        assertEquals("https://gitee.com/example/lyracode-3.10.0.apk", info.apkUrl)
-        assertEquals("https://gitee.com/yukisoffd/lyra-code/releases", info.webUrl)
+        assertEquals("https://github.com/example/app/releases/download/v3.10.0/lyracode-3.10.0.apk", info.apkUrl)
+        assertEquals("https://github.com/example/app/releases", info.webUrl)
         assertEquals(1, compareVersionNames("3.10.0", "3.9.9"))
         assertEquals(0, compareVersionNames("v3.10", "3.10.0-debug"))
     }

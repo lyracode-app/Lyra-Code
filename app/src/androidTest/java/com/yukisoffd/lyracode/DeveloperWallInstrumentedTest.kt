@@ -67,11 +67,12 @@ class DeveloperWallInstrumentedTest {
         assertEquals("https://example.com/alice", opened)
     }
 
-    @Test fun failedOrEmptyWallRendersNoSection() {
+    @Test fun failedWallWithoutCacheShowsConnectionError() {
         val repository = repository("{invalid")
         compose.setContent { MaterialTheme { DeveloperWallScreen(repository) } }
         compose.onNodeWithText(context.getString(R.string.developer_wall_title)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.developer_wall_developers)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.developer_wall_server_unavailable)).assertIsDisplayed()
     }
 
     @Test fun capturesThreeColumnAvatarLayout() {
@@ -109,12 +110,12 @@ class DeveloperWallInstrumentedTest {
         assertTrue(opened)
     }
 
-    @Test fun unavailableWallHidesAboutEntry() {
+    @Test fun unavailableWallKeepsAboutEntryVisible() {
         val repository = repository("{invalid")
         compose.setContent {
             MaterialTheme { DeveloperWallEntry(onClick = {}, repository = repository) }
         }
-        compose.onNodeWithText(context.getString(R.string.developer_wall_title)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.developer_wall_title)).assertIsDisplayed()
     }
 
     @Test fun longWallScrollsInsideItsOwnSettingsPage() {

@@ -15,4 +15,6 @@
     <string name="developer_wall_information">About the developer wall</string>
     <string name="developer_wall_information_body">The developer wall is maintained manually. If anyone is missing or any information is incorrect, please submit an issue.</string>
     <string name="developer_wall_report_issue">Submit an issue</string>
+    <string name="developer_wall_server_unavailable">Unable to connect to the server.</string>
+    <string name="developer_wall_empty">There are no entries on the developer wall yet.</string>
 </resources>

@@ -77,10 +77,7 @@ internal fun DeveloperWallEntry(
     onClick: () -> Unit,
     repository: DeveloperWallRepository = DeveloperWallManager.get(LocalContext.current),
 ) {
-    val state by repository.state.collectAsState()
     LaunchedEffect(repository) { repository.sync() }
-    if (state.people.isEmpty()) return
-
     KimiCardBox {
         KimiMenuRow(Icons.Default.Groups, uiText(R.string.developer_wall_title), onClick = onClick)
     }
@@ -172,6 +169,16 @@ internal fun DeveloperWallScreen(repository: DeveloperWallRepository = Developer
                 contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
+                if (state.people.isEmpty() && !isRefreshing && state.syncedAt != 0L) {
+                    item {
+                        Text(
+                            uiText(if (state.succeeded) R.string.developer_wall_empty else R.string.developer_wall_server_unavailable),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                            color = KimiMuted,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
+                }
                 val roleTitles = listOf(
                     R.string.developer_wall_developers,
                     R.string.developer_wall_sponsors,

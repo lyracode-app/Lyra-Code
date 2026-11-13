@@ -250,11 +250,17 @@ class GitHubAccelerationInstrumentedTest {
                     AboutSoftwareScreen(false, {}, {}, {}, onOpenGitHubAcceleration = { url ->
                         selectedUrl.value = url
                         accelerationPage.value = true
-                    }, updateInfoState = infoState)
+                    }, onOpenUpdateManagement = {}, updateInfoState = infoState)
                 }
             }
         }
         compose.onNodeWithText("Release notes").assertIsDisplayed()
+        compose.onNodeWithText("Download in App", ignoreCase = true).performClick()
+        compose.onNodeWithText("Download from original URL").assertIsDisplayed()
+        compose.onNodeWithText("Download via GH-Proxy").assertIsDisplayed()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK")
+            .use { command -> android.os.ParcelFileDescriptor.AutoCloseInputStream(command).use { it.readBytes() } }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Download from original URL").fetchSemanticsNodes().isEmpty() }
         compose.onNode(hasText("GitHub acceleration links") and hasAnyAncestor(isDialog())).performClick()
         assertEquals(sourceUrl, selectedUrl.value)
         compose.onNodeWithText("Automatic fallback").assertIsDisplayed()

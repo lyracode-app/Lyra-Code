@@ -2,6 +2,8 @@ package com.yukisoffd.lyracode.data
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -15,6 +17,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 
 data class AppUpdateInfo(
     val versionName: String,
@@ -44,6 +47,22 @@ data class UpdateDownloadProgress(
         get() = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
 }
 
+internal data class DownloadedUpdate(
+    val file: File,
+    val versionName: String,
+    val versionCode: Long,
+    val sha256: String,
+) {
+    fun matches(info: AppUpdateInfo): Boolean =
+        compareUpdateVersions(versionName, versionCode, info.versionName, info.versionCode) == 0
+
+    fun isOlderThan(info: AppUpdateInfo): Boolean =
+        compareUpdateVersions(versionName, versionCode, info.versionName, info.versionCode)?.let { it < 0 } == true
+}
+
+private fun compareUpdateVersions(name: String, code: Long, otherName: String, otherCode: Long): Int? =
+    if (code > 0L && otherCode > 0L) code.compareTo(otherCode) else compareVersionNames(name, otherName)
+
 class UpdateManager(private val context: Context) {
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE)
@@ -68,7 +87,7 @@ class UpdateManager(private val context: Context) {
     )
 
     init {
-        // A cached universal URL from older clients must not bypass the new ABI selection.
+        // Refresh cached metadata when the supported ABIs or update source policy change.
         val deviceAbis = Build.SUPPORTED_ABIS.filter { it in distributedUpdateAbis }.joinToString(",")
         fun needsRefresh() = prefs.getInt(KEY_APK_SELECTION_POLICY, 0) != APK_SELECTION_POLICY ||
             prefs.getString(KEY_APK_SELECTION_ABIS, null) != deviceAbis
@@ -86,73 +105,75 @@ class UpdateManager(private val context: Context) {
 
     fun manifestUrl(): String = com.yukisoffd.lyracode.BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim()
 
-    fun currentVersionCode(): Long {
-        val info = packageInfo()
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else {
-            @Suppress("DEPRECATION")
-            info.versionCode.toLong()
-        }
-    }
+    fun currentVersionCode(): Long = packageInfo().updateVersionCode()
 
     fun currentVersionName(): String = packageInfo().versionName.orEmpty()
 
-    private fun packageInfo(): android.content.pm.PackageInfo {
+    private fun packageInfo(flags: Int = 0): PackageInfo {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            appContext.packageManager.getPackageInfo(appContext.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            appContext.packageManager.getPackageInfo(appContext.packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
         } else {
             @Suppress("DEPRECATION")
-            appContext.packageManager.getPackageInfo(appContext.packageName, 0)
+            appContext.packageManager.getPackageInfo(appContext.packageName, flags)
         }
     }
 
-    fun checkForUpdate(): Result<AppUpdateInfo?> = runCatching {
-        val sources = buildList<Pair<String, () -> AppUpdateInfo>> {
-            manifestUrl().takeIf { it.isNotBlank() }?.let { url ->
-                add("网站 JSON" to { parseUpdateInfo(fetchJson(url)) })
-            }
-            add("GitHub" to {
-                parseReleaseUpdateInfo(
+    internal fun checkChannels(): List<UpdateCheckChannel> =
+        decodeUpdateCheckChannels(prefs.getString(KEY_CHECK_CHANNELS, null))
+
+    internal fun setCheckChannels(channels: List<UpdateCheckChannel>) = synchronized(UpdateDownloadFiles.lock) {
+        require(channels.isNotEmpty())
+        val ordered = channels.distinct()
+        if (ordered != checkChannels()) {
+            prefs.edit()
+                .putString(KEY_CHECK_CHANNELS, ordered.joinToString(",") { it.id })
+                .remove(KEY_LAST_DAILY_CHECK_DATE)
+                .apply()
+            clearLatestAvailableUpdate()
+        }
+    }
+
+    fun checkForUpdate(): Result<AppUpdateInfo?> = checkForUpdate(dailyCheckDate = null)
+
+    private fun checkForUpdate(dailyCheckDate: String?): Result<AppUpdateInfo?> = runCatching {
+        val channels = checkChannels()
+        val release = loadFromUpdateChannels(
+            channels,
+            onFailure = { channel, error ->
+                "${context.getString(channel.title)}: ${error.message.orEmpty().ifBlank { error.javaClass.simpleName }}"
+            },
+        ) { channel ->
+            when (channel) {
+                UpdateCheckChannel.MANIFEST -> {
+                    val url = manifestUrl()
+                    require(url.isNotBlank()) { context.getString(R.string.update_manifest_unconfigured) }
+                    parseUpdateInfo(fetchJson(url))
+                }
+                UpdateCheckChannel.GITHUB -> parseReleaseUpdateInfo(
                     json = fetchJson(GITHUB_LATEST_RELEASE_API),
                     fallbackWebUrl = GITHUB_RELEASES_URL,
                     supportedAbis = Build.SUPPORTED_ABIS.toList(),
                 )
-            })
-            add("Gitee" to {
-                parseReleaseUpdateInfo(
-                    json = fetchJson(GITEE_LATEST_RELEASE_API),
-                    fallbackWebUrl = GITEE_RELEASES_URL,
-                    supportedAbis = Build.SUPPORTED_ABIS.toList(),
-                )
-            })
-        }
-        val failures = mutableListOf<String>()
-        for ((name, load) in sources) {
-            try {
-                val info = load()
-                return@runCatching if (info.isNewerThan(currentVersionCode(), currentVersionName())) info else null
-            } catch (error: Exception) {
-                failures += "$name：${error.message.orEmpty().ifBlank { error.javaClass.simpleName }}"
             }
         }
-        error("版本检测失败，所有更新来源均不可用：${failures.joinToString("；")}")
+        val available = release.takeIf { it.isNewerThan(currentVersionCode(), currentVersionName()) }
+        synchronized(UpdateDownloadFiles.lock) {
+            check(channels == checkChannels()) { context.getString(R.string.update_channels_changed) }
+            if (available == null) clearLatestAvailableUpdate() else saveLatestAvailableUpdate(available)
+            if (dailyCheckDate != null) prefs.edit().putString(KEY_LAST_DAILY_CHECK_DATE, dailyCheckDate).apply()
+            available
+        }
     }
 
-    fun checkDailyForUpdateIfNeeded(): Result<AppUpdateInfo?> = runCatching {
+    fun checkDailyForUpdateIfNeeded(): Result<AppUpdateInfo?> {
         val today = java.time.LocalDate.now().toString()
         if (prefs.getString(KEY_LAST_DAILY_CHECK_DATE, "") == today) {
-            return@runCatching latestAvailableUpdate()
+            return Result.success(latestAvailableUpdate())
         }
-        val info = checkForUpdate().getOrThrow()
-        prefs.edit().putString(KEY_LAST_DAILY_CHECK_DATE, today).apply()
-        if (info == null) {
-            clearLatestAvailableUpdate()
-        } else {
-            saveLatestAvailableUpdate(info)
-        }
-        info
+        return checkForUpdate(today)
     }
 
-    fun latestAvailableUpdate(): AppUpdateInfo? {
+    fun latestAvailableUpdate(): AppUpdateInfo? = synchronized(UpdateDownloadFiles.lock) {
         val versionCode = prefs.getLong(KEY_LATEST_VERSION_CODE, 0L)
         val info = AppUpdateInfo(
             versionName = prefs.getString(KEY_LATEST_VERSION_NAME, "").orEmpty(),
@@ -166,9 +187,9 @@ class UpdateManager(private val context: Context) {
         )
         if (!info.isNewerThan(currentVersionCode(), currentVersionName())) {
             clearLatestAvailableUpdate()
-            return null
+            return@synchronized null
         }
-        return info
+        info
     }
 
     fun hasAvailableUpdate(): Boolean = latestAvailableUpdate() != null
@@ -192,7 +213,7 @@ class UpdateManager(private val context: Context) {
             .apply()
     }
 
-    fun saveLatestAvailableUpdate(info: AppUpdateInfo) {
+    fun saveLatestAvailableUpdate(info: AppUpdateInfo) = synchronized(UpdateDownloadFiles.lock) {
         prefs.edit()
             .putLong(KEY_LATEST_VERSION_CODE, info.versionCode)
             .putString(KEY_LATEST_VERSION_NAME, info.versionName)
@@ -203,9 +224,10 @@ class UpdateManager(private val context: Context) {
             .putString(KEY_LATEST_WEB_URL, info.webUrl)
             .putBoolean(KEY_LATEST_MANDATORY, info.mandatory)
             .apply()
+        if (readPendingUpdate()?.isOlderThan(info) == true) clearPendingApk()
     }
 
-    fun clearLatestAvailableUpdate() {
+    fun clearLatestAvailableUpdate() = synchronized(UpdateDownloadFiles.lock) {
         prefs.edit()
             .remove(KEY_LATEST_VERSION_CODE)
             .remove(KEY_LATEST_VERSION_NAME)
@@ -218,33 +240,45 @@ class UpdateManager(private val context: Context) {
             .apply()
     }
 
-    fun downloadApk(
+    internal fun downloadRoutes(info: AppUpdateInfo): List<List<GitHubDownloadTarget>> =
+        selectableGitHubDownloadRoutes(info.apkUrl, accelerationSettings.load())
+
+    internal fun downloadApk(
         info: AppUpdateInfo,
+        targets: List<GitHubDownloadTarget> = githubDownloadTargets(info.apkUrl, accelerationSettings.load()),
         onProgress: (UpdateDownloadProgress) -> Unit,
     ): Result<File> = runCatching {
         require(info.apkUrl.startsWith("https://") || info.apkUrl.startsWith("http://")) { "安装包下载地址无效" }
         val version = info.versionName.ifBlank { info.versionCode.toString() }.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val directory = requireNotNull(apkStorage.downloadDirectory) { "外部应用文件目录不可用，无法保存更新安装包" }
         val output = File(directory, "LyraCode-$version.apk")
+        val downloaded = DownloadedUpdate(output, info.versionName, info.versionCode, info.apkSha256)
         synchronized(UpdateDownloadFiles.lock) {
+            pendingDownload()?.takeIf { it.matches(info) }?.let { return@runCatching it.file }
             check(UpdateDownloadFiles.activeFile == null) { "已有更新安装包正在下载" }
+            check(latestAvailableUpdate()?.let(downloaded::isOlderThan) != true) {
+                context.getString(R.string.update_download_superseded)
+            }
             UpdateDownloadFiles.activeFile = output
         }
         try {
             // Also removes abandoned downloads from previous app versions/volumes.
-            pendingDownloadedApk()
             val file = apkDownloader.download(
-                targets = githubDownloadTargets(info.apkUrl, accelerationSettings.load()),
+                targets = targets,
                 output = output,
-                expectedSha256 = info.apkSha256,
+                expectedSha256 = "",
             ) { target, downloaded, total ->
                 val status = target.acceleratorName?.let {
-                    context.getString(R.string.github_acceleration_download_via, it)
+                    context.getString(R.string.github_acceleration_downloading_via, it)
                 } ?: context.getString(R.string.github_acceleration_download_direct)
                 onProgress(UpdateDownloadProgress(downloaded, total, status))
             }
             synchronized(UpdateDownloadFiles.lock) {
-                savePendingApk(file, info)
+                if (latestAvailableUpdate()?.let(downloaded::isOlderThan) == true) {
+                    file.delete()
+                    error(context.getString(R.string.update_download_superseded))
+                }
+                savePendingApk(downloaded)
                 pruneCachedUpdateArtifacts(keepFile = file)
             }
             onProgress(UpdateDownloadProgress(file.length(), file.length(), context.getString(R.string.github_acceleration_download_complete)))
@@ -254,47 +288,107 @@ class UpdateManager(private val context: Context) {
         }
     }
 
-    fun pendingDownloadedApk(): File? = synchronized(UpdateDownloadFiles.lock) { pendingDownloadedApkLocked() }
+    fun pendingDownloadedApk(): File? = pendingDownload()?.file
 
-    private fun pendingDownloadedApkLocked(): File? {
+    private fun readPendingUpdate(): DownloadedUpdate? {
         val path = prefs.getString(KEY_PENDING_APK_PATH, null).orEmpty()
-        if (path.isBlank()) {
-            pruneCachedUpdateArtifacts()
-            return null
-        }
-        val pendingVersionCode = prefs.getLong(KEY_PENDING_VERSION_CODE, 0L)
-        val pendingVersionName = prefs.getString(KEY_PENDING_VERSION_NAME, "").orEmpty()
-        val installedTargetVersion = if (pendingVersionCode > 0L) {
-            currentVersionCode() >= pendingVersionCode
-        } else {
-            compareVersionNames(currentVersionName(), pendingVersionName)?.let { it >= 0 } == true
-        }
-        if (installedTargetVersion) {
-            clearPendingApk()
-            pruneCachedUpdateArtifacts()
-            return null
-        }
-        val file = File(path)
-        val valid = runCatching {
-            apkStorage.owns(file) && Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                file.length() > 0L && isZipApk(file) &&
-                prefs.getString(KEY_PENDING_APK_SHA256, "").orEmpty().let { expected ->
-                    expected.isBlank() || apkSha256(file).equals(expected, ignoreCase = true)
-                }
-        }.getOrDefault(false)
-        if (!valid) {
-            clearPendingApk()
-            pruneCachedUpdateArtifacts()
-            return null
-        }
-        pruneCachedUpdateArtifacts(keepFile = file)
-        return file
+        if (path.isBlank()) return null
+        return DownloadedUpdate(
+            File(path),
+            prefs.getString(KEY_PENDING_VERSION_NAME, "").orEmpty(),
+            prefs.getLong(KEY_PENDING_VERSION_CODE, 0L),
+            prefs.getString(KEY_PENDING_APK_SHA256, "").orEmpty(),
+        )
     }
 
-    fun pendingDownloadedApkLabel(): String {
-        val version = prefs.getString(KEY_PENDING_VERSION_NAME, "").orEmpty()
-        return if (version.isNotBlank()) "继续安装 $version" else "继续安装已下载更新"
+    internal fun pendingDownload(): DownloadedUpdate? = synchronized(UpdateDownloadFiles.lock) {
+        val pending = readPendingUpdate()
+        val valid = pending?.takeIf {
+            val newerThanInstalled = if (it.versionCode > 0L) {
+                currentVersionCode() < it.versionCode
+            } else {
+                compareVersionNames(it.versionName, currentVersionName())?.let { comparison -> comparison > 0 } == true
+            }
+            newerThanInstalled && latestAvailableUpdate()?.let(it::isOlderThan) != true && isPendingFilePresent(it.file)
+        }
+        if (valid == null && pending != null) clearPendingApk()
+        pruneCachedUpdateArtifacts(keepFile = valid?.file)
+        valid
     }
+
+    private fun isPendingFilePresent(file: File): Boolean = runCatching {
+        val size = file.length()
+        apkStorage.owns(file) && Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            size > 0L && size == prefs.getLong(KEY_PENDING_APK_SIZE, size)
+    }.getOrDefault(false)
+
+    internal fun verifyPendingApk(file: File): Result<File> = synchronized(UpdateDownloadFiles.lock) {
+        val pending = pendingDownload()?.takeIf { it.file == file }
+            ?: return@synchronized Result.failure(IOException(context.getString(R.string.update_apk_unavailable)))
+        runCatching {
+            val invalidApk = context.getString(R.string.update_apk_invalid)
+            require(isZipApk(file)) { invalidApk }
+            if (pending.sha256.isNotBlank()) {
+                val expected = normalizeApkSha256(pending.sha256)
+                require(expected != null && apkSha256(file).equals(expected, ignoreCase = true)) { invalidApk }
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                @Suppress("DEPRECATION")
+                PackageManager.GET_SIGNATURES
+            }
+            val archive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.packageManager.getPackageArchiveInfo(file.absolutePath, PackageManager.PackageInfoFlags.of(flags.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                appContext.packageManager.getPackageArchiveInfo(file.absolutePath, flags)
+            }
+            require(archive != null && archive.packageName == appContext.packageName) { invalidApk }
+            require((archive.applicationInfo?.minSdkVersion ?: 0) <= Build.VERSION.SDK_INT && supportsDeviceAbi(file)) {
+                invalidApk
+            }
+            val installed = packageInfo(flags)
+            val archiveCode = archive.updateVersionCode()
+            val matchesPendingVersion = if (pending.versionCode > 0L) archiveCode == pending.versionCode
+                else compareVersionNames(archive.versionName.orEmpty(), pending.versionName) == 0
+            require(archiveCode > installed.updateVersionCode() && matchesPendingVersion) { invalidApk }
+            require(hasCompatibleUpdateSignature(installed, archive)) { invalidApk }
+            file
+        }.onFailure { clearPendingApk() }
+    }
+
+    private fun supportsDeviceAbi(file: File): Boolean = ZipFile(file).use { zip ->
+        val nativeAbis = zip.entries().asSequence().mapNotNull { entry ->
+            if (!entry.name.startsWith("lib/") || !entry.name.endsWith(".so")) null
+            else entry.name.substringAfter('/').substringBeforeLast('/', "").takeIf { it.isNotEmpty() }
+        }.toSet()
+        nativeAbis.isEmpty() || Build.SUPPORTED_ABIS.any { it in nativeAbis }
+    }
+
+    private fun hasCompatibleUpdateSignature(installed: PackageInfo, archive: PackageInfo): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val current = installed.signingInfo ?: return false
+            val update = archive.signingInfo ?: return false
+            if (current.hasMultipleSigners() || update.hasMultipleSigners()) {
+                val signers = current.apkContentsSigners.orEmpty().toSet()
+                return signers.isNotEmpty() && signers == update.apkContentsSigners.orEmpty().toSet()
+            }
+            val currentSigner = current.signingCertificateHistory?.lastOrNull() ?: return false
+            return currentSigner in update.signingCertificateHistory.orEmpty()
+        }
+        @Suppress("DEPRECATION")
+        val signers = installed.signatures.orEmpty().toSet()
+        @Suppress("DEPRECATION")
+        return signers.isNotEmpty() && signers == archive.signatures.orEmpty().toSet()
+    }
+
+    private fun PackageInfo.updateVersionCode(): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) longVersionCode
+        else {
+            @Suppress("DEPRECATION")
+            versionCode.toLong()
+        }
 
     fun clearPendingApk(deleteFile: Boolean = true): Unit = synchronized(UpdateDownloadFiles.lock) {
         if (deleteFile) {
@@ -302,14 +396,13 @@ class UpdateManager(private val context: Context) {
                 ?.takeIf { it.isNotBlank() }
                 ?.let { path ->
                     val file = File(path)
-                    synchronized(UpdateDownloadFiles.lock) {
-                        if (apkStorage.owns(file) && file != UpdateDownloadFiles.activeFile) runCatching { file.delete() }
-                    }
+                    if (apkStorage.owns(file) && file != UpdateDownloadFiles.activeFile) runCatching { file.delete() }
                 }
         }
         prefs.edit()
             .remove(KEY_PENDING_APK_PATH)
             .remove(KEY_PENDING_APK_SHA256)
+            .remove(KEY_PENDING_APK_SIZE)
             .remove(KEY_PENDING_VERSION_NAME)
             .remove(KEY_PENDING_VERSION_CODE)
             .apply()
@@ -373,12 +466,13 @@ class UpdateManager(private val context: Context) {
         }
     }
 
-    private fun savePendingApk(file: File, info: AppUpdateInfo) {
+    private fun savePendingApk(update: DownloadedUpdate) {
         prefs.edit()
-            .putString(KEY_PENDING_APK_PATH, file.absolutePath)
-            .putString(KEY_PENDING_APK_SHA256, normalizeApkSha256(info.apkSha256).orEmpty())
-            .putString(KEY_PENDING_VERSION_NAME, info.versionName)
-            .putLong(KEY_PENDING_VERSION_CODE, info.versionCode)
+            .putString(KEY_PENDING_APK_PATH, update.file.absolutePath)
+            .putString(KEY_PENDING_APK_SHA256, update.sha256)
+            .putLong(KEY_PENDING_APK_SIZE, update.file.length())
+            .putString(KEY_PENDING_VERSION_NAME, update.versionName)
+            .putLong(KEY_PENDING_VERSION_CODE, update.versionCode)
             .apply()
     }
 
@@ -387,11 +481,12 @@ class UpdateManager(private val context: Context) {
     }
 
     private companion object {
-        const val APK_SELECTION_POLICY = 1
+        const val APK_SELECTION_POLICY = 2
         const val KEY_APK_SELECTION_POLICY = "apk_selection_policy"
         const val KEY_APK_SELECTION_ABIS = "apk_selection_abis"
         const val KEY_PENDING_APK_PATH = "pending_apk_path"
         const val KEY_PENDING_APK_SHA256 = "pending_apk_sha256"
+        const val KEY_PENDING_APK_SIZE = "pending_apk_size"
         const val KEY_PENDING_VERSION_NAME = "pending_version_name"
         const val KEY_PENDING_VERSION_CODE = "pending_version_code"
         const val KEY_LAST_DAILY_CHECK_DATE = "last_daily_check_date"
@@ -405,11 +500,10 @@ class UpdateManager(private val context: Context) {
         const val KEY_LATEST_MANDATORY = "latest_mandatory"
         const val KEY_UPDATE_PROMPT_DISABLED = "update_prompt_disabled"
         const val KEY_LAST_UPDATE_PROMPT_DATE = "last_update_prompt_date"
+        const val KEY_CHECK_CHANNELS = "check_channels"
 
         const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/lyracode-app/Lyra-Code/releases/latest"
         const val GITHUB_RELEASES_URL = "https://github.com/lyracode-app/Lyra-Code/releases"
-        const val GITEE_LATEST_RELEASE_API = "https://gitee.com/api/v5/repos/yukisoffd/lyra-code/releases/latest"
-        const val GITEE_RELEASES_URL = "https://gitee.com/yukisoffd/lyra-code/releases"
     }
 }
 

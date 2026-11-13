@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.ErrorOutline
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.AppUpdateInfo
+import com.yukisoffd.lyracode.data.UpdateManager
 import com.yukisoffd.lyracode.data.GITHUB_CONNECTIVITY_TEST_URL
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.MediaGenerationKind
@@ -120,6 +121,7 @@ internal fun SettingsScreen(
     onBackupStatusChange: (String) -> Unit,
     updateAvailable: Boolean,
     onUpdateAvailabilityChange: (Boolean) -> Unit,
+    updateDownload: UpdateDownload,
     settingsBackRequest: Int,
     externalAccountNotice: String?,
     externalAccountTarget: String = "mengxi_account",
@@ -172,7 +174,9 @@ internal fun SettingsScreen(
         "mcp_tools" -> "mcp"
         "mcp_tool_detail" -> "mcp_tools"
         "web_search_blacklist", "deepseek_search", "deepseek_fetch" -> "web_search"
-        "github_acceleration" -> if (externalGitHubAccelerationUrl != null) gitHubAccelerationReturnDetail else "about"
+        "github_acceleration" -> if (externalGitHubAccelerationUrl != null) gitHubAccelerationReturnDetail else gitHubAccelerationReturnDetail ?: "update_management"
+        "update_channels", "update_prompts" -> "update_management"
+        "update_management" -> "about"
         "device" -> "about"
         "sponsor_development" -> "about"
         "developer_wall" -> "about"
@@ -498,12 +502,30 @@ internal fun SettingsScreen(
                         onOpenDeveloperWall = { detail = "developer_wall" },
                         onOpenGitHubAcceleration = { url ->
                             gitHubAccelerationTestUrl = url
+                            gitHubAccelerationReturnDetail = "about"
                             detail = "github_acceleration"
                         },
+                        onOpenUpdateManagement = { detail = "update_management" },
                         updateInfoState = aboutUpdateInfoState,
                         showUpdateDialog = detail == "about",
                         scrollState = aboutScrollState,
+                        updateDownload = updateDownload,
                     )
+                    "update_management" -> UpdateManagementScreen(
+                        onOpenChannels = { detail = "update_channels" },
+                        onOpenAcceleration = {
+                            gitHubAccelerationTestUrl = UpdateManager(context).latestAvailableUpdate()?.apkUrl
+                                ?: GITHUB_CONNECTIVITY_TEST_URL
+                            gitHubAccelerationReturnDetail = "update_management"
+                            detail = "github_acceleration"
+                        },
+                        onOpenPrompts = { detail = "update_prompts" },
+                    )
+                    "update_channels" -> UpdateChannelsScreen {
+                        aboutUpdateInfoState.value = null
+                        onUpdateAvailabilityChange(it)
+                    }
+                    "update_prompts" -> UpdatePromptSettingsScreen()
                     "github_acceleration" -> GitHubAccelerationSettingsScreen(initialTestUrl = gitHubAccelerationTestUrl)
                     "device" -> DeviceInfoScreen()
                     "sponsor_development" -> SponsorDevelopmentScreen()
@@ -660,6 +682,8 @@ internal fun SettingsScreen(
                         val forward = when {
                             initialState == "mengxi_account" && targetState == "profile" -> false
                             initialState == "github_acceleration" -> false
+                            initialState == "update_management" && targetState == "about" -> false
+                            initialState in setOf("update_channels", "update_prompts") && targetState == "update_management" -> false
                             initialState == "device" && targetState == "about" -> false
                             initialState == "about" && targetState == "device" -> true
                             initialState == "developer_wall" && targetState == "about" -> false
@@ -785,6 +809,9 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "licenses" -> context.getString(R.string.detail_licenses)
     "about" -> context.getString(R.string.detail_about)
     "github_acceleration" -> context.getString(R.string.github_acceleration_title)
+    "update_management" -> context.getString(R.string.update_management_title)
+    "update_channels" -> context.getString(R.string.update_channels_title)
+    "update_prompts" -> context.getString(R.string.update_prompt_settings_title)
     "sponsor_development" -> context.getString(R.string.sponsor_development_title)
     "developer_wall" -> context.getString(R.string.developer_wall_title)
     "device" -> context.getString(R.string.detail_device)

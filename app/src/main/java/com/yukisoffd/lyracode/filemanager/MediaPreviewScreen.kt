@@ -14,7 +14,6 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -91,8 +90,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.yukisoffd.lyracode.R
-import com.yukisoffd.lyracode.predictiveBackTransform
-import com.yukisoffd.lyracode.rememberPredictiveBackGestureState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -149,19 +146,11 @@ private const val MPEG_TS_SYNC_BYTE: Byte = 0x47
 internal fun MediaPreviewScreen(
     file: File,
     kind: MediaPreviewKind,
-    predictiveBackEnabled: Boolean = false,
     onClose: () -> Unit,
     onOpenExternal: () -> Unit,
 ) {
-    val predictiveBackState = rememberPredictiveBackGestureState(
-        enabled = predictiveBackEnabled,
-        onBack = onClose,
-    )
-    BackHandler(enabled = !predictiveBackEnabled, onBack = onClose)
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .predictiveBackTransform(predictiveBackState),
+        modifier = Modifier.fillMaxSize(),
         color = Color.Black,
     ) {
         when (kind) {

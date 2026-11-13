@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_management_title">更新管理</string>
+    <string name="update_prompt_settings_title">更新提示</string>
+    <string name="update_channels_title">檢查管道管理</string>
+    <string name="update_channel_manifest">更新清單 JSON</string>
+    <string name="update_channel_github">官方 GitHub</string>
+    <string name="update_channels_description">自動與手動檢查共用此設定。依清單順序檢查，目前的管道無法使用時會嘗試下一個已啟用的管道。</string>
+    <string name="update_channel_move_up">上移 %1$s</string>
+    <string name="update_channel_move_down">下移 %1$s</string>
+    <string name="update_manifest_unconfigured">尚未設定更新清單網址。</string>
+    <string name="update_channels_changed">檢查管道已變更，請重新檢查。</string>
+    <string name="update_download_original">從原始網址下載</string>
+    <string name="update_download_accelerated">透過 %1$s 下載</string>
+    <string name="update_install_now">立即安裝</string>
+    <string name="update_apk_saved_directory">安裝套件儲存目錄：%1$s</string>
+    <string name="update_apk_verifying">正在驗證安裝套件…</string>
+    <string name="update_apk_unavailable">安裝套件遺失或已過期，請重新檢查更新。</string>
+    <string name="update_apk_invalid">安裝套件驗證失敗，請重新下載。</string>
+    <string name="update_download_superseded">已有更新版本，請重新檢查更新。</string>
+    <string name="github_acceleration_downloading_via">正在透過 %1$s 下載</string>
+</resources>

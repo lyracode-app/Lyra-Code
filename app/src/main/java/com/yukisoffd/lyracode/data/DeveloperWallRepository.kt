@@ -49,7 +49,7 @@ internal class DeveloperWallRepository(
                     mutableState.value = DeveloperWallState()
                 }
                 if (!configured) {
-                    mutableState.value = DeveloperWallState()
+                    mutableState.value = DeveloperWallState(syncedAt = now())
                     return@withContext mutableState.value
                 }
                 val date = today().toString()
@@ -61,20 +61,25 @@ internal class DeveloperWallRepository(
                 mutableState.value = (cached?.second ?: DeveloperWallState()).copy(syncing = true)
                 try {
                     val people = parseDeveloperWallJson(fetchJson(sourceUrl))
-                    val avatars = downloadAvatars(people)
+                    val previousAvatars = cached?.second?.people.orEmpty().mapNotNull { person ->
+                        person.avatarFile?.let { person.avatar to it }
+                    }.toMap()
+                    val avatars = previousAvatars + downloadAvatars(people)
                     val result = DeveloperWallState(
                         people = people.map { it.copy(avatarFile = avatars[it.avatar]) },
                         syncedAt = now(),
                         succeeded = true,
                     )
                     writeCache(date, result)
+                    val retained = result.people.mapNotNull { it.avatarFile?.name }.toSet()
+                    File(cacheDirectory, "avatars").listFiles()?.filter { it.name !in retained }?.forEach { it.delete() }
                     mutableState.value = result
                 } catch (cancelled: CancellationException) {
                     mutableState.value = mutableState.value.copy(syncing = false)
                     throw cancelled
                 } catch (_: Exception) {
-                    // A failed refresh hides old entries and is also limited to one attempt per day.
-                    val result = DeveloperWallState(syncedAt = now())
+                    val result = cached?.second?.copy(succeeded = false)
+                        ?: DeveloperWallState(syncedAt = now())
                     runCatching { writeCache(date, result) }
                     mutableState.value = result
                 }
@@ -87,14 +92,16 @@ internal class DeveloperWallRepository(
         require(json.getInt("version") == 1 && json.getString("source") == sourceUrl)
         val people = parseDeveloperWallJson(json.getJSONArray("people").toString())
         val avatars = json.getJSONObject("avatars")
+        var missingAvatar = false
         val cachedPeople = people.map { person ->
             val filename = avatars.optString(person.avatar).takeIf { it.matches(Regex("[a-f0-9]{64}\\.png")) }
             val file = filename?.let { File(cacheDirectory, "avatars/$it") }
-            // Partial cache deletion must trigger a new sync as well.
-            require(file == null || file.isFile)
-            person.copy(avatarFile = file)
+            val availableFile = file?.takeIf { it.isFile }
+            if (file != null && availableFile == null) missingAvatar = true
+            person.copy(avatarFile = availableFile)
         }
-        json.getString("date") to DeveloperWallState(
+        val date = json.getString("date").takeUnless { missingAvatar }.orEmpty()
+        date to DeveloperWallState(
             people = cachedPeople,
             syncedAt = json.getLong("syncedAt"),
             succeeded = json.getBoolean("succeeded"),
@@ -123,8 +130,6 @@ internal class DeveloperWallRepository(
                 }
             }
         }.awaitAll().filterNotNull().toMap()
-        val retained = files.values.map { it.name }.toSet()
-        directory.listFiles()?.filter { it.name !in retained }?.forEach { it.delete() }
         files
     }
 

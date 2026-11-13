@@ -113,14 +113,16 @@ class DeveloperWallRepositoryTest {
         assertEquals(2, jsonCalls.get())
     }
 
-    @Test fun networkFailureHidesWallAndIsCachedUntilNextDayOrManualRetry() = runBlocking {
+    @Test fun networkFailureKeepsCachedPeopleAndAvatarsAcrossRestarts() = runBlocking {
         val repository = repository()
-        repository.sync()
+        val cached = repository.sync()
         date = date.plusDays(1)
         offline = true
         val failed = repository.sync()
         assertFalse(failed.succeeded)
-        assertTrue(failed.people.isEmpty())
+        assertEquals(cached.people, failed.people)
+        assertTrue(failed.people.single().avatarFile!!.isFile)
+        assertEquals(cached.syncedAt, failed.syncedAt)
         assertEquals(failed, repository().sync())
         assertEquals(2, jsonCalls.get())
         offline = false
@@ -139,13 +141,13 @@ class DeveloperWallRepositoryTest {
         assertEquals(2, jsonCalls.get())
     }
 
-    @Test fun invalidJsonHidesPreviousWallAndPersistsTheFailure() = runBlocking {
+    @Test fun invalidJsonKeepsThePreviousWallAndPersistsTheFailure() = runBlocking {
         val repository = repository()
         repository.sync()
         response = "{broken"
-        assertTrue(repository.sync(force = true).people.isEmpty())
+        assertEquals("Alice", repository.sync(force = true).people.single().name)
         assertFalse(repository.state.value.succeeded)
-        assertTrue(repository().sync().people.isEmpty())
+        assertEquals("Alice", repository().sync().people.single().name)
         assertEquals(2, jsonCalls.get())
     }
 

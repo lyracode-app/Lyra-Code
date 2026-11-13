@@ -93,6 +93,14 @@ internal fun githubDownloadTargets(url: String, config: GitHubAccelerationConfig
     }
 }.distinctBy { it.url }
 
+internal fun selectableGitHubDownloadRoutes(url: String, config: GitHubAccelerationConfig): List<List<GitHubDownloadTarget>> {
+    val targets = githubDownloadTargets(url, config.copy(enabled = true))
+    return buildList {
+        targets.forEach { add(listOf(it)) }
+        if (config.enabled && targets.size > 1) add(targets)
+    }
+}
+
 data class GitHubConnectionResult(
     val successful: Boolean,
     val elapsedMs: Long,

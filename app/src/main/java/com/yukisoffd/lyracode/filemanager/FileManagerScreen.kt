@@ -29,6 +29,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -126,6 +127,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
@@ -346,7 +348,18 @@ internal fun FileManagerScreen(
         }
         AnimatedContent(
             targetState = previewFile,
-            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+            transitionSpec = {
+                val exit = if (initialState != null && targetState == null) {
+                    scaleOut(
+                        animationSpec = tween(240),
+                        targetScale = 0f,
+                        transformOrigin = TransformOrigin(1f, 1f),
+                    ) + fadeOut(tween(240))
+                } else {
+                    fadeOut(tween(140))
+                }
+                fadeIn(tween(180)) togetherWith exit
+            },
             contentKey = { it?.first?.absolutePath },
             label = "media-preview-transition",
             modifier = Modifier.fillMaxSize(),
@@ -355,12 +368,12 @@ internal fun FileManagerScreen(
                 MediaPreviewScreen(
                     file = file,
                     kind = kind,
-                    predictiveBackEnabled = settings.predictiveBackEnabled,
                     onClose = { previewFile = null },
                     onOpenExternal = { openExternalFile(context, file) },
                 )
             }
         }
+        BackHandler(enabled = previewFile != null) { previewFile = null }
         AnimatedContent(
             targetState = openFile,
             transitionSpec = {
