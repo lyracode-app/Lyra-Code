@@ -9,8 +9,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -25,7 +23,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,14 +32,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,15 +73,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.data.AppUpdateInfo
-import com.yukisoffd.lyracode.data.UpdateDownloadProgress
 import com.yukisoffd.lyracode.data.UpdateManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URL
 import kotlin.math.min
 import kotlin.math.max
@@ -253,11 +243,13 @@ internal fun AboutSoftwareScreen(
     onOpenDeviceInfo: () -> Unit,
     onOpenServiceAgreements: () -> Unit,
     onOpenGitHubAcceleration: (String) -> Unit,
+    onOpenUpdateManagement: () -> Unit,
     onOpenSponsorDevelopment: () -> Unit = {},
     onOpenDeveloperWall: () -> Unit = {},
     updateInfoState: MutableState<AppUpdateInfo?> = remember { mutableStateOf(null) },
     showUpdateDialog: Boolean = true,
     scrollState: ScrollState = rememberScrollState(),
+    updateDownload: UpdateDownload? = null,
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -283,13 +275,10 @@ internal fun AboutSoftwareScreen(
     var notice by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }
     var updateInfo by updateInfoState
-    var downloadProgress by remember { mutableStateOf<UpdateDownloadProgress?>(null) }
-    var downloading by remember { mutableStateOf(false) }
-    var pendingApk by remember { mutableStateOf<java.io.File?>(null) }
-    LaunchedEffect(updateManager) {
-        pendingApk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
+    val download = updateDownload ?: rememberUpdateDownload(updateManager)
+    LaunchedEffect(download, showUpdateDialog) {
+        if (showUpdateDialog) download.refreshPending()
     }
-    var updatePromptDisabled by remember { mutableStateOf(updateManager.updatePromptDisabled()) }
     val easterEggSession = remember(context) { UpdateManifestEasterEggRuntime.takeSession(context) }
     var easterEggPrompt by remember { mutableStateOf<UpdateManifestEasterEggPrompt?>(null) }
     var easterEggVisible by remember { mutableStateOf(false) }
@@ -335,46 +324,23 @@ internal fun AboutSoftwareScreen(
     DisposableEffect(easterEggSession) {
         onDispose { easterEggSession.reset() }
     }
-    val installPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        scope.launch {
-            val apk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
-            pendingApk = apk
-            if (apk != null && !updateManager.needsInstallPermission()) {
-                runCatching { context.startActivity(updateManager.installIntent(apk)) }
-                    .onFailure { notice = it.message.orEmpty().ifBlank { uiText(R.string.notice_cannot_open_installer) } }
-            } else if (apk != null) {
-                notice = uiText(R.string.ui_permission_is_not_complete_you_can_tap_continue_installation)
-            }
-        }
-    }
-
-    fun openInstaller(apk: File) {
-        if (updateManager.needsInstallPermission()) {
-            notice = uiText(R.string.notice_grant_install_permission)
-            installPermissionLauncher.launch(updateManager.installPermissionIntent())
-        } else {
-            runCatching { context.startActivity(updateManager.installIntent(apk)) }
-                .onFailure { notice = it.message.orEmpty().ifBlank { uiText(R.string.notice_cannot_open_installer) } }
-        }
-    }
-
     fun checkUpdate() {
-        if (checking) return
+        if (checking || download.busy) return
         checking = true
         notice = uiText(R.string.action_checking_update)
         scope.launch {
             val result = withContext(Dispatchers.IO) { updateManager.checkForUpdate() }
+            download.refreshPending()
             checking = false
             result.fold(
                 onSuccess = { info ->
                     if (info == null) {
-                        updateManager.clearLatestAvailableUpdate()
                         onUpdateAvailabilityChange(false)
                         notice = uiText(R.string.ui_you_are_on_the_latest_version)
                     } else {
-                        updateManager.saveLatestAvailableUpdate(info)
                         onUpdateAvailabilityChange(true)
                         notice = ""
+                        download.clearStatus()
                         updateInfo = info
                     }
                 },
@@ -386,45 +352,11 @@ internal fun AboutSoftwareScreen(
     updateInfo?.takeIf { showUpdateDialog }?.let { info ->
         UpdateDialog(
             info = info,
-            progress = downloadProgress,
-            downloading = downloading,
+            download = download,
             onOpenGitHubAcceleration = onOpenGitHubAcceleration,
             onDismiss = {
-                if (!downloading) {
-                    updateInfo = null
-                    downloadProgress = null
-                }
-            },
-            onOpenWeb = {
-                val target = info.webUrl.ifBlank { info.apkUrl }
-                if (target.isNotBlank()) runCatching { uriHandler.openUri(target) }
-            },
-            onDownload = {
-                if (downloading) return@UpdateDialog
-                downloading = true
-                downloadProgress = UpdateDownloadProgress(status = uiText(R.string.notice_preparing_download))
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        val downloadContext = currentCoroutineContext()
-                        updateManager.downloadApk(info) { progress ->
-                            downloadContext.ensureActive()
-                            downloadProgress = progress
-                        }
-                    }
-                    downloading = false
-                    result.fold(
-                        onSuccess = { apk ->
-                            pendingApk = apk
-                            notice = uiText(R.string.notice_download_complete_prepare_install)
-                            openInstaller(apk)
-                        },
-                        onFailure = {
-                            val message = it.message.orEmpty().ifBlank { uiText(R.string.notice_download_failed) }
-                            downloadProgress = UpdateDownloadProgress(status = message)
-                            notice = message
-                        },
-                    )
-                }
+                updateInfo = null
+                download.clearStatus()
             },
         )
     }
@@ -525,40 +457,22 @@ internal fun AboutSoftwareScreen(
                 )
                 KimiDivider()
                 KimiMenuRow(
-                    Icons.Default.Speed,
-                    uiText(R.string.github_acceleration_title),
-                    uiText(R.string.github_acceleration_entry_desc),
-                    onClick = {
-                        onOpenGitHubAcceleration(
-                            updateManager.latestAvailableUpdate()?.apkUrl
-                                ?: com.yukisoffd.lyracode.data.GITHUB_CONNECTIVITY_TEST_URL,
-                        )
-                    },
+                    Icons.Default.SystemUpdate,
+                    uiText(R.string.update_management_title),
+                    onClick = onOpenUpdateManagement,
                 )
-                pendingApk?.let { apk ->
+                val pending = download.pending
+                if (pending != null) {
                     KimiDivider()
                     KimiMenuRow(
                         Icons.Default.InstallMobile,
-                        updateManager.pendingDownloadedApkLabel(),
-                        uiText(R.string.label_downloaded_size, formatBytes(apk.length())),
-                        onClick = { openInstaller(apk) },
+                        uiText(R.string.update_install_now),
+                        pending.versionName.ifBlank { pending.versionCode.toString() },
+                        onClick = { download.install(pending.file) },
                     )
                 }
-                KimiDivider()
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AboutIconBadge(Icons.Default.NotificationsOff)
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(uiText(R.string.label_no_update_prompt), style = MaterialTheme.typography.titleSmall)
-                        Text(uiText(R.string.no_update_prompt_desc), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(
-                        checked = updatePromptDisabled,
-                        onCheckedChange = {
-                            updatePromptDisabled = it
-                            updateManager.setUpdatePromptDisabled(it)
-                        },
-                    )
+                if (updateInfo == null && (pending != null || download.message.isNotBlank())) {
+                    UpdateDownloadStatus(pending, null, download.message)
                 }
                 KimiDivider()
                 KimiMenuRow(Icons.Default.Apps, uiText(R.string.label_app_id), context.packageName)
@@ -885,80 +799,5 @@ internal fun AboutLogoHeader() {
             style = MaterialTheme.typography.headlineMedium,
         )
     }
-}
-
-@Composable
-internal fun UpdateDialog(
-    info: AppUpdateInfo,
-    progress: UpdateDownloadProgress?,
-    downloading: Boolean,
-    onDismiss: () -> Unit,
-    onOpenWeb: () -> Unit,
-    onDownload: () -> Unit,
-    onOpenGitHubAcceleration: (String) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null) },
-        title = { Text(uiText(R.string.title_new_version, info.versionName.ifBlank { info.versionCode.toString() })) },
-        text = {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TextButton(onClick = { onOpenGitHubAcceleration(info.apkUrl) }, enabled = !downloading) {
-                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(uiText(R.string.github_acceleration_title))
-                }
-                if (info.mandatory) {
-                    Text(uiText(R.string.notice_mandatory_update), color = MaterialTheme.colorScheme.error)
-                }
-                RichMarkdownContent(
-                    markdown = info.releaseNotes,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if (info.apkSha256.isNotBlank()) {
-                    Text(
-                        "SHA-256：${info.apkSha256}",
-                        color = KimiMuted,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    )
-                }
-                progress?.let {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LinearProgressIndicator(
-                            progress = { it.percent },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        val totalText = if (it.totalBytes > 0) " / ${formatBytes(it.totalBytes)}" else ""
-                        Text(
-                            "${it.status} ${formatBytes(it.downloadedBytes)}$totalText",
-                            color = KimiMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDownload, enabled = !downloading && info.apkUrl.isNotBlank()) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (downloading) uiText(R.string.action_downloading) else uiText(R.string.action_download_in_app))
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (info.webUrl.isNotBlank() || info.apkUrl.isNotBlank()) {
-                    TextButton(onClick = onOpenWeb) { Text(uiText(R.string.action_download_web)) }
-                }
-                TextButton(onClick = onDismiss, enabled = !downloading) { Text(uiText(R.string.action_later)) }
-            }
-        },
-    )
 }
 

@@ -26,6 +26,16 @@ class GitHubAccelerationTest {
         assertEquals(1, githubDownloadTargets(githubUrl, GitHubAccelerationConfig(links = emptyList())).size)
     }
 
+    @Test fun manualSelectionUsesOneRouteEvenWhenAutomaticFallbackIsEnabled() {
+        val config = GitHubAccelerationConfig(links = listOf(first, second.copy(enabled = false)))
+        val direct = GitHubDownloadTarget(githubUrl)
+        val accelerated = GitHubDownloadTarget(first.prefix + githubUrl, first.name)
+        assertEquals(listOf(listOf(direct), listOf(accelerated), listOf(direct, accelerated)),
+            selectableGitHubDownloadRoutes(githubUrl, config))
+        assertEquals(listOf(listOf(direct), listOf(accelerated)),
+            selectableGitHubDownloadRoutes(githubUrl, config.copy(enabled = false)))
+    }
+
     @Test fun validatesHttpsPrefixesAndNormalizesTrailingSlash() {
         assertEquals("https://first.example/path/", normalizeGitHubAcceleratorPrefix(" https://FIRST.example/path "))
         for (invalid in listOf("http://first.example", "https://user:password@first.example", "https://first.example/?url=", "https://first.example/#fragment", "https://github.com/")) {

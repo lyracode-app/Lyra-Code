@@ -60,7 +60,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -71,7 +70,6 @@ import com.yukisoffd.lyracode.data.AuditLogStore
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.SkillPack
 import com.yukisoffd.lyracode.data.AppUpdateInfo
-import com.yukisoffd.lyracode.data.UpdateDownloadProgress
 import com.yukisoffd.lyracode.data.UpdateManager
 import com.yukisoffd.lyracode.filetransfer.FileTransferClient
 import com.yukisoffd.lyracode.filemanager.FileManagerScreen
@@ -88,11 +86,8 @@ import com.yukisoffd.lyracode.termux.TermuxExecutor
 import com.yukisoffd.lyracode.webdav.WebDavClient
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URL
 
 
@@ -194,14 +189,11 @@ internal fun LyraCodeApp(
     var appNotice by remember { mutableStateOf("") }
     var backupImportMode by remember { mutableStateOf("supplement") }
     val updateManager = remember(context) { UpdateManager(context) }
-    val uriHandler = LocalUriHandler.current
+    val updateDownload = rememberUpdateDownload(updateManager)
     var aboutUpdateAvailable by remember { mutableStateOf(updateManager.hasAvailableUpdate()) }
     var startupUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
-    var startupUpdateProgress by remember { mutableStateOf<UpdateDownloadProgress?>(null) }
-    var startupUpdateDownloading by remember { mutableStateOf(false) }
     var startupAccelerationUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var startupAccelerationReturnPage by rememberSaveable { mutableIntStateOf(PAGE_CHAT) }
-    var startupPendingApk by remember { mutableStateOf<File?>(null) }
     val appSettingsRevision = controller.settingsRevision.intValue
     val skills = remember(skillsRevision, appSettingsRevision) { settings.installedSkills() }
     var settingsDetailTitle by rememberSaveable { mutableStateOf<String?>(null) }
@@ -224,27 +216,6 @@ internal fun LyraCodeApp(
         backupStatus = message
         if (message.isNotBlank()) appNotice = message
     }
-    val startupInstallPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        scope.launch {
-            val apk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
-            startupPendingApk = apk
-            if (apk != null && !updateManager.needsInstallPermission()) {
-                runCatching { context.startActivity(updateManager.installIntent(apk)) }
-                    .onFailure { appNotice = it.message.orEmpty().ifBlank { context.getString(R.string.notice_cannot_open_installer) } }
-            } else if (apk != null) {
-                appNotice = context.getString(R.string.notice_auth_pending_install_later)
-            }
-        }
-    }
-    fun openStartupInstaller(apk: File) {
-        if (updateManager.needsInstallPermission()) {
-            appNotice = context.getString(R.string.notice_grant_install_permission)
-            startupInstallPermissionLauncher.launch(updateManager.installPermissionIntent())
-        } else {
-            runCatching { context.startActivity(updateManager.installIntent(apk)) }
-                .onFailure { appNotice = it.message.orEmpty().ifBlank { context.getString(R.string.notice_cannot_open_installer) } }
-        }
-    }
     LaunchedEffect(settings) {
         val attempted = withContext(Dispatchers.IO) {
             val account = settings.newApiAccount
@@ -256,10 +227,10 @@ internal fun LyraCodeApp(
         if (attempted) controller.settingsRevision.intValue++
     }
     LaunchedEffect(Unit) {
-        startupPendingApk = withContext(Dispatchers.IO) { updateManager.pendingDownloadedApk() }
         val info = withContext(Dispatchers.IO) {
             updateManager.checkDailyForUpdateIfNeeded().getOrNull() ?: updateManager.latestAvailableUpdate()
         }
+        updateDownload.refreshPending()
         aboutUpdateAvailable = updateManager.hasAvailableUpdate()
         if (info != null && updateManager.shouldShowDailyUpdatePrompt()) {
             updateManager.markDailyUpdatePromptShown()
@@ -354,50 +325,15 @@ internal fun LyraCodeApp(
     startupUpdateInfo?.takeIf { startupAccelerationUrl == null }?.let { info ->
         UpdateDialog(
             info = info,
-            progress = startupUpdateProgress,
-            downloading = startupUpdateDownloading,
+            download = updateDownload,
             onOpenGitHubAcceleration = { url ->
                 startupAccelerationReturnPage = safeSelectedPage
                 startupAccelerationUrl = url
                 selectedPage = PAGE_SETTINGS
             },
             onDismiss = {
-                if (!startupUpdateDownloading) {
-                    startupUpdateInfo = null
-                    startupUpdateProgress = null
-                }
-            },
-            onOpenWeb = {
-                val target = info.webUrl.ifBlank { info.apkUrl }
-                if (target.isNotBlank()) runCatching { uriHandler.openUri(target) }
-            },
-            onDownload = {
-                if (startupUpdateDownloading) return@UpdateDialog
-                startupUpdateDownloading = true
-                startupUpdateProgress = UpdateDownloadProgress(status = context.getString(R.string.notice_preparing_download))
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        val downloadContext = currentCoroutineContext()
-                        updateManager.downloadApk(info) { progress ->
-                            downloadContext.ensureActive()
-                            startupUpdateProgress = progress
-                        }
-                    }
-                    startupUpdateDownloading = false
-                    result.fold(
-                        onSuccess = { apk ->
-                            startupPendingApk = apk
-                            aboutUpdateAvailable = true
-                            appNotice = context.getString(R.string.notice_download_complete_prepare_install)
-                            openStartupInstaller(apk)
-                        },
-                        onFailure = {
-                            val message = it.message.orEmpty().ifBlank { context.getString(R.string.notice_download_failed) }
-                            startupUpdateProgress = UpdateDownloadProgress(status = message)
-                            appNotice = message
-                        },
-                    )
-                }
+                startupUpdateInfo = null
+                updateDownload.clearStatus()
             },
         )
     }
@@ -699,6 +635,7 @@ internal fun LyraCodeApp(
                             externalAccountNotice = externalAccountNotice,
                             externalAccountTarget = externalAccountTarget,
                             onExternalAccountOpened = { externalAccountNotice = null },
+                            updateDownload = updateDownload,
                             externalGitHubAccelerationUrl = startupAccelerationUrl,
                             onExternalGitHubAccelerationClosed = {
                                 selectedPage = startupAccelerationReturnPage

@@ -15,4 +15,6 @@
     <string name="developer_wall_information">開發者牆說明</string>
     <string name="developer_wall_information_body">開發者牆名單由人工維護。若有人員遺漏或資訊錯誤，請提交 Issue 回饋。</string>
     <string name="developer_wall_report_issue">提交 Issue</string>
+    <string name="developer_wall_server_unavailable">無法連線至伺服器。</string>
+    <string name="developer_wall_empty">開發者牆目前沒有內容。</string>
 </resources>

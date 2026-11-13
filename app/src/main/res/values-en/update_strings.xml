@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_management_title">Update management</string>
+    <string name="update_prompt_settings_title">Update prompts</string>
+    <string name="update_channels_title">Update check channels</string>
+    <string name="update_channel_manifest">Update manifest (JSON)</string>
+    <string name="update_channel_github">Official GitHub</string>
+    <string name="update_channels_description">Choose the channels used for automatic and manual checks. If a channel is unavailable, the app tries the next enabled channel in the order shown.</string>
+    <string name="update_channel_move_up">Move %1$s up</string>
+    <string name="update_channel_move_down">Move %1$s down</string>
+    <string name="update_manifest_unconfigured">The update manifest URL is missing.</string>
+    <string name="update_channels_changed">Update channels changed. Check again.</string>
+    <string name="update_download_original">Download from original URL</string>
+    <string name="update_download_accelerated">Download via %1$s</string>
+    <string name="update_install_now">Install now</string>
+    <string name="update_apk_saved_directory">Saved to %1$s</string>
+    <string name="update_apk_verifying">Verifying the installation package…</string>
+    <string name="update_apk_unavailable">The installation package is missing or has been superseded. Check for updates again.</string>
+    <string name="update_apk_invalid">The installation package failed verification. Download it again.</string>
+    <string name="update_download_superseded">A newer version is available. Check for updates again.</string>
+    <string name="github_acceleration_downloading_via">Downloading via %1$s</string>
+</resources>

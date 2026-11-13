@@ -10,6 +10,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.AppUpdateInfo
 import com.yukisoffd.lyracode.data.GitHubAccelerationSettings
+import com.yukisoffd.lyracode.data.UpdateCheckChannel
 import com.yukisoffd.lyracode.data.UpdateManager
 import org.junit.Assert.*
 import org.junit.Before
@@ -43,10 +44,12 @@ class GitHubAccelerationNavigationInstrumentedTest {
                 themeMode = "light"
             }
             context.getSharedPreferences("lyra_github_acceleration", Context.MODE_PRIVATE).edit().clear().commit()
-            context.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE).edit().clear()
+            context.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE).edit().clear().commit()
+            val manager = UpdateManager(context)
+            context.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE).edit()
                 .putString("last_daily_check_date", LocalDate.now().toString()).commit()
             if (description.methodName.startsWith("startup")) {
-                UpdateManager(context).saveLatestAvailableUpdate(
+                manager.saveLatestAvailableUpdate(
                     AppUpdateInfo("99.0", 999L, sourceUrl, "", "Navigation test release notes", "", "https://github.com/test/app/releases", false),
                 )
             }
@@ -108,10 +111,11 @@ class GitHubAccelerationNavigationInstrumentedTest {
         }
     }
 
-    @Test fun aboutEntryUsesSettingsSubpageAndBothBackActionsReturnToAbout() {
+    @Test fun aboutEntryUsesSettingsSubpageAndBothBackActionsReturnToUpdateManagement() {
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.cd_menu)).performClick()
         compose.onNodeWithText(compose.activity.getString(R.string.title_settings)).performClick()
         compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).performScrollTo().performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.update_management_title)).performScrollTo().performClick()
         compose.onNodeWithText(compose.activity.getString(R.string.github_acceleration_title)).performScrollTo().performClick()
         assertSubpage()
         screenshot("github-acceleration-subpage.png")
@@ -124,11 +128,11 @@ class GitHubAccelerationNavigationInstrumentedTest {
         assertSubpage()
         screenshot("github-acceleration-subpage-dark.png")
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.cd_back)).performClick()
-        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.update_management_title)).assertIsDisplayed()
         compose.onNodeWithText(compose.activity.getString(R.string.github_acceleration_title)).performScrollTo().performClick()
         assertSubpage()
         systemBack()
-        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.update_management_title)).assertIsDisplayed()
     }
 
     @Test fun startupUpdateEntryReturnsToOriginalPromptAndRetainsSettings() {
@@ -152,5 +156,23 @@ class GitHubAccelerationNavigationInstrumentedTest {
         compose.onNodeWithText(compose.activity.getString(R.string.action_later)).performClick()
         compose.onNodeWithContentDescription("Menu").assertIsDisplayed()
         compose.onNodeWithText("GitHub acceleration links").assertDoesNotExist()
+    }
+
+    @Test fun channelsCanBeReorderedAndReducedToOne() {
+        compose.onNodeWithContentDescription("Menu").performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.title_settings)).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).performScrollTo().performClick()
+        compose.onNodeWithText("Update management").performScrollTo().performClick()
+        compose.onNodeWithText("Update check channels").performClick()
+        compose.onNodeWithContentDescription("Move Official GitHub up").performClick()
+        val manager = UpdateManager(context)
+        assertEquals(listOf(UpdateCheckChannel.GITHUB, UpdateCheckChannel.MANIFEST), manager.checkChannels())
+        compose.onNodeWithContentDescription("Update manifest (JSON)").performClick()
+        compose.onNodeWithContentDescription("Official GitHub").assertIsOn().assertIsNotEnabled()
+        assertEquals(listOf(UpdateCheckChannel.GITHUB), manager.checkChannels())
+        systemBack()
+        compose.onNodeWithText("Update prompts").performClick()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.label_no_update_prompt)).performClick()
+        assertTrue(manager.updatePromptDisabled())
     }
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_management_title">更新管理</string>
+    <string name="update_prompt_settings_title">更新提示</string>
+    <string name="update_channels_title">检测渠道管理</string>
+    <string name="update_channel_manifest">更新清单 JSON</string>
+    <string name="update_channel_github">官方 GitHub</string>
+    <string name="update_channels_description">自动和手动检测共用此设置。按列表顺序检测，当前渠道不可用时尝试下一个已启用渠道。</string>
+    <string name="update_channel_move_up">上移 %1$s</string>
+    <string name="update_channel_move_down">下移 %1$s</string>
+    <string name="update_manifest_unconfigured">未配置更新清单地址。</string>
+    <string name="update_channels_changed">检测渠道已变更，请重新检测。</string>
+    <string name="update_download_original">从原地址下载</string>
+    <string name="update_download_accelerated">通过 %1$s 下载</string>
+    <string name="update_install_now">立即安装</string>
+    <string name="update_apk_saved_directory">安装包保存目录：%1$s</string>
+    <string name="update_apk_verifying">正在校验安装包…</string>
+    <string name="update_apk_unavailable">安装包已丢失或已过期，请重新检测更新。</string>
+    <string name="update_apk_invalid">安装包校验失败，请重新下载。</string>
+    <string name="update_download_superseded">已有更新版本，请重新检测更新。</string>
+    <string name="github_acceleration_downloading_via">正在通过 %1$s 下载</string>
+</resources>
