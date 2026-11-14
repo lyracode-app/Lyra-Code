@@ -12,7 +12,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.yukisoffd.lyracode.data.AppSettings
 import com.yukisoffd.lyracode.data.AppUpdateInfo
+import com.yukisoffd.lyracode.data.UpdateCheckChannel
 import com.yukisoffd.lyracode.data.UpdateManager
+import com.yukisoffd.lyracode.data.UpdateManifestSource
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -22,6 +28,7 @@ import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.security.MessageDigest
+import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -74,6 +81,53 @@ class UpdateStorageInstrumentedTest {
             .putLong("pending_version_code", version)
             .putString("pending_version_name", "99.0")
             .commit()
+    }
+
+    @Test fun manualAndDailyChecksUseTheSelectedManifestAfterSwitching() = withContext { context, manager ->
+        val defaultUrl = BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim()
+        val backupUrl = "https://www.lyracode.cn/api/lcupdate.json"
+        val requests = mutableListOf<String>()
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val url = chain.request().url.toString()
+            requests += url
+            val version = if (url == backupUrl) 999 else 998
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body("""{"versionCode":$version,"apkUrl":"https://example.com/update.apk"}""".toResponseBody())
+                .build()
+        }.build()
+
+        assertEquals(defaultUrl, manager.manifestUrl())
+        manager.setCheckChannels(listOf(UpdateCheckChannel.MANIFEST))
+        assertEquals(998L, UpdateManager(context, client).checkDailyForUpdateIfNeeded().getOrThrow()?.versionCode)
+        manager.setManifestSource(UpdateManifestSource.BACKUP)
+        val prefs = context.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE)
+        assertFalse(prefs.contains("last_daily_check_date"))
+        assertNull(manager.latestAvailableUpdate())
+
+        val reopened = UpdateManager(context, client)
+        assertEquals(backupUrl, reopened.manifestUrl())
+        assertEquals(listOf(UpdateCheckChannel.MANIFEST), reopened.checkChannels())
+        assertEquals(999L, reopened.checkDailyForUpdateIfNeeded().getOrThrow()?.versionCode)
+        assertEquals(LocalDate.now().toString(), prefs.getString("last_daily_check_date", null))
+        assertEquals(999L, reopened.checkForUpdate().getOrThrow()?.versionCode)
+        assertEquals(listOf(defaultUrl, backupUrl, backupUrl), requests)
+    }
+
+    @Test fun switchingManifestsDiscardsAResponseFromThePreviousManifest() = withContext { context, manager ->
+        manager.setCheckChannels(listOf(UpdateCheckChannel.MANIFEST))
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            manager.setManifestSource(UpdateManifestSource.BACKUP)
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body("""{"versionCode":999,"apkUrl":"https://example.com/update.apk"}""".toResponseBody())
+                .build()
+        }.build()
+
+        assertTrue(UpdateManager(context, client).checkDailyForUpdateIfNeeded().isFailure)
+        assertNull(manager.latestAvailableUpdate())
+        val prefs = context.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE)
+        assertFalse(prefs.contains("last_daily_check_date"))
     }
 
     @Test fun downloadsToExternalFilesAndSurvivesConcurrentCleanup() = withContext { context, manager ->

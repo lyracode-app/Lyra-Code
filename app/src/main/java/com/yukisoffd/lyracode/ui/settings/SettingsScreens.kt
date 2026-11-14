@@ -175,7 +175,7 @@ internal fun SettingsScreen(
         "mcp_tool_detail" -> "mcp_tools"
         "web_search_blacklist", "deepseek_search", "deepseek_fetch" -> "web_search"
         "github_acceleration" -> if (externalGitHubAccelerationUrl != null) gitHubAccelerationReturnDetail else gitHubAccelerationReturnDetail ?: "update_management"
-        "update_channels", "update_prompts" -> "update_management"
+        "update_channels", "update_manifest", "update_prompts" -> "update_management"
         "update_management" -> "about"
         "device" -> "about"
         "sponsor_development" -> "about"
@@ -513,6 +513,7 @@ internal fun SettingsScreen(
                     )
                     "update_management" -> UpdateManagementScreen(
                         onOpenChannels = { detail = "update_channels" },
+                        onOpenManifest = { detail = "update_manifest" },
                         onOpenAcceleration = {
                             gitHubAccelerationTestUrl = UpdateManager(context).latestAvailableUpdate()?.apkUrl
                                 ?: GITHUB_CONNECTIVITY_TEST_URL
@@ -524,6 +525,10 @@ internal fun SettingsScreen(
                     "update_channels" -> UpdateChannelsScreen {
                         aboutUpdateInfoState.value = null
                         onUpdateAvailabilityChange(it)
+                    }
+                    "update_manifest" -> UpdateManifestSettingsScreen {
+                        aboutUpdateInfoState.value = null
+                        onUpdateAvailabilityChange(false)
                     }
                     "update_prompts" -> UpdatePromptSettingsScreen()
                     "github_acceleration" -> GitHubAccelerationSettingsScreen(initialTestUrl = gitHubAccelerationTestUrl)
@@ -683,7 +688,7 @@ internal fun SettingsScreen(
                             initialState == "mengxi_account" && targetState == "profile" -> false
                             initialState == "github_acceleration" -> false
                             initialState == "update_management" && targetState == "about" -> false
-                            initialState in setOf("update_channels", "update_prompts") && targetState == "update_management" -> false
+                            initialState in setOf("update_channels", "update_manifest", "update_prompts") && targetState == "update_management" -> false
                             initialState == "device" && targetState == "about" -> false
                             initialState == "about" && targetState == "device" -> true
                             initialState == "developer_wall" && targetState == "about" -> false
@@ -811,6 +816,7 @@ internal fun settingsDetailTitle(context: Context, detail: String): String = whe
     "github_acceleration" -> context.getString(R.string.github_acceleration_title)
     "update_management" -> context.getString(R.string.update_management_title)
     "update_channels" -> context.getString(R.string.update_channels_title)
+    "update_manifest" -> context.getString(R.string.menu_update_manifest)
     "update_prompts" -> context.getString(R.string.update_prompt_settings_title)
     "sponsor_development" -> context.getString(R.string.sponsor_development_title)
     "developer_wall" -> context.getString(R.string.developer_wall_title)

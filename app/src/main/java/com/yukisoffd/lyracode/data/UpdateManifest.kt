@@ -1,6 +1,14 @@
 package com.yukisoffd.lyracode.data
 
+import androidx.annotation.StringRes
+import com.yukisoffd.lyracode.BuildConfig
+import com.yukisoffd.lyracode.R
 import org.json.JSONObject
+
+internal enum class UpdateManifestSource(val id: String, @get:StringRes val title: Int, val url: String) {
+    DEFAULT("default", R.string.update_manifest_default, BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim()),
+    BACKUP("backup", R.string.update_manifest_backup, "https://www.lyracode.cn/api/lcupdate.json"),
+}
 
 internal val distributedUpdateAbis = setOf("arm64-v8a", "x86_64")
 

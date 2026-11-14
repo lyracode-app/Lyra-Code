@@ -175,4 +175,21 @@ class GitHubAccelerationNavigationInstrumentedTest {
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.label_no_update_prompt)).performClick()
         assertTrue(manager.updatePromptDisabled())
     }
+
+    @Test fun canSelectAndReopenTheBackupManifest() {
+        compose.onNodeWithContentDescription("Menu").performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.title_settings)).performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.detail_about)).performScrollTo().performClick()
+        compose.onNodeWithText("Update management").performScrollTo().performClick()
+        compose.onNodeWithText("Update manifest").performClick()
+        compose.onNodeWithText("Default manifest").assertIsSelected()
+        compose.onNodeWithText("Backup manifest").performClick().assertIsSelected()
+        assertEquals("https://www.lyracode.cn/api/lcupdate.json", UpdateManager(context).manifestUrl())
+        systemBack()
+        compose.onNodeWithText("Update management").assertIsDisplayed()
+        compose.onNodeWithText("Update manifest").performClick()
+        compose.onNodeWithText("Backup manifest").assertIsSelected()
+        compose.onNodeWithText("Default manifest").performClick().assertIsSelected()
+        assertEquals(BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim(), UpdateManager(context).manifestUrl())
+    }
 }

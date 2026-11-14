@@ -9,7 +9,10 @@
     <string name="update_channel_move_up">上移 %1$s</string>
     <string name="update_channel_move_down">下移 %1$s</string>
     <string name="update_manifest_unconfigured">未配置更新清单地址。</string>
-    <string name="update_channels_changed">检测渠道已变更，请重新检测。</string>
+    <string name="update_check_settings_changed">更新检测设置已变更，请重新检测。</string>
+    <string name="update_manifest_default">默认清单</string>
+    <string name="update_manifest_backup">备用清单</string>
+    <string name="update_manifest_description">自动和手动检测都使用所选地址获取更新清单。</string>
     <string name="update_download_original">从原地址下载</string>
     <string name="update_download_accelerated">通过 %1$s 下载</string>
     <string name="update_install_now">立即安装</string>

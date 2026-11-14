@@ -5,15 +5,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,15 +28,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yukisoffd.lyracode.data.UpdateCheckChannel
 import com.yukisoffd.lyracode.data.UpdateManager
+import com.yukisoffd.lyracode.data.UpdateManifestSource
 
 @Composable
 internal fun UpdateManagementScreen(
     onOpenChannels: () -> Unit,
+    onOpenManifest: () -> Unit,
     onOpenAcceleration: () -> Unit,
     onOpenPrompts: () -> Unit,
 ) {
@@ -41,6 +48,12 @@ internal fun UpdateManagementScreen(
             Icons.Default.Sync,
             uiText(R.string.update_channels_title),
             onClick = onOpenChannels,
+        )
+        KimiDivider()
+        KimiMenuRow(
+            Icons.Default.CloudDownload,
+            uiText(R.string.menu_update_manifest),
+            onClick = onOpenManifest,
         )
         KimiDivider()
         KimiMenuRow(
@@ -55,6 +68,44 @@ internal fun UpdateManagementScreen(
             uiText(R.string.update_prompt_settings_title),
             onClick = onOpenPrompts,
         )
+    }
+}
+
+@Composable
+internal fun UpdateManifestSettingsScreen(onManifestChanged: () -> Unit) {
+    val context = LocalContext.current
+    val manager = remember(context) { UpdateManager(context) }
+    var selected by remember(manager) { mutableStateOf(manager.manifestSource()) }
+    Text(uiText(R.string.update_manifest_description), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+    KimiCardBox {
+        Column(Modifier.selectableGroup()) {
+            UpdateManifestSource.entries.forEachIndexed { index, source ->
+                if (index > 0) KimiDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .selectable(selected = selected == source, role = Role.RadioButton) {
+                            if (source != selected) {
+                                manager.setManifestSource(source)
+                                selected = source
+                                onManifestChanged()
+                            }
+                        }
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = selected == source, onClick = null)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(uiText(source.title), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            source.url.ifBlank { uiText(R.string.label_not_configured_or_na) },
+                            color = KimiMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
