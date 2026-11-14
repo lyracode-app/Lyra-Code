@@ -1274,7 +1274,7 @@
     <string name="label_documentation">Documentation</string>
     <string name="section_build_info">Section Build Info</string>
     <string name="menu_device_info">Device info</string>
-    <string name="menu_update_manifest">Menu Update Manifest</string>
+    <string name="menu_update_manifest">Update manifest</string>
     <string name="label_not_configured_or_na">Not configured</string>
     <string name="title_new_version">New Version %1$s</string>
     <string name="notice_mandatory_update">Mandatory Update</string>

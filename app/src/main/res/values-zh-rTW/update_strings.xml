@@ -9,7 +9,10 @@
     <string name="update_channel_move_up">上移 %1$s</string>
     <string name="update_channel_move_down">下移 %1$s</string>
     <string name="update_manifest_unconfigured">尚未設定更新清單網址。</string>
-    <string name="update_channels_changed">檢查管道已變更，請重新檢查。</string>
+    <string name="update_check_settings_changed">更新檢查設定已變更，請重新檢查。</string>
+    <string name="update_manifest_default">預設清單</string>
+    <string name="update_manifest_backup">備用清單</string>
+    <string name="update_manifest_description">自動與手動檢查都會使用所選網址取得更新清單。</string>
     <string name="update_download_original">從原始網址下載</string>
     <string name="update_download_accelerated">透過 %1$s 下載</string>
     <string name="update_install_now">立即安裝</string>

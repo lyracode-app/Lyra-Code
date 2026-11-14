@@ -63,7 +63,16 @@ internal data class DownloadedUpdate(
 private fun compareUpdateVersions(name: String, code: Long, otherName: String, otherCode: Long): Int? =
     if (code > 0L && otherCode > 0L) code.compareTo(otherCode) else compareVersionNames(name, otherName)
 
-class UpdateManager(private val context: Context) {
+class UpdateManager internal constructor(private val context: Context, private val client: OkHttpClient) {
+    constructor(context: Context) : this(
+        context,
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build(),
+    )
+
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences("lyra_update_state", Context.MODE_PRIVATE)
     internal val apkStorage by lazy {
@@ -75,11 +84,6 @@ class UpdateManager(private val context: Context) {
             (listOfNotNull(primary) + appContext.getExternalFilesDirs(null).filterNotNull()).distinct(),
         ))
     }
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
     private val accelerationSettings = GitHubAccelerationSettings(appContext)
     private val apkDownloader = UpdateApkDownloader(
         client.newBuilder().readTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(false).build(),
@@ -103,7 +107,22 @@ class UpdateManager(private val context: Context) {
         }
     }
 
-    fun manifestUrl(): String = com.yukisoffd.lyracode.BuildConfig.LYRA_UPDATE_MANIFEST_URL.trim()
+    internal fun manifestSource(): UpdateManifestSource {
+        val id = prefs.getString(KEY_MANIFEST_SOURCE, null)
+        return UpdateManifestSource.entries.firstOrNull { it.id == id } ?: UpdateManifestSource.DEFAULT
+    }
+
+    internal fun setManifestSource(source: UpdateManifestSource) = synchronized(UpdateDownloadFiles.lock) {
+        if (source != manifestSource()) {
+            prefs.edit()
+                .putString(KEY_MANIFEST_SOURCE, source.id)
+                .remove(KEY_LAST_DAILY_CHECK_DATE)
+                .apply()
+            clearLatestAvailableUpdate()
+        }
+    }
+
+    fun manifestUrl(): String = manifestSource().url
 
     fun currentVersionCode(): Long = packageInfo().updateVersionCode()
 
@@ -136,7 +155,7 @@ class UpdateManager(private val context: Context) {
     fun checkForUpdate(): Result<AppUpdateInfo?> = checkForUpdate(dailyCheckDate = null)
 
     private fun checkForUpdate(dailyCheckDate: String?): Result<AppUpdateInfo?> = runCatching {
-        val channels = checkChannels()
+        val (channels, manifest) = synchronized(UpdateDownloadFiles.lock) { checkChannels() to manifestSource() }
         val release = loadFromUpdateChannels(
             channels,
             onFailure = { channel, error ->
@@ -145,7 +164,7 @@ class UpdateManager(private val context: Context) {
         ) { channel ->
             when (channel) {
                 UpdateCheckChannel.MANIFEST -> {
-                    val url = manifestUrl()
+                    val url = manifest.url
                     require(url.isNotBlank()) { context.getString(R.string.update_manifest_unconfigured) }
                     parseUpdateInfo(fetchJson(url))
                 }
@@ -158,7 +177,9 @@ class UpdateManager(private val context: Context) {
         }
         val available = release.takeIf { it.isNewerThan(currentVersionCode(), currentVersionName()) }
         synchronized(UpdateDownloadFiles.lock) {
-            check(channels == checkChannels()) { context.getString(R.string.update_channels_changed) }
+            check(channels == checkChannels() && manifest == manifestSource()) {
+                context.getString(R.string.update_check_settings_changed)
+            }
             if (available == null) clearLatestAvailableUpdate() else saveLatestAvailableUpdate(available)
             if (dailyCheckDate != null) prefs.edit().putString(KEY_LAST_DAILY_CHECK_DATE, dailyCheckDate).apply()
             available
@@ -501,6 +522,7 @@ class UpdateManager(private val context: Context) {
         const val KEY_UPDATE_PROMPT_DISABLED = "update_prompt_disabled"
         const val KEY_LAST_UPDATE_PROMPT_DATE = "last_update_prompt_date"
         const val KEY_CHECK_CHANNELS = "check_channels"
+        const val KEY_MANIFEST_SOURCE = "manifest_source"
 
         const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/lyracode-app/Lyra-Code/releases/latest"
         const val GITHUB_RELEASES_URL = "https://github.com/lyracode-app/Lyra-Code/releases"

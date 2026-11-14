@@ -9,7 +9,10 @@
     <string name="update_channel_move_up">Move %1$s up</string>
     <string name="update_channel_move_down">Move %1$s down</string>
     <string name="update_manifest_unconfigured">The update manifest URL is missing.</string>
-    <string name="update_channels_changed">Update channels changed. Check again.</string>
+    <string name="update_check_settings_changed">Update check settings changed. Check again.</string>
+    <string name="update_manifest_default">Default manifest</string>
+    <string name="update_manifest_backup">Backup manifest</string>
+    <string name="update_manifest_description">The update manifest channel uses the selected URL for automatic and manual checks.</string>
     <string name="update_download_original">Download from original URL</string>
     <string name="update_download_accelerated">Download via %1$s</string>
     <string name="update_install_now">Install now</string>
