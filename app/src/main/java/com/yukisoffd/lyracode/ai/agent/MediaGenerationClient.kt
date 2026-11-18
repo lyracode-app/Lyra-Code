@@ -52,6 +52,7 @@ internal class MediaGenerationClient(
         request: MediaGenerationPrompt,
     ): MediaGenerationResult {
         require(!profile.isChatGpt) { "ChatGPT plan usage does not support media generation. Choose another service." }
+        require(!profile.isDeepSeekHarness) { "DeepSeek Harness does not provide a media generation endpoint." }
         require(model.isNotBlank()) { "The configured ${request.kind.value} model is empty." }
         val references = request.references.distinct().map(::normalizeReferenceSource)
         val prompt = mediaPromptText(request)

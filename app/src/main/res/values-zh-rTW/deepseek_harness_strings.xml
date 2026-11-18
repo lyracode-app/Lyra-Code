@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="harness_sign_in">使用 DeepSeek Harness 登入</string>
+    <string name="harness_signed_in">已登入 DeepSeek Harness</string>
+    <string name="harness_sign_in_description">在系統瀏覽器授權 DeepSeek Harness 模型存取，並查看 DeepSeek 帳戶餘額。</string>
+    <string name="harness_waiting_browser">請在瀏覽器完成授權，然後返回 Lyra Code。</string>
+    <string name="harness_sign_in_timeout">登入請求已逾時，請重新發起登入。</string>
+    <string name="harness_session_expired">DeepSeek Harness 登入已失效，請重新登入。</string>
+    <string name="harness_request_failed">DeepSeek Harness 請求失敗，請重試。</string>
+    <string name="harness_sign_out_failed">已在本機登出，DeepSeek 平台登出請求失敗。</string>
+    <string name="harness_model_list_failed">模型清單更新失敗，目前的模型設定仍可使用。</string>
+    <string name="harness_recharge_balance">儲值餘額</string>
+    <string name="harness_bonus_balance">贈金餘額 %1$s</string>
+    <string name="harness_balance_loading">正在讀取餘額…</string>
+    <string name="harness_balance_unavailable">暫時無法取得餘額</string>
+    <string name="harness_balance_stale">正在顯示上一次取得的餘額。</string>
+    <string name="harness_refresh_balance">更新餘額</string>
+    <string name="harness_usage">查詢用量</string>
+    <string name="harness_top_up">儲值</string>
+    <string name="harness_balance_alert">低餘額警示</string>
+    <string name="harness_balance_alert_hint">所選幣別的儲值餘額低於門檻時提醒一次。餘額恢復到門檻後，再次低於門檻才會提醒。</string>
+    <string name="harness_alert_threshold">餘額門檻</string>
+    <string name="harness_notification_permission">請啟用 Android 通知以接收餘額警示。</string>
+    <string name="harness_notification_settings">通知設定</string>
+    <string name="harness_alert_title">DeepSeek Harness 餘額不足</string>
+    <string name="harness_alert_message">儲值餘額 %1$s 已低於設定門檻 %2$s。</string>
+    <string name="harness_service_description">此模型服務使用 DeepSeek Harness 登入簽發的專用憑證。</string>
+    <string name="harness_account_data">DeepSeek Harness 登入會在瀏覽器開啟 DeepSeek 官方平台。Lyra Code 使用授權碼與裝置識別碼換取專用憑證，並將憑證加密儲存在本機，憑證不納入備份。Lyra Code 使用憑證查詢使用者資料與錢包餘額，以及向 DeepSeek 傳送所選模型的請求。開啟低餘額警示後，應用程式會定期查詢儲值錢包，並在符合警示條件時傳送 Android 通知。DeepSeek 服務請求適用其協議與隱私權政策。</string>
+    <string name="harness_platform_rate_limited">DeepSeek 平台暫時限制此連線（HTTP 429）。請稍後再試。</string>
+    <string name="harness_platform_blocked">DeepSeek 平台攔截了這次請求（HTTP %1$d）。請在可以存取該平台的網路上重試。</string>
+    <string name="harness_platform_http_error">DeepSeek 平台回傳 HTTP %1$d。請稍後再試。</string>
+    <string name="harness_platform_invalid_response">DeepSeek 平台回傳了異常回應（HTTP %1$d）。</string>
+    <string name="harness_platform_rejected">DeepSeek 平台拒絕了這次請求（錯誤碼 %1$d）。</string>
+    <string name="harness_platform_connection_failed">無法連線至 DeepSeek 平台，請檢查網路連線。</string>
+    <string name="harness_invalid_browser_destination">DeepSeek 回傳的登入頁網址無效。</string>
+    <string name="harness_invalid_authorization_payload">DeepSeek 回傳的授權資料不完整。</string>
+    <string name="harness_browser_unavailable">Android 找不到可開啟 DeepSeek 登入頁的瀏覽器。</string>
+    <string name="harness_callback_unavailable">無法啟動本機登入回呼，請重新發起登入。</string>
+</resources>

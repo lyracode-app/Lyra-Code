@@ -13,7 +13,7 @@ internal class ProviderKeyInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()
         val profile = original.tag(ApiProfile::class.java) ?: return chain.proceed(original)
-        if (profile.isChatGpt) return chain.proceed(original)
+        if (profile.usesAccountCredential) return chain.proceed(original)
         if (original.body?.isOneShot() == true || original.body?.isDuplex() == true) return chain.proceed(original)
         val keys = profile.allApiKeys
         val templates = profile.modelRequestOverrides.values.flatMap { it.headers.entries }

@@ -3,6 +3,7 @@ package com.yukisoffd.lyracode.ai
 import android.content.Context
 import android.util.Log
 import com.yukisoffd.lyracode.data.ApiProfile
+import com.yukisoffd.lyracode.data.DeepSeekHarnessProtocol
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -31,12 +32,15 @@ internal data class DeepSeekCachedFile(
 )
 
 internal fun supportsDeepSeekFilesApi(profile: ApiProfile, model: String): Boolean {
+    val modelId = model.trim().lowercase(Locale.US)
+    if (profile.isDeepSeekHarness) return modelId == "deepseek-flash" || modelId.contains("vision")
     return isDeepSeekApiProfile(profile) &&
         profile.apiFormat != ApiProfile.API_FORMAT_GEMINI &&
-        model.trim().lowercase(Locale.US).contains("vision")
+        modelId.contains("vision")
 }
 
 internal fun deepSeekFilesEndpoint(profile: ApiProfile): String {
+    if (profile.isDeepSeekHarness) return DeepSeekHarnessProtocol.FILES
     val raw = profile.baseUrl.trim().trimEnd('/')
     val uri = runCatching { URI(raw) }.getOrNull()
     if (uri?.scheme != null && uri.host != null && uri.host.equals("api.deepseek.com", ignoreCase = true)) {
@@ -137,7 +141,7 @@ internal fun deepSeekFileUploadRequest(
 ): Request {
     val body = MultipartBody.Builder()
         .setType(MultipartBody.FORM)
-        .addFormDataPart("purpose", "user_data")
+        .apply { if (!profile.isDeepSeekHarness) addFormDataPart("purpose", "user_data") }
         .addFormDataPart("expires_after[anchor]", "created_at")
         .addFormDataPart("expires_after[seconds]", FILE_EXPIRY_SECONDS.toString())
         .addFormDataPart("file", image.filename, image.bytes.toRequestBody(image.mimeType.toMediaType()))
@@ -172,7 +176,8 @@ internal class DeepSeekFilesApi(
 
     private fun resolveFileId(profile: ApiProfile, image: DeepSeekInlineImage): String {
         val endpoint = deepSeekFilesEndpoint(profile)
-        val cacheKey = sha256("$endpoint\n${sha256(profile.apiKey.toByteArray())}\n${image.digest}".toByteArray())
+        val scope = if (profile.isDeepSeekHarness) profile.id else sha256(profile.apiKey.toByteArray())
+        val cacheKey = sha256("$endpoint\n$scope\n${image.digest}".toByteArray())
         val lock = keyLocks.getOrPut(cacheKey) { Any() }
         return synchronized(lock) {
             val now = System.currentTimeMillis()

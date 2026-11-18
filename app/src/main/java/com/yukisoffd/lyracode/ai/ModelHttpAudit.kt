@@ -79,7 +79,7 @@ internal class ModelHttpAudit(private val sink: HttpAuditSink, private val tempD
     val application = Interceptor { chain ->
         val original = chain.request()
         // OAuth credentials and authorization diagnostics must never enter HTTP audit exports.
-        if (original.tag(com.yukisoffd.lyracode.data.ApiProfile::class.java)?.isChatGpt == true) return@Interceptor chain.proceed(original)
+        if (original.tag(com.yukisoffd.lyracode.data.ApiProfile::class.java)?.usesAccountCredential == true) return@Interceptor chain.proceed(original)
         if (original.tag(ModelAuditTag::class.java) == null) return@Interceptor chain.proceed(original)
         val exchange = HttpAuditExchange(start(original))
         val started = System.nanoTime()

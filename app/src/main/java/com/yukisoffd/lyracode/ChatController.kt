@@ -1759,6 +1759,10 @@ class ChatController(
 
     internal fun stopChatGptAccountRequests(clientId: String) {
         val profileIds = settings.profiles().filter { it.chatGptAccountId == clientId }.map { it.id }.toSet()
+        stopAccountRequests(profileIds)
+    }
+
+    internal fun stopAccountRequests(profileIds: Set<String>) {
         jobs.keys.toList().forEach { id ->
             if (conversationStore.conversation(id)?.profileId in profileIds) {
                 jobs[id]?.cancel()

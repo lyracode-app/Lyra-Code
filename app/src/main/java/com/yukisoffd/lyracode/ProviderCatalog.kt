@@ -283,6 +283,7 @@ internal object ProviderCatalog {
     }
 
     fun logoRes(profile: ApiProfile): Int? = when {
+        profile.isDeepSeekHarness -> R.drawable.ai_service_deepseek
         profile.isChatGpt -> R.drawable.ai_service_openai
         profile.id.startsWith("newapi:") -> R.drawable.ai_service_newapi
         else -> match(profile)?.logoRes

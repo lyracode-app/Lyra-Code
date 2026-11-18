@@ -163,11 +163,13 @@ class OpenAiAgent(
     )
     private val client = OkHttpClient.Builder()
         .addInterceptor(ChatGptAuthInterceptor { settings.chatGptAccount })
+        .addInterceptor(DeepSeekHarnessAuthInterceptor { settings.deepSeekHarnessAccount })
         .addInterceptor(ProviderKeyInterceptor())
         .addInterceptor(httpAudit.application)
         .addInterceptor(GzipRequestInterceptor())
         .addNetworkInterceptor(httpAudit.network)
         .addNetworkInterceptor(ChatGptRouteGuard())
+        .addNetworkInterceptor(DeepSeekHarnessRouteGuard())
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
         .build()
@@ -589,9 +591,11 @@ class OpenAiAgent(
 
     private val reachabilityService = AgentReachabilityService(client, reachabilityClient)
 
-    fun fetchModels(profile: ApiProfile): Result<List<String>> = if (profile.isChatGpt) runCatching {
-        settings.chatGptAccount.fetchModels(profile.chatGptAccountId).map { it.slug }
-    } else reachabilityService.fetchModels(profile)
+    fun fetchModels(profile: ApiProfile): Result<List<String>> = when {
+        profile.isDeepSeekHarness -> runCatching { settings.deepSeekHarnessAccount.fetchModels(profile.id) }
+        profile.isChatGpt -> runCatching { settings.chatGptAccount.fetchModels(profile.chatGptAccountId).map { it.slug } }
+        else -> reachabilityService.fetchModels(profile)
+    }
 
     fun checkReachability(profile: ApiProfile, models: List<String>): ProviderReachabilityReport =
         reachabilityService.checkReachability(profile, models)

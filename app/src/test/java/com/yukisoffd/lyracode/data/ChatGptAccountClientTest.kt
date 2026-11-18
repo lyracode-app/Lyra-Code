@@ -14,7 +14,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-internal class MemoryChatGptStore : ChatGptAccountStore {
+internal class MemoryChatGptStore : AccountStateStore {
     var state = JSONObject()
     @Synchronized override fun <T> transaction(block: (JSONObject) -> T): T {
         val copy = JSONObject(state.toString())

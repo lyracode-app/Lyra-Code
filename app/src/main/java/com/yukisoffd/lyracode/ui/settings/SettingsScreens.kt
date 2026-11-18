@@ -169,7 +169,7 @@ internal fun SettingsScreen(
         )
     }
     fun previousDetail(current: String?): String? = when (current) {
-        "new_api_account", "chatgpt_account" -> "profile"
+        "new_api_account", "chatgpt_account", "deepseek_harness_account" -> "profile"
         "chatgpt_sign_in" -> "chatgpt_account"
         "mcp_tools" -> "mcp"
         "mcp_tool_detail" -> "mcp_tools"
@@ -314,7 +314,11 @@ internal fun SettingsScreen(
                     scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "developer_wall", "device", "font", "font_library", "github_acceleration", "floating_page"),
                 ) {
                     when (target) {
-                    "profile" -> ProfileSettingsSummary(settings, controller::reloadProfiles, { detail = "chatgpt_account" }) { notice ->
+                    "profile" -> ProfileSettingsSummary(
+                        settings, controller::reloadProfiles,
+                        onOpenChatGptAccount = { detail = "chatgpt_account" },
+                        onOpenDeepSeekHarnessAccount = { detail = "deepseek_harness_account" },
+                    ) { notice ->
                         accountNotice = notice
                         accountPageVersion++
                         detail = "new_api_account"
@@ -325,6 +329,7 @@ internal fun SettingsScreen(
                             detail = "profile"
                         }
                     }
+                    "deepseek_harness_account" -> DeepSeekHarnessAccountPage(settings, controller::reloadProfiles)
                     "chatgpt_account" -> ChatGptAccountPage(
                         settings = settings, onServicesChanged = controller::reloadProfiles,
                         onBeforeSignOut = controller::stopChatGptAccountRequests,
@@ -757,6 +762,7 @@ internal fun SettingsDetailPage(
 internal fun settingsDetailTitle(context: Context, detail: String): String = when (detail) {
     "profile" -> context.getString(R.string.detail_profile)
     "new_api_account" -> context.getString(R.string.new_api_account)
+    "deepseek_harness_account" -> context.getString(R.string.harness_account_name)
     "chatgpt_account" -> context.getString(R.string.chatgpt_account_title)
     "chatgpt_sign_in" -> context.getString(R.string.chatgpt_sign_in_title)
     "model" -> context.getString(R.string.detail_model)

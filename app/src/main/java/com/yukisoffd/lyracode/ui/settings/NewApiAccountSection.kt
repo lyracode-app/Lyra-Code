@@ -62,7 +62,7 @@ internal fun syncNewApiAccountServices(settings: AppSettings): com.yukisoffd.lyr
         val latest = settings.profiles()
         val merged = if (latest.any { it.id == profile.id }) latest.map { if (it.id == profile.id) profile else it } else latest + profile
         val selected = settings.selectedProfile()
-        settings.saveProfiles(merged, if (selected.allApiKeys.isEmpty() && !selected.isChatGpt) profile.id else settings.selectedApiProfileId)
+        settings.saveProfiles(merged, if (selected.allApiKeys.isEmpty() && !selected.usesAccountCredential) profile.id else settings.selectedApiProfileId)
     }
 }
 

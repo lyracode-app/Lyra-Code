@@ -66,6 +66,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.yukisoffd.lyracode.data.AppSettings
+import com.yukisoffd.lyracode.data.DeepSeekHarnessBalanceWorker
 import com.yukisoffd.lyracode.data.AuditLogStore
 import com.yukisoffd.lyracode.data.BackupManager
 import com.yukisoffd.lyracode.data.SkillPack
@@ -86,8 +87,16 @@ import com.yukisoffd.lyracode.termux.TermuxExecutor
 import com.yukisoffd.lyracode.webdav.WebDavClient
 import com.yukisoffd.lyracode.workspace.WorkspaceManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import java.net.URL
 
 
@@ -137,6 +146,30 @@ internal fun LyraCodeApp(
     onCustomFontScaleChange: (Float) -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val harness = settings.deepSeekHarnessAccount
+    LaunchedEffect(harness, controller) {
+        var previous = harness.view.value.profileId
+        harness.view.map { it.profileId }.distinctUntilChanged().collect { id ->
+            if (id != previous) {
+                previous?.let { controller.stopAccountRequests(setOf(it)) }
+                controller.reloadProfiles()
+                previous = id
+            }
+        }
+    }
+    LaunchedEffect(harness, lifecycle) {
+        harness.view.map { state -> state.profileId?.takeIf { state.alert != null } }
+            .distinctUntilChanged().collectLatest { id ->
+                DeepSeekHarnessBalanceWorker.schedule(context.applicationContext, enabled = id != null)
+                if (id != null) lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    while (isActive) {
+                        withContext(Dispatchers.IO) { runCatching { harness.refreshBalance(id, maxAgeMillis = 55_000) } }
+                        delay(60_000)
+                    }
+                }
+            }
+    }
     val pages = listOf(
         context.getString(R.string.nav_tab_ai_chat),
         context.getString(R.string.nav_tab_files),
@@ -466,6 +499,14 @@ internal fun LyraCodeApp(
                             scope.launch {
                                 drawerState.close()
                                 externalAccountTarget = "chatgpt_account"
+                                externalAccountNotice = ""
+                                selectedPage = PAGE_SETTINGS
+                            }
+                        },
+                        onOpenDeepSeekHarnessAccount = {
+                            scope.launch {
+                                drawerState.close()
+                                externalAccountTarget = "deepseek_harness_account"
                                 externalAccountNotice = ""
                                 selectedPage = PAGE_SETTINGS
                             }
