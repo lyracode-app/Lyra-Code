@@ -199,7 +199,7 @@ internal fun LyraCodeApp(
     var settingsDetailTitle by rememberSaveable { mutableStateOf<String?>(null) }
     var settingsBackRequest by remember { mutableIntStateOf(0) }
     var externalAccountNotice by rememberSaveable { mutableStateOf<String?>(null) }
-    var externalAccountTarget by rememberSaveable { mutableStateOf("mengxi_account") }
+    var externalAccountTarget by rememberSaveable { mutableStateOf("new_api_account") }
     ChatGptUsageDialog(settings, settings.selectedProfile().chatGptAccountId)
     var conversationDetailsExpanded by rememberSaveable { mutableStateOf(false) }
     var showStatsAboutDialog by rememberSaveable { mutableStateOf(false) }
@@ -458,7 +458,7 @@ internal fun LyraCodeApp(
                             scope.launch {
                                 drawerState.close()
                                 externalAccountNotice = notice
-                                externalAccountTarget = "mengxi_account"
+                                externalAccountTarget = "new_api_account"
                                 selectedPage = PAGE_SETTINGS
                             }
                         },

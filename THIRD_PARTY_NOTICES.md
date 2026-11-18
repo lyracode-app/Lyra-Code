@@ -15,6 +15,7 @@ This document summarizes the main third-party components used by Lyra Code. It i
 | AndroidX Security Crypto | Apache License 2.0 | Encrypted preferences. |
 | Kotlinx Coroutines Android | Apache License 2.0 | Coroutine runtime. |
 | OkHttp | Apache License 2.0 | HTTP client. |
+| Lobe Icons | MIT | Selected light and dark WebP logos. The upstream license is packaged in `app/src/main/assets/licenses/lobe-icons-LICENSE.txt`. |
 | Android Mail / Jakarta Mail API for Android 1.6.7 (`com.sun.mail:android-mail`) | Eclipse Public License 2.0 | Controls Lyra Code's IMAP message reading, folder and draft management, SMTP sending, and MIME processing. The packaged JAR retains its `META-INF/LICENSE.md` and `META-INF/NOTICE.md`. |
 | Jakarta Activation fork for Android (`com.sun.mail:android-activation`) | Eclipse Public License 2.0 | MIME data handlers used by mail attachments. The packaged JAR retains its license and notice resources. |
 | mwiede JSch | BSD/ISC-style licenses; includes bundled license files | SSH client. Check upstream `LICENSE.txt`, `LICENSE.JZlib.txt`, and `LICENSE.jBCrypt.txt`. |

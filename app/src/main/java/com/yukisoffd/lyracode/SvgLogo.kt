@@ -10,10 +10,31 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+
+@Composable
+internal fun themedAiLogoRes(@DrawableRes logoRes: Int): Int {
+    if (!LocalDarkTheme.current) return logoRes
+    return when (logoRes) {
+        R.drawable.ai_service_anthropic -> R.drawable.ai_service_anthropic_dark
+        R.drawable.ai_service_moonshot -> R.drawable.ai_service_moonshot_dark
+        R.drawable.ai_service_openai -> R.drawable.ai_service_openai_dark
+        R.drawable.ai_service_stepfun -> R.drawable.ai_service_stepfun_dark
+        R.drawable.ai_service_xai -> R.drawable.ai_service_xai_dark
+        R.drawable.ai_service_xiaomimimo -> R.drawable.ai_service_xiaomimimo_dark
+        R.drawable.ai_service_zai -> R.drawable.ai_service_zai_dark
+        R.drawable.ai_model_grok -> R.drawable.ai_model_grok_dark
+        R.drawable.ai_model_kimi -> R.drawable.ai_model_kimi_dark
+        R.drawable.ai_model_longcat -> R.drawable.ai_model_longcat_dark
+        R.drawable.ai_model_openai -> R.drawable.ai_model_openai_dark
+        R.drawable.ai_model_stepfun -> R.drawable.ai_model_stepfun_dark
+        R.drawable.ai_model_xiaomimimo -> R.drawable.ai_model_xiaomimimo_dark
+        R.drawable.ai_model_zeroone -> R.drawable.ai_model_zeroone_dark
+        else -> logoRes
+    }
+}
 
 @Composable
 internal fun AiLogoBadge(
@@ -34,13 +55,12 @@ internal fun AiLogoBadge(
             )
         } else {
             Image(
-                painter = painterResource(logoRes),
+                painter = painterResource(themedAiLogoRes(logoRes)),
                 contentDescription = null,
                 modifier = Modifier
                     .matchParentSize()
                     .padding(3.dp),
                 contentScale = ContentScale.Fit,
-                colorFilter = if (logoRes == R.drawable.ai_service_openai) ColorFilter.tint(MaterialTheme.colorScheme.onSurface) else null,
             )
         }
     }

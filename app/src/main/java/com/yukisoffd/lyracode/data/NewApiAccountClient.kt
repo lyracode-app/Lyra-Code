@@ -4,6 +4,7 @@ import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -11,6 +12,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -26,19 +28,33 @@ internal data class NewApiSyncResult(val profile: ApiProfile, val warnings: List
 /** Only account endpoints and /v1/models are used here. No local chat/configuration data is accepted. */
 internal class NewApiAccountClient(
     private val store: NewApiAccountStore,
-    baseUrl: String = PLATFORM_URL,
+    baseUrl: String? = null,
     transport: OkHttpClient = OkHttpClient(),
 ) {
-    private val origin = baseUrl.trimEnd('/').toHttpUrl()
     private var session = runCatching { JSONObject(store.state) }.getOrDefault(JSONObject())
+    private val storedSite = when {
+        session.has("site_url") -> parseSiteUrl(session.optString("site_url"))
+        session.length() > 0 -> LEGACY_SITE
+        else -> null
+    }
+    @Volatile private var origin = baseUrl?.let { requireNotNull(parseSiteUrl(it)) } ?: storedSite
+    init {
+        if (origin == null || origin != storedSite) session = JSONObject()
+    }
     @Volatile private var userSnapshot = session.optJSONObject("user")?.toString()
-    @Volatile private var loggedInSnapshot = session.optString("access_token").isNotBlank()
+    @Volatile private var loggedInSnapshot = hasSession()
     @Volatile private var savedLoginSnapshot = session.optJSONObject("saved_login")?.toString()
-    private data class PendingLogin(val flowToken: String, val savedLogin: NewApiSavedLogin?)
+    private data class PendingLogin(
+        val flowToken: String,
+        val serverToken: String?,
+        val savedLogin: NewApiSavedLogin?,
+    )
     @Volatile private var pendingLogin: PendingLogin? = null
     private val cookies = mutableListOf<Cookie>().apply {
         val saved = session.optJSONArray("cookies") ?: JSONArray()
-        for (i in 0 until saved.length()) Cookie.parse(origin, saved.optString(i))?.let(::add)
+        origin?.let { site ->
+            for (i in 0 until saved.length()) Cookie.parse(site, saved.optString(i))?.let(::add)
+        }
     }
     private val client = transport.newBuilder()
         .connectTimeout(20, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS)
@@ -71,11 +87,30 @@ internal class NewApiAccountClient(
         else NewApiSavedLogin(username, password, data.optBoolean("auto_login"))
     }
     val user: JSONObject? get() = userSnapshot?.let(::JSONObject)
-    val profileId: String get() = "newapi:${origin.host}:${user?.optLong("id") ?: 0}"
+    val siteUrl: String? get() = origin?.toString()?.trimEnd('/')
+    val profileId: String? get() {
+        val site = origin ?: return null
+        val userId = user?.optLong("id")?.takeIf { it > 0 } ?: return null
+        val siteId = if (site == LEGACY_SITE) site.host else site.toString().trimEnd('/')
+        return "newapi:$siteId:$userId"
+    }
+
+    @Synchronized fun <T> useSite(site: HttpUrl, action: () -> T): T {
+        if (site != origin) {
+            check(!isLoggedIn) { "Sign out before changing the New API site" }
+            val next = JSONObject().put("site_url", site.toString())
+            store.state = next.toString()
+            session = next
+            pendingLogin = null
+            cookies.clear()
+            publishSession()
+            origin = site
+        }
+        return action()
+    }
 
     @Synchronized fun sendVerification(email: String) {
-        val url = origin.newBuilder().encodedPath("/api/verification").addQueryParameter("email", email.trim()).build()
-        exchange(url, "GET")
+        exchange(url("/api/verification").newBuilder().addQueryParameter("email", email.trim()).build(), "GET")
     }
 
     @Synchronized fun register(username: String, password: String, email: String, code: String, invitation: String) {
@@ -92,13 +127,24 @@ internal class NewApiAccountClient(
     ): NewApiLoginResult {
         pendingLogin = null
         check(!rememberCredentials || canRememberCredentials) { "Encrypted credential storage is unavailable" }
+        if (!isLoggedIn) cookies.clear()
         val saved = if (rememberCredentials) NewApiSavedLogin(username.trim(), password, autoLogin) else null
         val data = exchange(url("/api/user/login"), "POST",
             JSONObject().put("username", username.trim()).put("password", password)).getJSONObject("data")
-        if (data.optBoolean("require_2fa")) {
-            val flow = data.optString("flow_token")
-            check(flow.isNotBlank()) { "Missing two-factor flow token" }
-            pendingLogin = PendingLogin(flow, saved)
+        val requiresVerification = data.optBoolean("require_verification")
+        if (data.optBoolean("require_2fa") || requiresVerification) {
+            val serverToken = data.optString("flow_token").takeIf(String::isNotBlank)
+            if (requiresVerification) {
+                checkNotNull(serverToken) { "Missing two-factor flow token" }
+                val methods = data.optJSONArray("methods")
+                if (methods != null && (0 until methods.length()).none { index ->
+                    methods.optJSONObject(index)?.let { it.optString("method") == "2fa" && it.optBoolean("available") } == true
+                }) {
+                    throw NewApiException(200, "Complete the required verification on the New API site.")
+                }
+            }
+            val flow = serverToken ?: UUID.randomUUID().toString()
+            pendingLogin = PendingLogin(flow, serverToken, saved)
             return NewApiLoginResult(flow)
         }
         acceptAuthentication(data, newLogin = true, saved = saved)
@@ -106,9 +152,11 @@ internal class NewApiAccountClient(
     }
 
     @Synchronized fun verifyTwoFactor(flowToken: String, code: String) {
-        acceptAuthentication(exchange(url("/api/user/login/2fa"), "POST",
-            JSONObject().put("flow_token", flowToken).put("code", code.trim())).getJSONObject("data"),
-            newLogin = true, saved = pendingLogin?.takeIf { it.flowToken == flowToken }?.savedLogin)
+        val pending = checkNotNull(pendingLogin?.takeIf { it.flowToken == flowToken }) { "Sign in again to request a new code" }
+        val body = JSONObject().put("code", code.trim())
+        pending.serverToken?.let { body.put("flow_token", it) }
+        acceptAuthentication(exchange(url("/api/user/login/2fa"), "POST", body).getJSONObject("data"),
+            newLogin = true, saved = pending.savedLogin)
         pendingLogin = null
     }
 
@@ -137,7 +185,14 @@ internal class NewApiAccountClient(
         val remembered = savedLogin?.copy(autoLogin = false)
         // Disable before the request so an interrupted/manual logout cannot sign the user back in.
         saveLogin(remembered)
-        try { exchange(url("/api/user/auth/logout"), "POST", JSONObject()) }
+        try {
+            if (session.optBoolean("legacy_session")) {
+                exchange(url("/api/user/logout"), "GET")
+            } else {
+                exchange(url("/api/user/auth/logout"), "POST", accessToken = session.optString("access_token").takeIf(String::isNotBlank),
+                    sessionCookieRequest = true)
+            }
+        }
         finally {
             cookies.clear()
             session = JSONObject()
@@ -182,9 +237,15 @@ internal class NewApiAccountClient(
         fun reveal(token: JSONObject): String {
             val id = token.getLong("id").toString()
             val key = previousKeys.optString(id).ifBlank {
-                authenticated("/api/token/$id/key", "POST", JSONObject()).getJSONObject("data").getString("key")
+                val listedKey = token.optString("key").takeIf { session.optBoolean("legacy_session") && isPlaintextKey(it) }
+                listedKey ?: try {
+                    authenticated("/api/token/$id/key", "POST", JSONObject()).getJSONObject("data").getString("key")
+                } catch (error: NewApiException) {
+                    if (!session.optBoolean("legacy_session") || error.status !in listOf(404, 405)) throw error
+                    authenticated("/api/token/$id").getJSONObject("data").getString("key")
+                }
             }.trim()
-            check(key.isNotBlank() && !key.contains('*') && !key.contains('…')) { "Platform returned a masked API key" }
+            check(isPlaintextKey(key)) { "Platform returned a masked API key" }
             val normalized = if (key.startsWith("sk-")) key else "sk-$key"
             currentKeys.put(id, normalized)
             // Save each revealed key so resuming after rate limiting does not repeat plaintext requests.
@@ -194,9 +255,14 @@ internal class NewApiAccountClient(
             return normalized
         }
         val serviceKey = reveal(serviceToken)
-        var profile = existing?.copy() ?: ApiProfile(
-            id = profileId, name = "$PLATFORM_NAME · ${account.optString("username")}", apiKey = serviceKey,
-            baseUrl = "${origin.toString().trimEnd('/')}/v1", selectedModel = "", savedModels = emptyList(),
+        val id = checkNotNull(profileId)
+        val baseUrl = url("/v1").toString()
+        val currentProfile = existing?.takeIf { it.id == id && it.baseUrl.trimEnd('/') == baseUrl }
+        val site = checkNotNull(origin)
+        val siteName = site.toString().substringAfter("://").trimEnd('/')
+        var profile = currentProfile ?: ApiProfile(
+            id = id, name = "New API · $siteName · ${account.optString("username")}", apiKey = serviceKey,
+            baseUrl = baseUrl, selectedModel = "", savedModels = emptyList(),
         )
         // Persist the usable service before optional plaintext/model requests which may be rate limited.
         profile = profile.copy(apiKey = profile.apiKey.ifBlank { serviceKey },
@@ -219,13 +285,15 @@ internal class NewApiAccountClient(
         if (complete) { session.put("token_keys", currentKeys); persist() }
         try {
             val models = fetchModels(serviceKey)
-            val enabled = if (existing == null || existing.savedModels.isEmpty()) models else profile.enabledModels.filter { it in models }
+            val enabled = if (currentProfile == null || currentProfile.savedModels.isEmpty()) models else profile.enabledModels.filter { it in models }
             profile = profile.copy(savedModels = models, enabledModels = enabled,
                 selectedModel = profile.selectedModel.takeIf { it in enabled } ?: enabled.firstOrNull().orEmpty())
         } catch (error: Exception) { warnings += error.message.orEmpty() }
         save(profile)
         return NewApiSyncResult(profile, warnings)
     }
+
+    private fun isPlaintextKey(key: String): Boolean = key.isNotBlank() && '*' !in key && '…' !in key
 
     private fun usableToken(token: JSONObject): Boolean = token.optInt("status", 1) == 1 &&
         (token.optLong("expired_time", -1) == -1L || token.optLong("expired_time") > System.currentTimeMillis() / 1000) &&
@@ -260,22 +328,28 @@ internal class NewApiAccountClient(
     }
 
     private fun acceptAuthentication(data: JSONObject, newLogin: Boolean = false, saved: NewApiSavedLogin? = null) {
-        val token = data.getString("access_token")
-        check(token.isNotBlank()) { "Missing account access token" }
-        val incomingUser = data.optJSONObject("user")
+        val token = data.optString("access_token").takeIf(String::isNotBlank)
+            ?: data.optString("token").takeIf(String::isNotBlank)
+        val incomingUser = data.optJSONObject("user") ?: data.takeIf { it.optLong("id") > 0 }
+        val legacySession = !data.has("access_token") && incomingUser != null
+        check(token != null || (newLogin && legacySession && cookies.isNotEmpty())) { "Platform did not return an account session" }
         if (newLogin && (incomingUser == null || incomingUser.optLong("id") != user?.optLong("id"))) {
             session.remove("managed_name")
             session.remove("token_keys")
             session.remove("user")
         }
         session.put("access_token", token).put("access_expires_at", data.optLong("access_expires_at"))
+            .put("legacy_session", legacySession)
+            .put("session_id", data.optJSONObject("session")?.optString("sid"))
         if (incomingUser != null) session.put("user", incomingUser)
         if (newLogin) writeSavedLogin(saved)
         persist()
     }
 
     private fun refresh() {
-        try { acceptAuthentication(exchange(url("/api/user/auth/refresh"), "POST", JSONObject()).getJSONObject("data")) }
+        try {
+            acceptAuthentication(exchange(url("/api/user/auth/refresh"), "POST", sessionCookieRequest = true).getJSONObject("data"))
+        }
         catch (error: NewApiException) {
             if (error.status in listOf(200, 401, 403)) clearAuthentication()
             throw error
@@ -300,10 +374,14 @@ internal class NewApiAccountClient(
                     throw error
                 }
             }
-            try { return exchange(url(path), method, body, session.getString("access_token")) }
+            val legacySession = session.optBoolean("legacy_session")
+            try {
+                return exchange(url(path), method, body, session.optString("access_token").takeIf(String::isNotBlank),
+                    legacyUserId = user?.optLong("id")?.takeIf { legacySession && it > 0 })
+            }
             catch (error: NewApiException) {
                 if (error.status != 401) throw error
-                if (!refreshed && !signedInAgain) {
+                if (!legacySession && !refreshed && !signedInAgain) {
                     refreshed = true
                     try { refresh() }
                     catch (refreshError: NewApiException) {
@@ -320,6 +398,9 @@ internal class NewApiAccountClient(
 
     private fun clearAuthentication() {
         session.remove("access_token")
+        session.remove("legacy_session")
+        session.remove("session_id")
+        session.remove("access_expires_at")
         cookies.clear()
         persist()
     }
@@ -341,34 +422,67 @@ internal class NewApiAccountClient(
         }
     }
 
-    private fun exchange(url: HttpUrl, method: String, body: JSONObject? = null, accessToken: String? = null): JSONObject {
+    private fun exchange(
+        url: HttpUrl,
+        method: String,
+        body: JSONObject? = null,
+        accessToken: String? = null,
+        legacyUserId: Long? = null,
+        sessionCookieRequest: Boolean = false,
+    ): JSONObject {
         val request = Request.Builder().url(url)
             .header("Accept", "application/json")
-            .apply { if (accessToken != null) header("Authorization", "Bearer $accessToken") }
+            .apply {
+                if (accessToken != null) header("Authorization", "Bearer $accessToken")
+                if (legacyUserId != null) header("New-Api-User", legacyUserId.toString())
+                if (sessionCookieRequest) {
+                    header("Origin", url.newBuilder().encodedPath("/").query(null).build().toString().trimEnd('/'))
+                    session.optString("session_id").takeIf(String::isNotBlank)?.let { header("X-Auth-Session", it) }
+                }
+            }
             .method(method, if (method == "GET") null else (body ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()))
             .build()
         return client.newCall(request).execute().use { response ->
             val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
             if (!response.isSuccessful || json?.optBoolean("success") != true) {
                 throw NewApiException(response.code, json?.optString("message")?.takeIf(String::isNotBlank)
-                    ?: "$PLATFORM_NAME: HTTP ${response.code}")
+                    ?: "New API: HTTP ${response.code}")
             }
             json
         }
     }
 
-    private fun url(path: String): HttpUrl = origin.resolve(path) ?: error("Invalid platform path")
+    private fun url(path: String): HttpUrl =
+        checkNotNull(origin) { "Enter a New API site URL" }.resolve(path.removePrefix("/")) ?: error("Invalid platform path")
+
+    private fun hasSession(): Boolean =
+        session.optBoolean("legacy_session") || session.optString("access_token").isNotBlank()
+
     private fun persist() {
+        session.put("site_url", origin?.toString())
         session.put("cookies", JSONArray(cookies.map(Cookie::toString)))
         store.state = session.toString()
+        publishSession()
+    }
+
+    private fun publishSession() {
         userSnapshot = session.optJSONObject("user")?.toString()
-        loggedInSnapshot = session.optString("access_token").isNotBlank()
+        loggedInSnapshot = hasSession()
         savedLoginSnapshot = session.optJSONObject("saved_login")?.toString()
     }
 
     companion object {
         private val APP_TOKEN_NAME = Regex("Lyra-[0-9a-f]{8}-[0-9a-f]{3}", RegexOption.IGNORE_CASE)
-        const val PLATFORM_URL = "https://api.huanyan.fun"
-        const val PLATFORM_NAME = "梦汐 API"
+        private val LEGACY_SITE = "https://api.huanyan.fun/".toHttpUrl()
+
+        fun parseSiteUrl(value: String): HttpUrl? {
+            val text = value.trim()
+            val uri = runCatching { URI(text) }.getOrNull() ?: return null
+            val authority = uri.rawAuthority ?: return null
+            if ('@' in authority || uri.rawQuery != null || uri.rawFragment != null) return null
+            val url = text.toHttpUrlOrNull() ?: return null
+            val path = url.encodedPath.trimEnd('/')
+            return url.newBuilder().encodedPath("$path/").build()
+        }
     }
 }

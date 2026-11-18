@@ -119,7 +119,7 @@ internal fun ProfileSettingsSummary(settings: AppSettings, onServicesChanged: ()
             }
         }
     }
-    KimiSectionLabel(uiText(R.string.mengxi_third_party_accounts))
+    KimiSectionLabel(uiText(R.string.third_party_accounts))
     KimiCardBox { NewApiAccountSection(settings, onServicesChanged, onOpenAccount) }
     KimiCardBox { ChatGptAccountSection(settings, onOpenChatGptAccount) }
 }

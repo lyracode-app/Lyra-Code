@@ -36,8 +36,8 @@ internal object ApiProfileJson {
         val keys = (listOf(item.optString("apiKey")) + strings("secondaryApiKeys"))
             .map(String::trim).filter(String::isNotBlank).distinct()
         val storedName = item.optString("name").ifBlank { defaultName }
-        val displayName = if (item.optString("id").startsWith("newapi:") && storedName.startsWith("New API · ")) {
-            storedName.replaceFirst("New API · ", "${NewApiAccountClient.PLATFORM_NAME} · ")
+        val displayName = if (item.optString("id").startsWith("newapi:")) {
+            storedName.replaceFirst(Regex("^(梦汐|夢汐) API · "), "New API · ")
         } else storedName
         return ApiProfile(
             id = item.optString("id").ifBlank { AppSettings.newId() },
