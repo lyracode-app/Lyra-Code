@@ -41,7 +41,7 @@ internal object ModelRequestPreviews {
             ApiProfile.API_FORMAT_ANTHROPIC -> {
                 if (profile.apiKey.isNotBlank()) headers["x-api-key"] = "{{apiKey}}"
                 headers["anthropic-version"] = "2023-06-01"
-                body.put("model", model).put("max_tokens", 4096).put("messages", JSONArray()).put("stream", true).put("temperature", 0.2)
+                body.put("model", model).put("max_tokens", anthropicChatMaxTokens(profile)).put("messages", JSONArray()).put("stream", true).put("temperature", 0.2)
             }
             ApiProfile.API_FORMAT_GEMINI -> {
                 if (profile.apiKey.isNotBlank()) headers["x-goog-api-key"] = "{{apiKey}}"

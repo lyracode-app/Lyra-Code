@@ -69,6 +69,8 @@ class AiResponseCache(
     fun cacheKey(profile: ApiProfile, request: JSONObject, conversationScope: String = ""): String {
         val normalized = JSONObject()
             .put("cache_version", CACHE_VERSION)
+            // Older DeepSeek entries may have been saved after a truncated turn.
+            .apply { if (profile.usesOfficialDeepSeekEndpoint()) put("validated_deepseek_turn", true) }
             .put("conversation_scope", conversationScope.trim())
             .put("endpoint", normalizeEndpoint(profile.chatEndpoint))
             .put("model", request.optString("model").trim())
