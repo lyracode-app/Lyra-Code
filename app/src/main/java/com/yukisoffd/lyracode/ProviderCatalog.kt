@@ -161,6 +161,14 @@ internal object ProviderCatalog {
             logoRes = R.drawable.ai_service_openai,
         ),
         ProviderPreset(
+            id = "opencodego",
+            nameZh = "OpenCode Go",
+            websiteUrl = "https://opencode.ai/console/go",
+            baseUrl = "https://opencode.ai/inference/go/v1",
+            logoRes = R.drawable.ai_service_opencode,
+            aliases = setOf("opencode"),
+        ),
+        ProviderPreset(
             id = "openrouter",
             nameZh = "OpenRouter",
             websiteUrl = "https://openrouter.ai/",

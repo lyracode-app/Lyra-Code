@@ -47,6 +47,16 @@ class ProviderCatalogTest {
     }
 
     @Test
+    fun openCodeGoPresetMatchesOfficialEndpointAndLogo() {
+        val preset = requireNotNull(ProviderCatalog.byId("opencodego"))
+        val profile = preset.createProfile("opencodego-test")
+
+        assertEquals("https://opencode.ai/inference/go/v1/chat/completions", profile.chatEndpoint)
+        assertEquals("opencodego", ProviderCatalog.match(profile)?.id)
+        assertEquals(R.drawable.ai_service_opencode, ProviderCatalog.logoRes(profile))
+    }
+
+    @Test
     fun providerPlanSelectsItsOwnEditableBaseUrl() {
         val volcengine = requireNotNull(ProviderCatalog.byId("volcengine"))
         val defaultPlan = volcengine.createProfile("volc-default")
