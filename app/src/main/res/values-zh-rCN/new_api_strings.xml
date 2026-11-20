@@ -34,8 +34,8 @@
     <string name="new_api_user_id">用户 ID</string>
     <string name="new_api_display_name">显示名称</string>
     <string name="new_api_group">用户分组</string>
-    <string name="new_api_quota">剩余额度</string>
-    <string name="new_api_used_quota">已用额度</string>
+    <string name="new_api_balance">账户余额</string>
+    <string name="new_api_amount_used">已用金额</string>
     <string name="new_api_request_count">请求次数</string>
     <string name="new_api_close">关闭</string>
     <string name="new_api_account_data">New API 登录为可选功能。注册、登录、退出、刷新、同步或已开启的自动登录检查与恢复登录态时，Lyra Code 会连接你填写的 New API 站点，并发送该操作所需的信息，例如用户名、密码、邮箱、验证码、可选邀请码、账号访问令牌或会话 Cookie。勾选「记住账密」后，账密会加密保存在本机。开启自动登录后，应用启动时会检查登录态，失效时使用已保存的账密再次登录。二步验证需手动完成。用户信息、会话 Cookie 和 API Key 保存在设备内。账号登录态及记住的账密不纳入应用备份、Android 云备份或设备迁移。主副模型 Key 仅在备份中勾选包含密钥时导出。使用模型服务时，模型请求会直接发送至该站点，适用其协议与隐私政策。手动退出会关闭自动登录，保留已记住的账密供下次手动登录，清除本地登录态并尝试注销站点会话。已同步的模型服务和 Key 可在模型服务设置中移除。</string>

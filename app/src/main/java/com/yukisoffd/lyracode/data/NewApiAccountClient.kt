@@ -12,7 +12,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.math.BigDecimal
+import java.math.MathContext
 import java.net.URI
+import java.text.NumberFormat
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -25,7 +28,45 @@ internal data class NewApiLoginResult(val flowToken: String? = null)
 internal data class NewApiSavedLogin(val username: String, val password: String, val autoLogin: Boolean)
 internal data class NewApiSyncResult(val profile: ApiProfile, val warnings: List<String>)
 
-/** Only account endpoints and /v1/models are used here. No local chat/configuration data is accepted. */
+internal class NewApiCurrency private constructor(
+    private val quotaPerUsd: BigDecimal,
+    private val exchangeRate: BigDecimal,
+    private val symbol: String,
+) {
+    fun format(quota: Any?): String? {
+        val units = quota?.toString()?.toLongOrNull()?.toBigDecimal() ?: return null
+        val amount = units.multiply(exchangeRate).divide(quotaPerUsd, MathContext.DECIMAL128)
+        val number = NumberFormat.getNumberInstance().apply {
+            minimumFractionDigits = 2
+            maximumFractionDigits = 6
+        }
+        return symbol + number.format(amount)
+    }
+
+    companion object {
+        val fields = arrayOf("quota_per_unit", "quota_display_type", "usd_exchange_rate",
+            "custom_currency_symbol", "custom_currency_exchange_rate")
+
+        fun from(status: JSONObject?): NewApiCurrency? {
+            if (status == null) return null
+            fun positive(key: String) = status.optDouble(key)
+                .takeIf { it.isFinite() && it > 0 }?.toBigDecimal()
+            val unit = positive("quota_per_unit") ?: return null
+            return when (status.optString("quota_display_type", "USD")) {
+                "USD", "TOKENS" -> NewApiCurrency(unit, BigDecimal.ONE, "$")
+                "CNY" -> NewApiCurrency(unit, positive("usd_exchange_rate") ?: return null, "¥")
+                "CUSTOM" -> {
+                    val symbol = status.opt("custom_currency_symbol") as? String ?: return null
+                    val rate = positive("custom_currency_exchange_rate") ?: return null
+                    if (symbol.isBlank()) null else NewApiCurrency(unit, rate, symbol)
+                }
+                else -> null
+            }
+        }
+    }
+}
+
+/** Retrieves site settings, account data and /v1/models without sharing local chat data. */
 internal class NewApiAccountClient(
     private val store: NewApiAccountStore,
     baseUrl: String? = null,
@@ -42,6 +83,8 @@ internal class NewApiAccountClient(
         if (origin == null || origin != storedSite) session = JSONObject()
     }
     @Volatile private var userSnapshot = session.optJSONObject("user")?.toString()
+    @Volatile var currency = NewApiCurrency.from(session.optJSONObject("currency"))
+        private set
     @Volatile private var loggedInSnapshot = hasSession()
     @Volatile private var savedLoginSnapshot = session.optJSONObject("saved_login")?.toString()
     private data class PendingLogin(
@@ -175,6 +218,15 @@ internal class NewApiAccountClient(
 
     @Synchronized fun refreshUser(): JSONObject {
         val current = authenticated("/api/user/self").getJSONObject("data")
+        if (current.has("quota") || current.has("used_quota")) {
+            try {
+                val status = exchange(url("/api/status"), "GET").optJSONObject("data")
+                session.put("currency", status?.let { JSONObject(it, NewApiCurrency.fields) })
+            } catch (_: IOException) {
+                // Older or temporarily offline status endpoints can still serve account data.
+                // Keep the last conversion settings for this site if available.
+            }
+        }
         session.put("user", current)
         persist()
         return JSONObject(current.toString())
@@ -467,6 +519,7 @@ internal class NewApiAccountClient(
 
     private fun publishSession() {
         userSnapshot = session.optJSONObject("user")?.toString()
+        currency = NewApiCurrency.from(session.optJSONObject("currency"))
         loggedInSnapshot = hasSession()
         savedLoginSnapshot = session.optJSONObject("saved_login")?.toString()
     }

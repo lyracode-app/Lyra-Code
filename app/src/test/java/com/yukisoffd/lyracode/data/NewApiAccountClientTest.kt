@@ -48,6 +48,45 @@ class NewApiAccountClientTest {
             .put("user", JSONObject().put("id", 7).put("username", "tester"))).toString()
     private fun success(data: Any? = null) = JSONObject().put("success", true).apply { if (data != null) put("data", data) }.toString()
 
+    @Test fun balanceUsesSiteCurrencyAndSurvivesAnUnavailableStatusEndpoint() {
+        val store = Store()
+        var online = true
+        Server { request ->
+            when (request.path) {
+                "/api/user/login" -> Reply(auth())
+                "/api/user/self" -> Reply(success(JSONObject().put("id", 7).put("quota", 125).put("used_quota", 0)))
+                "/api/status" -> if (online) Reply(success(JSONObject().put("quota_per_unit", 1000)
+                    .put("quota_display_type", "CNY").put("usd_exchange_rate", 8))) else Reply("", 503)
+                else -> error(request.path)
+            }
+        }.use { server ->
+            var client = NewApiAccountClient(store, server.url)
+            client.login("tester", "password")
+            val decimal = java.text.DecimalFormatSymbols.getInstance().decimalSeparator
+            repeat(2) {
+                val user = client.refreshUser()
+                assertEquals("¥1${decimal}00", client.currency?.format(user.opt("quota")))
+                assertEquals("¥0${decimal}00", client.currency?.format(user.opt("used_quota")))
+                assertNull(client.currency?.format(user.opt("absent")))
+                online = false
+                client = NewApiAccountClient(store, server.url)
+            }
+        }
+    }
+
+    @Test fun customAndTokenBalancesUseTheirMonetaryValue() {
+        val decimal = java.text.DecimalFormatSymbols.getInstance().decimalSeparator
+        val status = JSONObject().put("quota_per_unit", 500000)
+        for (mode in listOf("USD", "TOKENS")) {
+            status.put("quota_display_type", mode)
+            assertEquals("$0${decimal}000002", NewApiCurrency.from(status)?.format(1))
+        }
+        status.put("quota_display_type", "CUSTOM").put("custom_currency_exchange_rate", "1.5")
+            .put("custom_currency_symbol", "¤")
+        assertEquals("¤3${decimal}00", NewApiCurrency.from(status)?.format(1000000))
+        assertNull(NewApiCurrency.from(status.put("quota_per_unit", 0)))
+    }
+
     @Test fun validatedSiteIsSavedAndChangingItDropsPreviousSiteCredentials() {
         val store = Store()
         val client = NewApiAccountClient(store)
@@ -385,6 +424,7 @@ class NewApiAccountClientTest {
                 request.path == "/api/user/login" -> Reply(auth(), cookie = "refresh=local; Path=/; HttpOnly")
                 request.path == "/api/user/auth/logout" -> Reply(success())
                 request.path == "/api/user/self" -> Reply(success(JSONObject().put("id", 7).put("username", "tester").put("quota", 500000)))
+                request.path == "/api/status" -> Reply("", 404)
                 request.path.startsWith("/api/token/?") -> {
                     val items = JSONArray().put(JSONObject().put("id", 10).put("name", "existing").put("key", "sk-***"))
                     created?.let { items.put(JSONObject(it.toString()).put("id", 11)) }

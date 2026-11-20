@@ -158,14 +158,14 @@ internal fun NewApiAccountPage(settings: AppSettings, initialNotice: String, onS
             Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.AccountBalanceWallet, null, Modifier.size(20.dp))
-                    Text(uiText(R.string.new_api_quota), style = MaterialTheme.typography.labelLarge)
+                    Text(uiText(R.string.new_api_balance), style = MaterialTheme.typography.labelLarge)
                 }
-                AccountQuotaText(formatQuota(user.optLong("quota")))
+                AccountBalanceText(account.currency?.format(user.opt("quota")) ?: "—")
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AccountMetric(uiText(R.string.new_api_used_quota),
-                formatQuota(user.optLong("used_quota")), Modifier.weight(1f))
+            AccountMetric(uiText(R.string.new_api_amount_used),
+                account.currency?.format(user.opt("used_quota")) ?: "—", Modifier.weight(1f))
             AccountMetric(uiText(R.string.new_api_request_count), NumberFormat.getIntegerInstance().format(user.optLong("request_count")), Modifier.weight(1f))
         }
         KimiSectionLabel(uiText(R.string.section_model_service))
@@ -213,7 +213,7 @@ internal fun NewApiAccountPage(settings: AppSettings, initialNotice: String, onS
 }
 
 @Composable
-private fun AccountQuotaText(value: String) {
+private fun AccountBalanceText(value: String) {
     val style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)
     val textMeasurer = rememberTextMeasurer()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -237,5 +237,3 @@ private fun AccountMetric(label: String, value: String, modifier: Modifier) {
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
 }
-
-private fun formatQuota(quota: Long): String = NumberFormat.getIntegerInstance().format(quota)

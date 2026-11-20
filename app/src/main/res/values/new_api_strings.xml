@@ -34,8 +34,8 @@
     <string name="new_api_user_id">User ID</string>
     <string name="new_api_display_name">Display name</string>
     <string name="new_api_group">User group</string>
-    <string name="new_api_quota">Remaining quota</string>
-    <string name="new_api_used_quota">Used quota</string>
+    <string name="new_api_balance">Balance</string>
+    <string name="new_api_amount_used">Amount spent</string>
     <string name="new_api_request_count">Request count</string>
     <string name="new_api_close">Close</string>
     <string name="new_api_account_data">New API sign-in is optional. Lyra Code contacts the New API site you enter when you register, sign in, sign out, refresh, sync, or when enabled auto sign-in checks or restores your session. Each action sends the account information it requires, which may include your username, password, email, verification code, optional invitation code, access token or session cookie. Credentials are saved encrypted on this device only if you enable Remember credentials. Auto sign-in checks the session when the app starts and signs in again with saved credentials when the session expires. Two-factor verification requires manual input. User information, session cookies and API keys are stored locally. Account sessions and remembered credentials are excluded from app backups and Android backup and transfer. Primary and secondary model keys are exported only when you include secrets in a backup. When you use the model service, Lyra Code sends model requests directly to the site under its terms and privacy policy. Signing out disables auto sign-in, keeps remembered credentials for the next manual sign-in, clears the local session and attempts to revoke it on the site. Synced model services and keys can be removed in Model services.</string>
