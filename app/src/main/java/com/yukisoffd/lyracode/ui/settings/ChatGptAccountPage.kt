@@ -210,9 +210,8 @@ private fun ChatGptSignInButton(enabled: Boolean, codex: Boolean = false, onClic
 }
 
 @Composable
-internal fun ChatGptLogo(modifier: Modifier, tint: Color = MaterialTheme.colorScheme.onSurface) {
-    // Reuse the OpenAI artwork sourced from aisvg/services/openai.svg.
-    Icon(painterResource(R.drawable.ai_service_openai), "ChatGPT", modifier, tint = tint)
+internal fun ChatGptLogo(modifier: Modifier, tint: Color = Color.Unspecified) {
+    Icon(painterResource(themedAiLogoRes(R.drawable.ai_service_openai)), "ChatGPT", modifier, tint = tint)
 }
 
 @Composable

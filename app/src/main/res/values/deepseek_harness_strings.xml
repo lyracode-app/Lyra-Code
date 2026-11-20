@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="harness_account_name" translatable="false">DeepSeek Harness</string>
+    <string name="harness_sign_in">Sign in with DeepSeek Harness</string>
+    <string name="harness_signed_in">Signed in to DeepSeek Harness</string>
+    <string name="harness_sign_in_description">Continue in the system browser to authorize DeepSeek Harness model access and view your DeepSeek balance.</string>
+    <string name="harness_waiting_browser">Complete authorization in the browser, then return to Lyra Code.</string>
+    <string name="harness_sign_in_timeout">The sign-in request expired. Start a new sign-in.</string>
+    <string name="harness_session_expired">Your DeepSeek Harness session expired. Sign in again.</string>
+    <string name="harness_request_failed">DeepSeek Harness could not complete the request. Try again.</string>
+    <string name="harness_sign_out_failed">Signed out on this device. The DeepSeek Platform sign-out request failed.</string>
+    <string name="harness_model_list_failed">Model list could not be refreshed. The available model configuration is retained.</string>
+    <string name="harness_recharge_balance">Recharge balance</string>
+    <string name="harness_bonus_balance">Bonus balance %1$s</string>
+    <string name="harness_balance_loading">Reading balance…</string>
+    <string name="harness_balance_unavailable">Balance unavailable</string>
+    <string name="harness_balance_stale">Showing the last retrieved balance.</string>
+    <string name="harness_refresh_balance">Refresh balance</string>
+    <string name="harness_usage">View usage</string>
+    <string name="harness_top_up">Top up</string>
+    <string name="harness_balance_alert">Low balance alert</string>
+    <string name="harness_balance_alert_hint">Receive one Android notification below the threshold for the selected recharge wallet. The alert resets after the balance reaches the threshold again.</string>
+    <string name="harness_alert_threshold">Balance threshold</string>
+    <string name="harness_notification_permission">Turn on Android notifications to receive the balance alert.</string>
+    <string name="harness_notification_settings">Notification settings</string>
+    <string name="harness_alert_title">DeepSeek Harness balance is low</string>
+    <string name="harness_alert_message">Recharge balance %1$s is below your threshold of %2$s.</string>
+    <string name="harness_service_description">This service uses the dedicated credential from DeepSeek Harness sign-in.</string>
+    <string name="harness_account_data">DeepSeek Harness sign-in opens the official DeepSeek Platform in the browser. Lyra Code exchanges the authorization code with a device identifier and stores the resulting dedicated credential securely on this device, outside backups. Lyra Code uses this credential to read profile and wallet details and to send selected model requests to DeepSeek. If you enable the low balance alert, Lyra Code checks the recharge wallet periodically and may post an Android notification. DeepSeek handles service requests under its own terms and privacy policy.</string>
+    <string name="harness_platform_rate_limited">DeepSeek Platform limited this connection (HTTP 429). Try again later.</string>
+    <string name="harness_platform_blocked">DeepSeek Platform blocked the request (HTTP %1$d). Try again when the connection can access the platform.</string>
+    <string name="harness_platform_http_error">DeepSeek Platform returned HTTP %1$d. Try again later.</string>
+    <string name="harness_platform_invalid_response">DeepSeek Platform returned an unexpected response (HTTP %1$d).</string>
+    <string name="harness_platform_rejected">DeepSeek Platform rejected the request (code %1$d).</string>
+    <string name="harness_platform_connection_failed">Could not connect to DeepSeek Platform. Check your network connection.</string>
+    <string name="harness_invalid_browser_destination">DeepSeek returned an invalid sign-in page address.</string>
+    <string name="harness_invalid_authorization_payload">DeepSeek returned incomplete authorization data.</string>
+    <string name="harness_browser_unavailable">Android could not find a browser to open the DeepSeek sign-in page.</string>
+    <string name="harness_callback_unavailable">Could not start the local sign-in callback. Start a new sign-in.</string>
+</resources>

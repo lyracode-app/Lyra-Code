@@ -1,3 +1,25 @@
+# Lyra .7 validation (2026-11-20)
+
+The NDK API 24 build of both ARM64 and x86_64 executable/loader pairs
+produced identical SHA-256 hashes from the checkout and the application
+source mirror. All four ELF files have the expected machine type and
+16 KB LOAD alignment. The loaders also match the previous release.
+
+On an Android API 36 x86_64 emulator, all three new upstream C tests
+passed in adb shell with PRoot seccomp both enabled and disabled. These
+exercise chroot, private mount namespaces and binding lifetimes. Bionic
+requires the fcntl.h declaration of creat in the binding lifetime test.
+The three helpers also cross-compile for ARM64. ARM64 execution was not
+tested on a device.
+
+The APK contained all four pinned files. Inside the installed debuggable
+application, the x86_64 regression harness passed with and without PRoot
+seccomp, including the three C helpers, the duplicated hard-link descriptor
+and sibling-loader discovery. The harness reported the existing kernel and
+policy skips for namespace maps, memfd reopens and trapped statx. In the
+separate adb shell context, the general harness stopped at the Unix socket
+bind under shell SELinux policy.
+
 # Lyra .6 validation (2026-10-29)
 
 ## Source integration and compatibility

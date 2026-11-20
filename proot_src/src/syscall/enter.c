@@ -255,33 +255,6 @@ static int translate_sysarg(Tracee *tracee, Reg reg, Type type)
 }
 
 /**
- * Canonicalize @user_path as a guest path, relative to the @tracee's
- * cwd when @user_path is relative.  Stores the result in @guest_path
- * with any trailing "/" or "/." stripped, so it can be used as a
- * binding key.  Returns 0 on success, -errno otherwise.
- */
-static int guest_canonicalize(Tracee *tracee, const char *user_path,
-			      char guest_path[PATH_MAX])
-{
-	int status;
-
-	if (user_path[0] == '/')
-		strcpy(guest_path, "/");
-	else {
-		status = getcwd2(tracee, guest_path);
-		if (status < 0)
-			return status;
-	}
-
-	status = canonicalize(tracee, user_path, true, guest_path, 0);
-	if (status < 0)
-		return status;
-
-	chop_finality(guest_path);
-	return 0;
-}
-
-/**
  * Emulate mount(@src_user, @target_user, @fstype, @flags) by adding a
  * PRoot binding from a host directory to the canonicalized target.
  * Bind mounts use the translated source; "proc"/"sysfs" use the
@@ -397,7 +370,9 @@ static void emulate_pivot_root(Tracee *tracee, const char *new_root_user,
 
 	/* Snapshot the current bindings before mutating the lists: the loop
 	 * below both inserts (rebased / re-exposed) and removes bindings, so
-	 * walking the live list would be unsafe. */
+	 * walking the live list would be unsafe.  The snapshot holds them
+	 * too: inserting a binding frees the one it replaces (same guest
+	 * path), which may be further in the snapshot. */
 	for (iter = CIRCLEQ_FIRST(tracee->fs->bindings.guest);
 	     iter != (void *) tracee->fs->bindings.guest;
 	     iter = CIRCLEQ_NEXT(iter, link.guest))
@@ -409,13 +384,20 @@ static void emulate_pivot_root(Tracee *tracee, const char *new_root_user,
 	i = 0;
 	for (iter = CIRCLEQ_FIRST(tracee->fs->bindings.guest);
 	     iter != (void *) tracee->fs->bindings.guest && i < count;
-	     iter = CIRCLEQ_NEXT(iter, link.guest))
+	     iter = CIRCLEQ_NEXT(iter, link.guest)) {
+		if (hold_binding(snapshot, iter) < 0) {
+			while (i > 0)
+				release_binding(snapshot, snapshot[--i]);
+			talloc_free(snapshot);
+			return;
+		}
 		snapshot[i++] = iter;
+	}
 
 	/* Switch the root over to new_root and expose the previous root at
 	 * put_old, so the tracee can still reach it (bubblewrap accesses
 	 * everything via "/oldroot" right after the pivot). */
-	remove_binding_from_all_lists(tracee, root_binding);
+	free_binding(tracee, root_binding);
 	(void) insort_binding3(tracee, tracee->fs, new_root_host, "/");
 	if (have_put_old)
 		(void) insort_binding3(tracee, tracee->fs, old_root_host, put_old_after);
@@ -444,7 +426,7 @@ static void emulate_pivot_root(Tracee *tracee, const char *new_root_user,
 					       b->guest.path + new_root_len);
 			/* Drop the stale pre-pivot binding so it can't shadow
 			 * the rebased one (e.g. host->guest detranslation). */
-			remove_binding_from_all_lists(tracee, b);
+			free_binding(tracee, b);
 			continue;
 		}
 
@@ -469,6 +451,9 @@ static void emulate_pivot_root(Tracee *tracee, const char *new_root_user,
 		}
 	}
 
+	/* The bindings dropped meanwhile are freed now.  */
+	for (i = 0; i < count; i++)
+		release_binding(snapshot, snapshot[i]);
 	talloc_free(snapshot);
 }
 
@@ -476,9 +461,9 @@ static void emulate_pivot_root(Tracee *tracee, const char *new_root_user,
  * Emulate umount(@target_user) by removing the matching binding (if
  * any) so that a subsequent access to @target_user no longer goes
  * through the now-unmounted location.  This is the inverse of
- * emulate_mount().  Bindings put in place at PRoot startup
- * (recommended -R bindings, the rootfs itself) are NOT removed: we
- * only drop runtime bindings whose guest path exactly matches.
+ * emulate_mount().  Only a binding whose guest path is exactly
+ * @target_user is dropped, be it put in place at PRoot startup or by
+ * emulate_mount(), and never the root one.
  */
 static void emulate_umount(Tracee *tracee, const char *target_user)
 {
@@ -502,7 +487,7 @@ static void emulate_umount(Tracee *tracee, const char *target_user)
 	if (strcmp(binding->guest.path, guest_path) != 0)
 		return;
 
-	remove_binding_from_all_lists(tracee, binding);
+	free_binding(tracee, binding);
 }
 
 /**
@@ -567,6 +552,39 @@ void apply_emulated_pivot_root(Tracee *tracee)
 		return;
 
 	emulate_pivot_root(tracee, new_root_user, put_old_user);
+}
+
+/**
+ * Emulate unshare(2) with the flags in the @tracee's registers.  PRoot
+ * can't create name-spaces, so the syscall itself is voided, but what
+ * it emulates of them is unshared: a new mount name-space starts with
+ * a copy of the bindings, since sandbox helpers do mount(2) right
+ * after unshare(CLONE_NEWNS) and this must not change what the other
+ * tracees see; a new network name-space gets rtnetlink answers of its
+ * own (see is_netns_netlink_fd()).  Safe to call from both the normal
+ * sysenter path and the SIGSYS handler.  This function returns -errno
+ * if an error occurred, otherwise 0.
+ */
+int apply_emulated_unshare(Tracee *tracee)
+{
+	word_t flags = peek_reg(tracee, CURRENT, SYSARG_1);
+	int status;
+
+	/* As for the kernel, a new mount or user name-space implies
+	 * a file-system name-space (working directory) of its own.  */
+	if ((flags & (CLONE_NEWNS | CLONE_NEWUSER)) != 0)
+		flags |= CLONE_FS;
+
+	if ((flags & CLONE_FS) != 0) {
+		status = unshare_fs(tracee, (flags & CLONE_NEWNS) != 0);
+		if (status < 0)
+			return status;
+	}
+
+	if ((flags & CLONE_NEWNET) != 0)
+		tracee->fake_netns = true;
+
+	return 0;
 }
 
 /**
@@ -2501,15 +2519,13 @@ int translate_syscall_enter(Tracee *tracee)
 		status = translate_sysarg(tracee, SYSARG_1, REGULAR);
 		break;
 
-	/* Pretend namespace syscalls succeed without doing anything;
-	 * PRoot can't really create namespaces, and sandbox helpers
-	 * like bubblewrap only check the return value.  Remember an
-	 * unshared network namespace though: the tracee now expects to
-	 * be able to configure "its" interfaces (see enter.c netlink
-	 * helpers).  */
+	/* Pretend namespace syscalls succeed; PRoot can't really
+	 * create namespaces.  What it emulates of those unshare(2)
+	 * asks for is unshared though, see apply_emulated_unshare().  */
 	case PR_unshare:
-		if ((peek_reg(tracee, CURRENT, SYSARG_1) & CLONE_NEWNET) != 0)
-			tracee->fake_netns = true;
+		status = apply_emulated_unshare(tracee);
+		if (status < 0)
+			break;
 		poke_reg(tracee, SYSARG_RESULT, 0);
 		set_sysnum(tracee, PR_void);
 		status = 0;

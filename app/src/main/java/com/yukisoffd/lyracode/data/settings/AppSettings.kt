@@ -968,13 +968,24 @@ class AppSettings(context: Context) {
 
     fun profiles(): List<ApiProfile> {
         val raw = securePrefs.getString(KEY_API_PROFILES, null)
-        if (raw.isNullOrBlank()) return listOf(defaultProfile())
-        return runCatching {
+        val stored = if (raw.isNullOrBlank()) emptyList() else runCatching {
             val array = JSONArray(raw)
-            (0 until array.length()).map {
-                ApiProfileJson.decode(array.getJSONObject(it), DEFAULT_BASE_URL, DEFAULT_MODEL, "OpenAI")
-            }.ifEmpty { listOf(defaultProfile()) }
-        }.getOrDefault(listOf(defaultProfile()))
+            List(array.length()) { ApiProfileJson.decode(array.getJSONObject(it), DEFAULT_BASE_URL, DEFAULT_MODEL, "OpenAI") }
+        }.getOrDefault(emptyList())
+        val harnessId = deepSeekHarnessAccount.view.value.profileId
+        val profiles = stored.filter { !it.isDeepSeekHarness || it.id == harnessId }.ifEmpty { listOf(defaultProfile()) }
+        return if (harnessId == null || profiles.any { it.id == harnessId }) profiles
+        else profiles + ApiProfile(
+            id = harnessId,
+            name = DeepSeekHarnessProtocol.NAME,
+            apiKey = "",
+            baseUrl = DeepSeekHarnessProtocol.BASE,
+            chatPath = ApiProfile.DEFAULT_ANTHROPIC_CHAT_PATH,
+            apiFormat = ApiProfile.API_FORMAT_ANTHROPIC,
+            selectedModel = DeepSeekHarnessProtocol.bundledModels.first(),
+            savedModels = DeepSeekHarnessProtocol.bundledModels,
+            gzipRequestBodies = false,
+        )
     }
 
     fun saveProfiles(profiles: List<ApiProfile>, selectedProfileId: String? = null) {
@@ -990,8 +1001,11 @@ class AppSettings(context: Context) {
 
     // Account sessions are device-local and deliberately excluded from all exports/backups.
     internal val chatGptAccount: ChatGptAccountClient by lazy {
-        ChatGptAccountClient(ChatGptCredentialStore(appContext))
+        ChatGptAccountClient(EncryptedAccountStore(appContext, "chatgpt", "lyra_chatgpt_sessions_v1", "LyraCode.ChatGPT.v1"))
     }
+
+    internal val deepSeekHarnessAccount: DeepSeekHarnessAccountClient
+        get() = DeepSeekHarnessAccountClient.get(appContext)
 
     internal val newApiAccount: NewApiAccountClient by lazy {
         val accountPrefs = createSecurePrefs("lyra_new_api_account")
@@ -1615,7 +1629,7 @@ class AppSettings(context: Context) {
                 }
             })
             .put("profiles", JSONArray().also { array ->
-                profiles().forEach { array.put(ApiProfileJson.encode(it, includeSecrets)) }
+                profiles().filterNot { it.isDeepSeekHarness }.forEach { array.put(ApiProfileJson.encode(it, includeSecrets)) }
             })
             .put("mcpServers", JSONArray().also { array ->
                 mcpServers().forEach { server ->
@@ -2236,8 +2250,8 @@ class AppSettings(context: Context) {
 
     private fun mergeProfiles(existing: List<ApiProfile>, imported: List<ApiProfile>): List<ApiProfile> {
         val result = existing.toMutableList()
-        imported.forEach { incoming ->
-            val index = result.indexOfFirst { it.id == incoming.id || sameEndpointProfile(it, incoming) }
+        imported.filterNot { it.isDeepSeekHarness }.forEach { incoming ->
+            val index = result.indexOfFirst { !it.isDeepSeekHarness && (it.id == incoming.id || sameEndpointProfile(it, incoming)) }
             if (index >= 0) {
                 val current = result[index]
                 result[index] = ApiProfileJson.merge(current, incoming)

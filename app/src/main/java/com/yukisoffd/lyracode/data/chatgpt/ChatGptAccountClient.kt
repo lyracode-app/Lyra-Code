@@ -34,7 +34,7 @@ internal data class ChatGptUsageWindow(val minutes: Int, val usedPercent: Double
 
 /** All HTTP methods run on an IO dispatcher; credentials never enter ApiProfile or exported settings. */
 internal class ChatGptAccountClient(
-    private val store: ChatGptAccountStore,
+    private val store: AccountStateStore,
     private val http: OkHttpClient = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .connectTimeout(20, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).callTimeout(45, TimeUnit.SECONDS).build(),
 ) {

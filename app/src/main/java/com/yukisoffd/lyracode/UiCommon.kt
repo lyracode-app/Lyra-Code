@@ -211,6 +211,7 @@ import kotlin.math.abs
 import android.graphics.Canvas as AndroidCanvas
 
 internal val LocalCodeFontFamily = staticCompositionLocalOf<FontFamily> { FontFamily.Monospace }
+internal val LocalDarkTheme = staticCompositionLocalOf { false }
 
 @Composable
 internal fun LyraCodeTheme(
@@ -332,6 +333,7 @@ internal fun LyraCodeTheme(
     CompositionLocalProvider(
         LocalDensity provides Density(density.density, fontScale.coerceIn(AppSettings.MIN_FONT_SCALE, AppSettings.MAX_FONT_SCALE)),
         LocalCodeFontFamily provides codeFontFamily,
+        LocalDarkTheme provides darkMode,
         LocalUriHandler provides uriHandler,
     ) {
         MaterialTheme(colorScheme = colorScheme, typography = typography, content = content)
@@ -467,6 +469,29 @@ internal fun KimiMenuRow(
 ) {
     val (iconContainer, iconContent) = if (enabled) kimiMenuAccent(title) else
         MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    KimiMenuRow(
+        leading = {
+            Box(Modifier.size(44.dp).clip(CircleShape).background(iconContainer), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(23.dp), tint = iconContent)
+            }
+        },
+        title = title,
+        value = value,
+        enabled = enabled,
+        onDisabledClick = onDisabledClick,
+        onClick = onClick,
+    )
+}
+
+@Composable
+internal fun KimiMenuRow(
+    leading: @Composable () -> Unit,
+    title: String,
+    value: String = "",
+    enabled: Boolean = true,
+    onDisabledClick: (() -> Unit)? = null,
+    onClick: () -> Unit = {},
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -476,20 +501,7 @@ internal fun KimiMenuRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(iconContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(23.dp),
-                tint = iconContent,
-            )
-        }
+        leading()
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(

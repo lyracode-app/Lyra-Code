@@ -22,19 +22,30 @@ data class ApiProfile(
     val modelDisplayNames: Map<String, String> = emptyMap(),
 ) {
     val isChatGpt: Boolean get() = chatGptAccountId.isNotBlank()
+    val isDeepSeekHarness: Boolean get() = id.startsWith(DeepSeekHarnessProtocol.PROFILE_PREFIX)
+    val usesAccountCredential: Boolean get() = isChatGpt || isDeepSeekHarness
     val isChatGptCodex: Boolean get() = chatGptAccountId.startsWith("codex:")
     val chatGptBaseUrl: String get() = if (isChatGptCodex) ChatGptCodexProtocol.BASE else ChatGptProtocol.RESOURCE
-    val usesResponsesApi: Boolean get() = isChatGpt || useResponsesApi
+    val usesResponsesApi: Boolean get() = !isDeepSeekHarness && (isChatGpt || useResponsesApi)
     fun modelDisplayName(model: String): String = modelDisplayNames[model]?.takeIf(String::isNotBlank) ?: model
 
     val allApiKeys: List<String>
-        get() = if (isChatGpt) emptyList() else (listOf(apiKey) + secondaryApiKeys).map(String::trim).filter(String::isNotBlank).distinct()
+        get() = if (usesAccountCredential) emptyList() else (listOf(apiKey) + secondaryApiKeys).map(String::trim).filter(String::isNotBlank).distinct()
 
     val chatEndpoint: String
-        get() = if (isChatGpt) responsesEndpoint else "${baseUrl.trimEnd('/')}${normalizedChatPath(apiFormat, chatPath)}"
+        get() = when {
+            isDeepSeekHarness -> DeepSeekHarnessProtocol.MESSAGES
+            isChatGpt -> responsesEndpoint
+            else -> "${baseUrl.trimEnd('/')}${normalizedChatPath(apiFormat, chatPath)}"
+        }
 
     val modelsEndpoint: String
-        get() = if (isChatGptCodex) ChatGptCodexProtocol.MODELS else if (isChatGpt) "${ChatGptProtocol.RESOURCE}/models" else "${baseUrl.trimEnd('/')}/models"
+        get() = when {
+            isDeepSeekHarness -> DeepSeekHarnessProtocol.MODELS
+            isChatGptCodex -> ChatGptCodexProtocol.MODELS
+            isChatGpt -> "${ChatGptProtocol.RESOURCE}/models"
+            else -> "${baseUrl.trimEnd('/')}/models"
+        }
 
     val responsesEndpoint: String
         get() = if (isChatGpt) "$chatGptBaseUrl/responses" else "${baseUrl.trimEnd('/')}/responses"

@@ -96,9 +96,9 @@ val packagedAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
 
 val bundledProotRuntimeDir = layout.projectDirectory.dir("src/debianRuntime/jniLibs")
 val bundledProotRuntimeHashes = mapOf(
-    "arm64-v8a/libproot_exec.so" to "8cd986e8e9505f20ef263095037d59ece8756b230e5730315dc142332a8032e2",
+    "arm64-v8a/libproot_exec.so" to "7ef9a2ea7130791f66f8e0d903fea69043a83175791269b8414130abf78725e7",
     "arm64-v8a/libproot_loader.so" to "825d0362db3319c2b3ed3b75fe300287c0f9eeb7f2427ceb05a4a004ad33ed12",
-    "x86_64/libproot_exec.so" to "e3c6a7bde6a8e4851b2ddc36965b5a6c3fe71b5e630731aa7869e046cce82a72",
+    "x86_64/libproot_exec.so" to "97fcc734d0a882f7ee8b5ccba39d4cc977f41b8fc2d18ffaf483bb793b05ce9a",
     "x86_64/libproot_loader.so" to "61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869",
 )
 

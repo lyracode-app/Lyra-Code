@@ -49,10 +49,14 @@ extern Binding *insort_binding3(const Tracee *tracee, const TALLOC_CTX *context,
 				const char host_path[PATH_MAX], const char guest_path[PATH_MAX]);
 extern Binding *new_binding(Tracee *tracee, const char *host, const char *guest, bool must_exist);
 extern int initialize_bindings(Tracee *tracee);
+extern int copy_bindings(Tracee *tracee, const FileSystemNameSpace *from);
 extern const char *get_path_binding(const Tracee* tracee, Side side, const char path[PATH_MAX]);
 extern Binding *get_binding(const Tracee *tracee, Side side, const char path[PATH_MAX]);
 extern const char *get_root(const Tracee* tracee);
 extern int substitute_binding(const Tracee* tracee, Side side, char path[PATH_MAX]);
 extern void remove_binding_from_all_lists(const Tracee *tracee, Binding *binding);
+extern int hold_binding(const void *holder, Binding *binding);
+extern void release_binding(const void *holder, Binding *binding);
+extern void free_binding(const Tracee *tracee, Binding *binding);
 
 #endif /* BINDING_H */

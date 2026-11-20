@@ -287,6 +287,71 @@ void remove_binding_from_all_lists(const Tracee *tracee, Binding *binding)
 }
 
 /**
+ * Keep @binding allocated until @holder releases it with
+ * release_binding(), even if it's freed meanwhile (see
+ * free_binding()).  This function returns -errno if an error
+ * occurred, otherwise 0.
+ */
+int hold_binding(const void *holder, Binding *binding)
+{
+	return talloc_reference(holder, binding) != NULL ? 0 : -ENOMEM;
+}
+
+/**
+ * Release the hold @holder has on @binding (see hold_binding()).
+ * The binding is freed if it's in no list anymore and nothing else
+ * holds it.
+ */
+void release_binding(const void *holder, Binding *binding)
+{
+	bool owned;
+
+	/* Still in use: the lists hold it.  */
+	if (   IS_LINKED(binding, link.pending)
+	    || IS_LINKED(binding, link.guest)
+	    || IS_LINKED(binding, link.host)) {
+		(void) talloc_unlink(holder, binding);
+		return;
+	}
+
+	/* @holder may own the binding now: removing a binding from a
+	 * list that owns it hands it over to a holder, if any (see
+	 * free_binding()).  Unlinking it from @holder then frees it,
+	 * or hands it over to another holder.  */
+	owned = talloc_parent(binding) == holder;
+	(void) talloc_unlink(holder, binding);
+
+	/* Otherwise it still belongs to the context it was created in
+	 * (a file-system name-space, a list of bindings, ...).  */
+	if (!owned && talloc_reference_count(binding) == 0)
+		talloc_free(binding);
+}
+
+/**
+ * Remove @binding from all the @tracee's lists of bindings and free
+ * it, unless something holds it (see hold_binding()): as nothing can
+ * reach it anymore, it would stay allocated as long as the context
+ * it was created in otherwise.  It's freed by removing it from the
+ * lists already if one of these owns it.
+ */
+void free_binding(const Tracee *tracee, Binding *binding)
+{
+	void *anchor;
+
+	/* Keep it allocated meanwhile, whichever case.  */
+	anchor = talloc_new(NULL);
+	if (anchor == NULL || hold_binding(anchor, binding) < 0) {
+		remove_binding_from_all_lists(tracee, binding);
+		talloc_free(anchor);
+		return;
+	}
+
+	remove_binding_from_all_lists(tracee, binding);
+	release_binding(anchor, binding);
+	talloc_free(anchor);
+}
+
+/**
  * Insert @binding into the list of @bindings, in a sorted manner so
  * as to make the substitution of nested bindings determistic, ex.:
  *
@@ -342,7 +407,7 @@ static void insort_binding(const Tracee *tracee, Side side, Binding *binding)
 
 			/* Replace this iterator with the new binding.  */
 			CIRCLEQ_INSERT_AFTER_(tracee, iterator, binding, side);
-			remove_binding_from_all_lists(tracee, iterator);
+			free_binding(tracee, iterator);
 			return;
 
 		case PATH1_IS_PREFIX:
@@ -415,36 +480,73 @@ Binding *insort_binding3(const Tracee *tracee, const TALLOC_CTX *context,
 }
 
 /**
- * Free all bindings from @bindings.
+ * Free all bindings from @bindings, the list of the given @side.
  *
- * Note: this is a Talloc destructor.
+ * The list is unlinked by itself, not looked up in the file-system
+ * name-space of a tracee as CIRCLEQ_REMOVE_() does: when it is freed,
+ * the name-space may not use it anymore (see copy_bindings()), or may
+ * be detached from its tracee already (see chroot.c).  TRACEE() would
+ * abort then, since Talloc can't tell the parent of a context being
+ * freed.
  */
-static int remove_bindings(Bindings *bindings)
+static void remove_bindings(Bindings *bindings, Side side)
 {
 	Binding *binding;
-	Tracee *tracee;
 
 	/* Unlink all bindings from the @link list.  */
 #define CIRCLEQ_REMOVE_ALL(name) do {				\
 	binding = CIRCLEQ_FIRST(bindings);			\
 	while (binding != (void *) bindings) {			\
 		Binding *next = CIRCLEQ_NEXT(binding, link.name);\
-		CIRCLEQ_REMOVE_(tracee, binding, name);		\
+		CIRCLEQ_REMOVE(bindings, binding, link.name);	\
+		binding->link.name.cqe_next = NULL;		\
+		binding->link.name.cqe_prev = NULL;		\
+		talloc_unlink(bindings, binding);		\
 		binding = next;					\
 	}							\
 } while (0)
 
-	/* Search which link is used by this list.  */
-	tracee = TRACEE(bindings);
-	if (bindings == tracee->fs->bindings.pending)
+	switch (side) {
+	case PENDING:
 		CIRCLEQ_REMOVE_ALL(pending);
-	else if (bindings == tracee->fs->bindings.guest)
+		break;
+
+	case GUEST:
 		CIRCLEQ_REMOVE_ALL(guest);
-	else if (bindings == tracee->fs->bindings.host)
+		break;
+
+	case HOST:
 		CIRCLEQ_REMOVE_ALL(host);
+		break;
+
+	default:
+		assert(0);
+	}
+
+#undef CIRCLEQ_REMOVE_ALL
 
 	bzero(bindings, sizeof(Bindings));
+}
 
+/**
+ * Talloc destructors of the lists of bindings, one per side since
+ * each side chains the bindings through its own link.
+ */
+static int remove_pending_bindings(Bindings *bindings)
+{
+	remove_bindings(bindings, PENDING);
+	return 0;
+}
+
+static int remove_guest_bindings(Bindings *bindings)
+{
+	remove_bindings(bindings, GUEST);
+	return 0;
+}
+
+static int remove_host_bindings(Bindings *bindings)
+{
+	remove_bindings(bindings, HOST);
 	return 0;
 }
 
@@ -467,7 +569,7 @@ Binding *new_binding(Tracee *tracee, const char *host, const char *guest, bool m
 		if (tracee->fs->bindings.pending == NULL)
 			return NULL;
 		CIRCLEQ_INIT(tracee->fs->bindings.pending);
-		talloc_set_destructor(tracee->fs->bindings.pending, remove_bindings);
+		talloc_set_destructor(tracee->fs->bindings.pending, remove_pending_bindings);
 	}
 
 	/* Allocate an empty binding.  */
@@ -732,8 +834,8 @@ int initialize_bindings(Tracee *tracee)
 	CIRCLEQ_INIT(tracee->fs->bindings.guest);
 	CIRCLEQ_INIT(tracee->fs->bindings.host);
 
-	talloc_set_destructor(tracee->fs->bindings.guest, remove_bindings);
-	talloc_set_destructor(tracee->fs->bindings.host, remove_bindings);
+	talloc_set_destructor(tracee->fs->bindings.guest, remove_guest_bindings);
+	talloc_set_destructor(tracee->fs->bindings.host, remove_host_bindings);
 
 	/* The binding to "/" has to be installed before other
 	 * bindings since this former is required to canonicalize
@@ -764,4 +866,70 @@ int initialize_bindings(Tracee *tracee)
 		print_bindings(tracee);
 
 	return 0;
+}
+
+/**
+ * Make @tracee->fs use its own copy of the bindings of the file-system
+ * name-space @from, as a new mount name-space starts with a copy of the
+ * mounts of the one it comes from: the bindings added or removed later
+ * in either of them (see emulate_mount()) don't show in the other.
+ * @from can be @tracee->fs itself.  The lists of bindings @tracee->fs
+ * used so far are released.  This function returns -errno if an error
+ * occurred (@tracee->fs is unchanged then), otherwise 0.
+ */
+int copy_bindings(Tracee *tracee, const FileSystemNameSpace *from)
+{
+	FileSystemNameSpace *fs = tracee->fs;
+	Bindings *previous_guest = fs->bindings.guest;
+	Bindings *previous_host  = fs->bindings.host;
+	Bindings *host = from->bindings.host;
+	const Binding *binding;
+
+	fs->bindings.guest = talloc_zero(fs, Bindings);
+	fs->bindings.host  = talloc_zero(fs, Bindings);
+	if (fs->bindings.guest == NULL || fs->bindings.host == NULL)
+		goto error;
+
+	CIRCLEQ_INIT(fs->bindings.guest);
+	CIRCLEQ_INIT(fs->bindings.host);
+
+	talloc_set_destructor(fs->bindings.guest, remove_guest_bindings);
+	talloc_set_destructor(fs->bindings.host, remove_host_bindings);
+
+	/* Copy the bindings in the order of the "host" list.  Of the
+	 * bindings of the same host path, insort_binding() keeps the
+	 * first inserted first, so get_binding() picks the same one as
+	 * in @from to detranslate a path.  The "guest" list doesn't hold
+	 * such duplicates: its order follows from the paths alone.
+	 *
+	 * The copies belong to the new "guest" list, so they are freed
+	 * along with the lists, once no name-space uses them anymore,
+	 * or on error.  Removing a copy from the lists drops the
+	 * reference this list holds, not the ownership, so the copy
+	 * stays allocated until freed explicitly, as any binding does
+	 * (see free_binding()).  */
+	for (binding = CIRCLEQ_FIRST(host);
+	     binding != (void *) host;
+	     binding = CIRCLEQ_NEXT(binding, link.host)) {
+		if (insort_binding3(tracee, fs->bindings.guest, binding->host.path,
+				    binding->guest.path) == NULL)
+			goto error;
+	}
+
+	/* They are freed unless another name-space still uses them.  */
+	if (previous_guest != NULL)
+		(void) talloc_unlink(fs, previous_guest);
+	if (previous_host != NULL)
+		(void) talloc_unlink(fs, previous_host);
+
+	return 0;
+
+error:
+	TALLOC_FREE(fs->bindings.guest);
+	TALLOC_FREE(fs->bindings.host);
+
+	fs->bindings.guest = previous_guest;
+	fs->bindings.host  = previous_host;
+
+	return -ENOMEM;
 }

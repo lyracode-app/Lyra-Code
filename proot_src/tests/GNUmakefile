@@ -107,6 +107,18 @@ check-test-f6b33793.c: test-f6b33793
 	$(call check_c,$<,$(PROOT) ./$<)
 	$(call check_c,$<,env PROOT_NO_SECCOMP=1 $(PROOT) ./$<)
 
+check-test-7e1d4c2a.c: test-7e1d4c2a
+	$(call check_c,$<,$(PROOT) ./$<)
+	$(call check_c,$<,env PROOT_NO_SECCOMP=1 $(PROOT) ./$<)
+
+check-test-4c9e2b17.c: test-4c9e2b17
+	$(call check_c,$<,$(PROOT) -0 -b /proc ./$<)
+	$(call check_c,$<,env PROOT_NO_SECCOMP=1 $(PROOT) -0 -b /proc ./$<)
+
+check-test-6b2f0d58.c: test-6b2f0d58
+	$(call check_c,$<,$(PROOT) -b /proc ./$<)
+	$(call check_c,$<,env PROOT_NO_SECCOMP=1 $(PROOT) -b /proc ./$<)
+
 check_c = $(Q)if [ -e $< ]; then			\
 		$(2) $(silently); $(call check,$(1))	\
 	else						\
@@ -232,6 +244,15 @@ test-c47aeb7d: test-c47aeb7d.c
 
 test-f6b33793: test-f6b33793.c
 	$(Q)$(CC) $< -pthread -o $@ $(silently) || true
+
+test-7e1d4c2a: test-7e1d4c2a.c
+	$(Q)$(CC) $< -pthread -o $@ $(silently) || true
+
+test-4c9e2b17: test-4c9e2b17.c
+	$(Q)$(CC) $< -o $@ $(silently) || true
+
+test-6b2f0d58: test-6b2f0d58.c
+	$(Q)$(CC) $< -o $@ $(silently) || true
 
 ######################################################################
 # Beautified output

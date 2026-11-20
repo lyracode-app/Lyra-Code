@@ -127,6 +127,12 @@ except for the two pre-existing Lyra external-loader/Bionic adaptations.
 The Android harness now uses upstream helpers for threaded exec, statx,
 getdents, link, renameat2 and Unix sockets in both seccomp modes.
 
+## Lyra .7 upstream integration (2026-11-20)
+
+The six master commits through `3c6912e` fix descriptor names after dup,
+mount namespace isolation, chroot path translation and binding lifetimes.
+The package uses the Lyra external loader on both Android ABIs.
+
 ## Android runtime regression checks
 
 After building, run against an explicitly selected connected device with API 28

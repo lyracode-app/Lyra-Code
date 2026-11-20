@@ -164,6 +164,3 @@ internal fun chatGptComposerAllowance(account: ChatGptAccount?, windows: List<Ch
 }
 
 /** State changes are serialized, including refresh token rotation, across every app process. */
-internal interface ChatGptAccountStore {
-    fun <T> transaction(block: (JSONObject) -> T): T
-}

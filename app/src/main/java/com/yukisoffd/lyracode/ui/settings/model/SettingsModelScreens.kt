@@ -108,7 +108,13 @@ import kotlin.math.max
 
 
 @Composable
-internal fun ProfileSettingsSummary(settings: AppSettings, onServicesChanged: () -> Unit, onOpenChatGptAccount: () -> Unit, onOpenAccount: (String) -> Unit) {
+internal fun ProfileSettingsSummary(
+    settings: AppSettings,
+    onServicesChanged: () -> Unit,
+    onOpenChatGptAccount: () -> Unit,
+    onOpenDeepSeekHarnessAccount: () -> Unit,
+    onOpenAccount: (String) -> Unit,
+) {
     KimiCardBox {
         Row(verticalAlignment = Alignment.CenterVertically) {
             UserAvatar(settings.userAvatarPath, settings.userNickname.take(1).ifBlank { "L" }, Modifier.size(56.dp))
@@ -119,9 +125,10 @@ internal fun ProfileSettingsSummary(settings: AppSettings, onServicesChanged: ()
             }
         }
     }
-    KimiSectionLabel(uiText(R.string.mengxi_third_party_accounts))
+    KimiSectionLabel(uiText(R.string.third_party_accounts))
     KimiCardBox { NewApiAccountSection(settings, onServicesChanged, onOpenAccount) }
     KimiCardBox { ChatGptAccountSection(settings, onOpenChatGptAccount) }
+    KimiCardBox { DeepSeekHarnessAccountSection(settings, onOpenDeepSeekHarnessAccount) }
 }
 
 @Composable
@@ -510,7 +517,7 @@ internal fun MediaGenerationModelEditor(
     controller: ChatController,
     kind: MediaGenerationKind,
 ) {
-    val profiles = controller.profiles.filterNot { it.isChatGpt }
+    val profiles = controller.profiles.filterNot { it.usesAccountCredential }
     val saved = remember(kind, controller.settingsRevision.intValue) { settings.mediaGenerationModel(kind) }
     var enabled by remember(kind) { mutableStateOf(saved.profileId.isNotBlank() && saved.model.isNotBlank()) }
     var profileId by remember(kind) {
@@ -896,7 +903,7 @@ internal fun ModelServiceSettings(
                     else -> uiText(R.string.detail_model)
                 }, style = MaterialTheme.typography.titleLarge) },
                 actions = {
-                    if (page == 2 && current?.isChatGpt != true) TextButton(onClick = { showRequestCustomization = true }) { Text(uiText(R.string.request_custom)) }
+                    if (page == 2 && current?.usesAccountCredential != true) TextButton(onClick = { showRequestCustomization = true }) { Text(uiText(R.string.request_custom)) }
                 },
             )
         Box(
@@ -1063,7 +1070,9 @@ internal fun ModelServiceSettings(
                         }
                     }
                     OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_service_name)) }, singleLine = true)
-                    if (current?.isChatGpt == true) {
+                    if (current?.isDeepSeekHarness == true) {
+                        Text(uiText(R.string.harness_service_description), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+                    } else if (current?.isChatGpt == true) {
                         Text(uiText(R.string.chatgpt_service_description), color = KimiMuted, style = MaterialTheme.typography.bodySmall)
                     } else {
                     ProviderKeysEditor(key, secondaryKeys) { primary, secondary -> key = primary; secondaryKeys = secondary }
@@ -1186,7 +1195,7 @@ internal fun ModelServiceSettings(
                     }
                     }
                     OutlinedTextField(value = if (current?.isChatGpt == true) current.modelDisplayName(model) else model, onValueChange = { model = it }, readOnly = current?.isChatGpt == true, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.label_default_model)) }, singleLine = true)
-                    if (current?.isChatGpt != true) OutlinedTextField(value = savedModels, onValueChange = { savedModels = it }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.detected_models_one_per_line)) }, minLines = 3)
+                    if (current?.usesAccountCredential != true) OutlinedTextField(value = savedModels, onValueChange = { savedModels = it }, modifier = Modifier.fillMaxWidth(), label = { Text(uiText(R.string.detected_models_one_per_line)) }, minLines = 3)
                     OutlinedButton(
                         enabled = savedModels.isNotBlank() || enabledModels.isNotEmpty(),
                         onClick = { showEnabledModelsDialog = true },
@@ -1226,7 +1235,7 @@ internal fun ModelServiceSettings(
                                                 status = uiText(R.string.notice_no_models_fetched)
                                             } else {
                                                 savedModels = distinct.joinToString("\n")
-                                                if (current?.isChatGpt == true) {
+                                                if (current?.usesAccountCredential == true) {
                                                     enabledModels = enabledModels.intersect(distinct.toSet()).ifEmpty { distinct.take(1).toSet() }
                                                     if (model !in enabledModels) model = enabledModels.firstOrNull().orEmpty()
                                                 }
@@ -1251,7 +1260,7 @@ internal fun ModelServiceSettings(
                             shape = KimiPillShape,
                         ) { Text(uiText(R.string.refresh_model_list), maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         IconButton(
-                            enabled = profiles.size > 1,
+                            enabled = profiles.size > 1 && current?.isDeepSeekHarness != true,
                             onClick = { current?.let { deleteTarget = it } },
                         ) {
                             Icon(Icons.Default.DeleteOutline, contentDescription = uiText(R.string.cd_delete_platform))

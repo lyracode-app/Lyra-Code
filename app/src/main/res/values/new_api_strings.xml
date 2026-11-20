@@ -6,8 +6,8 @@
     <string name="provider_remove_key">Remove key</string>
     <string name="provider_add_secondary">Add secondary Key</string>
     <string name="provider_keys_hint">The primary Key is tried first. On HTTP 401, 402, 403 or 429, secondary Keys are tried in order. Keys are included only in backups with secrets enabled.</string>
-    <string name="new_api_account">梦汐 API account</string>
-    <string name="new_api_privacy">Login is optional. This account is provided by api.huanyan.fun and only syncs platform user information, API Keys and available models. Local conversations and other settings stay on this device and are not uploaded by account sync. Signing in and using its model service are subject to the platform terms and privacy policy; model requests are sent to that platform.</string>
+    <string name="new_api_account">New API compatible sign-in</string>
+    <string name="new_api_privacy">Sign in with an account from a New API site that allows password sign-in. Lyra Code syncs account details, API keys and available models. The site handles sign-in and model requests under its own terms and privacy policy. For sign-in methods required by your site, open the site directly.</string>
     <string name="new_api_view_account">View platform account</string>
     <string name="new_api_sign_in_register">Sign in / Register</string>
     <string name="new_api_login">Sign in</string>
@@ -16,11 +16,11 @@
     <string name="new_api_back_to_login">Back to sign in</string>
     <string name="new_api_username">Username</string>
     <string name="new_api_password">Password</string>
-    <string name="new_api_email">Email (any domain)</string>
+    <string name="new_api_email">Email (if required by the site)</string>
     <string name="new_api_code">Verification code</string>
     <string name="new_api_send_code">Send email code</string>
     <string name="new_api_invitation">Invitation code (optional)</string>
-    <string name="new_api_2fa_hint">Enter the six-digit code from your authenticator to finish signing in.</string>
+    <string name="new_api_2fa_hint">Enter the code from your authenticator app or a backup code.</string>
     <string name="new_api_code_sent">Code sent. Check your email.</string>
     <string name="new_api_registered">Registration succeeded. Sign in with your new account.</string>
     <string name="new_api_synced">Platform information, API Keys and models have been synced.</string>
@@ -34,26 +34,23 @@
     <string name="new_api_user_id">User ID</string>
     <string name="new_api_display_name">Display name</string>
     <string name="new_api_group">User group</string>
-    <string name="new_api_quota">Remaining quota</string>
-    <string name="new_api_used_quota">Used quota</string>
+    <string name="new_api_balance">Balance</string>
+    <string name="new_api_amount_used">Amount spent</string>
     <string name="new_api_request_count">Request count</string>
-    <string name="new_api_quota_hint">Platform quota unit: 500,000 = 1 梦汐币. New app Keys use unlimited quota, no model restriction and the automatic group. Unlimited Key quota does not increase the account balance.</string>
     <string name="new_api_close">Close</string>
-    <string name="new_api_account_data">梦汐 API accounts are optional and provided by api.huanyan.fun. The app contacts that platform when you register, sign in, sign out, refresh or sync, or when enabled auto sign-in checks or restores your session, sending the username, password, email, verification code, optional invitation code, account access token or refresh cookie required by the selected operation. Credentials are saved encrypted on this device only if you enable Remember credentials. Auto sign-in checks the session when the app starts and signs in again with saved credentials when the session expires; two-factor verification requires manual input. User information, session cookies and API Keys are stored locally; account sessions and remembered credentials are excluded from app backups and Android backup/transfer. Primary and secondary model Keys are exported only when you enable secrets in a backup. Account sync never uploads local conversations, attachments or other settings. When you use this model service, the model request content is sent directly to the platform under its own agreement and privacy policy. Signing out disables auto sign-in, retains remembered credentials for the next manual sign-in, clears the local account session and attempts to revoke that session; model services and Keys remain until you remove them.</string>
+    <string name="new_api_account_data">New API sign-in is optional. Lyra Code contacts the New API site you enter when you register, sign in, sign out, refresh, sync, or when enabled auto sign-in checks or restores your session. Each action sends the account information it requires, which may include your username, password, email, verification code, optional invitation code, access token or session cookie. Credentials are saved encrypted on this device only if you enable Remember credentials. Auto sign-in checks the session when the app starts and signs in again with saved credentials when the session expires. Two-factor verification requires manual input. User information, session cookies and API keys are stored locally. Account sessions and remembered credentials are excluded from app backups and Android backup and transfer. Primary and secondary model keys are exported only when you include secrets in a backup. When you use the model service, Lyra Code sends model requests directly to the site under its terms and privacy policy. Signing out disables auto sign-in, keeps remembered credentials for the next manual sign-in, clears the local session and attempts to revoke it on the site. Synced model services and keys can be removed in Model services.</string>
     <string name="new_api_email_address">Email</string>
     <string name="new_api_user_refreshed">User information refreshed.</string>
-    <string name="mengxi_platform_name">梦汐 API</string>
-    <string name="mengxi_third_party_accounts">Third-party accounts</string>
-    <string name="mengxi_not_signed_in">Not signed in</string>
-    <string name="mengxi_connected">Connected</string>
-    <string name="mengxi_user_details">Account information</string>
-    <string name="mengxi_quota_units">%1$s quota · 500,000 = 1 梦汐币</string>
-    <string name="mengxi_keys_count">%1$d API Keys</string>
-    <string name="mengxi_open_website">Visit 梦汐 API website</string>
-    <string name="mengxi_coin_amount">%1$s 梦汐币</string>
+    <string name="third_party_accounts">Third-party accounts</string>
+    <string name="new_api_not_signed_in">Not signed in</string>
+    <string name="new_api_connected">Connected</string>
+    <string name="new_api_keys_count">%1$d API Keys</string>
+    <string name="new_api_open_website">Visit platform website</string>
     <string name="provider_hold_to_reveal_key">Hold to show this API Key; release to hide</string>
     <string name="new_api_remember_credentials">Remember credentials</string>
     <string name="new_api_auto_login">Sign in automatically</string>
     <string name="new_api_saved_login_hint">Remembered credentials are encrypted on this device and filled in next time. Auto sign-in requires remembered credentials. Signing out turns off auto sign-in; two-factor verification still requires your input.</string>
     <string name="new_api_secure_storage_unavailable">Encrypted storage is unavailable on this device. You can sign in, but credentials cannot be remembered.</string>
+    <string name="new_api_site_url">New API site URL</string>
+    <string name="new_api_invalid_site_url">Enter a site URL beginning with https:// or http://.</string>
 </resources>

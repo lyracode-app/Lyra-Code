@@ -101,7 +101,7 @@ internal class AgentReachabilityService(
 
     private fun modelReachabilityRequest(profile: ApiProfile, model: String): Request {
         // Catalog admission checks avoid spending subscription quota on a one-token probe.
-        if (profile.isChatGpt) return providerReachabilityRequest(profile)
+        if (profile.usesAccountCredential) return providerReachabilityRequest(profile)
         return when (profile.apiFormat) {
             ApiProfile.API_FORMAT_ANTHROPIC -> {
                 val body = JSONObject()

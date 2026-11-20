@@ -89,6 +89,7 @@ internal fun ProfileEditDialog(
     onServicesChanged: () -> Unit = {},
     onOpenAccount: (String) -> Unit = {},
     onOpenChatGptAccount: () -> Unit = {},
+    onOpenDeepSeekHarnessAccount: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -175,9 +176,10 @@ internal fun ProfileEditDialog(
                     Text(context.getString(R.string.label_vertical_position), color = KimiMuted, style = MaterialTheme.typography.labelMedium)
                     Slider(value = offsetY, onValueChange = { offsetY = it }, valueRange = -1f..1f)
                 }
-                KimiSectionLabel(context.getString(R.string.mengxi_third_party_accounts))
+                KimiSectionLabel(context.getString(R.string.third_party_accounts))
                 KimiCardBox { NewApiAccountSection(settings, onServicesChanged, onOpenAccount) }
                 KimiCardBox { ChatGptAccountSection(settings, onOpenChatGptAccount) }
+                KimiCardBox { DeepSeekHarnessAccountSection(settings, onOpenDeepSeekHarnessAccount) }
             }
         },
         confirmButton = {

@@ -266,14 +266,14 @@ Corresponding source and upstream chain:
 
 Binary provenance for this build:
 - Source: https://github.com/Soffd/proot
-- Source commit: 75ef424c5d241d2c90a6312f4935d18977165375 (main; merges all 40 upstream commits 8bf810c through b27d81a, inclusive; retains local contributor policy)
+- Source commit: 851fc3c4cc81b9852467ba2890d0cf621033424a (main, including master through 3c6912e)
 - Build targets: aarch64-linux-android24, x86_64-linux-android24
-- PRoot version: 5.1.107.100-lyra.6
+- PRoot version: 5.1.107.100-lyra.7
 - Toolchain: Android NDK 29.0.14206865; CMake 3.22.1; static talloc 2.5.0
 - Configuration: external loader, ARG_MAX=131072, libandroid-shmem disabled
-- arm64-v8a/libproot_exec.so SHA-256: 8cd986e8e9505f20ef263095037d59ece8756b230e5730315dc142332a8032e2
+- arm64-v8a/libproot_exec.so SHA-256: 7ef9a2ea7130791f66f8e0d903fea69043a83175791269b8414130abf78725e7
 - arm64-v8a/libproot_loader.so SHA-256: 825d0362db3319c2b3ed3b75fe300287c0f9eeb7f2427ceb05a4a004ad33ed12
-- x86_64/libproot_exec.so SHA-256: e3c6a7bde6a8e4851b2ddc36965b5a6c3fe71b5e630731aa7869e046cce82a72
+- x86_64/libproot_exec.so SHA-256: 97fcc734d0a882f7ee8b5ccba39d4cc977f41b8fc2d18ffaf483bb793b05ce9a
 - x86_64/libproot_loader.so SHA-256: 61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869
 
 The executable statically links talloc 2.5.0, copyright its respective Samba contributors, under LGPL-3.0-or-later. Its source and license material are included with the maintained corresponding source. The resulting combined binary is conveyed under GPLv3 as part of this AGPL-v3 application distribution.

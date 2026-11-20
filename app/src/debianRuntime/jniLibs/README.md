@@ -1,7 +1,7 @@
 # Bundled PRoot runtime
 
 Every APK contains ARM64 and x86_64 executable/loader pairs built locally from
-Soffd/proot main commit `75ef424c5d241d2c90a6312f4935d18977165375`.
+Soffd/proot main commit `851fc3c4cc81b9852467ba2890d0cf621033424a`.
 The source retains `7266fb3` (link-directory pinning) and includes these previous five
 upstream commits, cherry-picked in order with their original IDs recorded:
 
@@ -38,15 +38,15 @@ seccomp; command lookup; failed-startup and Unix-socket cleanup; and tracee
 PID reuse, early child deaths and execve from a non-leader thread. The local
 contributor-policy file is retained, as recorded in the upstream commit list.
 
-Remote master was verified at `b27d81a68d765f3462e807f4a14e01a03f8e89ea`
-on 2026-10-29. The local master branch was not modified. `proot_src/` is the
-Git-free source copy of this main revision, including the Bionic-compatible
-getdents helper and expanded Android runtime regressions. The four packaged
-files are reproduced byte-for-byte by independent builds of this mirror.
+The November 20 update merges six more master commits through `3c6912e`.
+It fixes guest paths for duplicated descriptors and chroot, isolates mount
+bindings for private namespaces, and frees discarded bindings. The ordered
+commit list is in `proot_src/android/UPSTREAM_COMMITS.md`. The tracked source
+mirror reproduces both executable/loader pairs byte-for-byte.
 
 ## Binary provenance
 
-- Version: `5.1.107.100-lyra.6`
+- Version: `5.1.107.100-lyra.7`
 - NDK: `29.0.14206865`, Clang 21; CMake 3.22.1, Ninja
 - Targets: `aarch64-linux-android24`, `x86_64-linux-android24`
 - Static dependency: vendored talloc 2.5.0
@@ -96,7 +96,7 @@ Keep the corresponding source and build material available to binary recipients
 under the selected GPLv3 terms; talloc is LGPL-3.0-or-later.
 
 ## SHA-256
-- `arm64-v8a/libproot_exec.so`: `8cd986e8e9505f20ef263095037d59ece8756b230e5730315dc142332a8032e2`
+- `arm64-v8a/libproot_exec.so`: `7ef9a2ea7130791f66f8e0d903fea69043a83175791269b8414130abf78725e7`
 - `arm64-v8a/libproot_loader.so`: `825d0362db3319c2b3ed3b75fe300287c0f9eeb7f2427ceb05a4a004ad33ed12`
-- `x86_64/libproot_exec.so`: `e3c6a7bde6a8e4851b2ddc36965b5a6c3fe71b5e630731aa7869e046cce82a72`
+- `x86_64/libproot_exec.so`: `97fcc734d0a882f7ee8b5ccba39d4cc977f41b8fc2d18ffaf483bb793b05ce9a`
 - `x86_64/libproot_loader.so`: `61b2dd1a858caddbab4647c519cfe0c23bbd2d47981358b9cc6ae818e79e6869`

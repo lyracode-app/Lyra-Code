@@ -33,7 +33,7 @@ internal class GzipRequestInterceptor : Interceptor {
 
     private fun gzippedOrNull(request: Request): Request? {
         val profile = request.tag(ApiProfile::class.java) ?: return null
-        if (!profile.gzipRequestBodies || profile.isChatGpt || hostKey(request) in plainHosts) return null
+        if (!profile.gzipRequestBodies || profile.usesAccountCredential || hostKey(request) in plainHosts) return null
         val body = request.body ?: return null
         if (body.isOneShot() || body.isDuplex() || request.header("Content-Encoding") != null) return null
         if (body.contentType()?.subtype?.contains("json", ignoreCase = true) != true) return null

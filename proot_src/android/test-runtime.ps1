@@ -25,7 +25,8 @@ New-Item -ItemType Directory -Force $helpers | Out-Null
 $compiler = Join-Path $NdkPath 'toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe'
 $names = @('puts_proc_self_exe', 'execveat', 'open_nofollow', 'test-fork',
     'test-upstream', 'test-latest', 'fork_regs', 'fchmodat2', 'open_tree', 'test-571fb953',
-    'test-f6b33793', 'getdents', 'link', 'renameat2', 'statx', 'unix_socket')
+    'test-f6b33793', 'getdents', 'link', 'renameat2', 'statx', 'unix_socket',
+    'test-4c9e2b17', 'test-7e1d4c2a', 'test-6b2f0d58')
 foreach ($name in $names) {
     $inputFile = if ($name -in @('test-fork', 'test-upstream', 'test-latest')) { "$PSScriptRoot/$name.c" } else { "$source/tests/$name.c" }
     & $compiler "--target=$target" -O2 -fPIE -pie $inputFile -o "$helpers/$name"

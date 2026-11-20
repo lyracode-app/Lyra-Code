@@ -124,7 +124,7 @@ internal fun SettingsScreen(
     updateDownload: UpdateDownload,
     settingsBackRequest: Int,
     externalAccountNotice: String?,
-    externalAccountTarget: String = "mengxi_account",
+    externalAccountTarget: String = "new_api_account",
     onExternalAccountOpened: () -> Unit,
     externalGitHubAccelerationUrl: String?,
     onExternalGitHubAccelerationClosed: () -> Unit,
@@ -169,7 +169,7 @@ internal fun SettingsScreen(
         )
     }
     fun previousDetail(current: String?): String? = when (current) {
-        "mengxi_account", "chatgpt_account" -> "profile"
+        "new_api_account", "chatgpt_account", "deepseek_harness_account" -> "profile"
         "chatgpt_sign_in" -> "chatgpt_account"
         "mcp_tools" -> "mcp"
         "mcp_tool_detail" -> "mcp_tools"
@@ -314,17 +314,22 @@ internal fun SettingsScreen(
                     scroll = target !in setOf("model", "prompts", "memories", "licenses", "about", "developer_wall", "device", "font", "font_library", "github_acceleration", "floating_page"),
                 ) {
                     when (target) {
-                    "profile" -> ProfileSettingsSummary(settings, controller::reloadProfiles, { detail = "chatgpt_account" }) { notice ->
+                    "profile" -> ProfileSettingsSummary(
+                        settings, controller::reloadProfiles,
+                        onOpenChatGptAccount = { detail = "chatgpt_account" },
+                        onOpenDeepSeekHarnessAccount = { detail = "deepseek_harness_account" },
+                    ) { notice ->
                         accountNotice = notice
                         accountPageVersion++
-                        detail = "mengxi_account"
+                        detail = "new_api_account"
                     }
-                    "mengxi_account" -> key(accountPageVersion) {
-                        MengxiAccountPage(settings, accountNotice, controller::reloadProfiles) {
+                    "new_api_account" -> key(accountPageVersion) {
+                        NewApiAccountPage(settings, accountNotice, controller::reloadProfiles) {
                             accountNotice = ""
                             detail = "profile"
                         }
                     }
+                    "deepseek_harness_account" -> DeepSeekHarnessAccountPage(settings, controller::reloadProfiles)
                     "chatgpt_account" -> ChatGptAccountPage(
                         settings = settings, onServicesChanged = controller::reloadProfiles,
                         onBeforeSignOut = controller::stopChatGptAccountRequests,
@@ -685,7 +690,7 @@ internal fun SettingsScreen(
                         EnterTransition.None togetherWith ExitTransition.None
                     } else {
                         val forward = when {
-                            initialState == "mengxi_account" && targetState == "profile" -> false
+                            initialState == "new_api_account" && targetState == "profile" -> false
                             initialState == "github_acceleration" -> false
                             initialState == "update_management" && targetState == "about" -> false
                             initialState in setOf("update_channels", "update_manifest", "update_prompts") && targetState == "update_management" -> false
@@ -756,7 +761,8 @@ internal fun SettingsDetailPage(
 
 internal fun settingsDetailTitle(context: Context, detail: String): String = when (detail) {
     "profile" -> context.getString(R.string.detail_profile)
-    "mengxi_account" -> context.getString(R.string.new_api_account)
+    "new_api_account" -> context.getString(R.string.new_api_account)
+    "deepseek_harness_account" -> context.getString(R.string.harness_account_name)
     "chatgpt_account" -> context.getString(R.string.chatgpt_account_title)
     "chatgpt_sign_in" -> context.getString(R.string.chatgpt_sign_in_title)
     "model" -> context.getString(R.string.detail_model)

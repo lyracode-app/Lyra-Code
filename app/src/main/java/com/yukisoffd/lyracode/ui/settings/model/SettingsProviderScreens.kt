@@ -203,7 +203,7 @@ internal fun ModelProviderRow(
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
-            IconButton(onClick = onDelete) {
+            if (!profile.isDeepSeekHarness) IconButton(onClick = onDelete) {
                 Icon(Icons.Default.DeleteOutline, contentDescription = uiText(R.string.file_action_delete), tint = KimiMuted)
             }
         }

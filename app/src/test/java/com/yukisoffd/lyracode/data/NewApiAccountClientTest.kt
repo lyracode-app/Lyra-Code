@@ -14,7 +14,8 @@ class NewApiAccountClientTest {
         override val supportsRememberedLogin = true
     }
     private data class Reply(val body: String, val status: Int = 200, val cookie: String? = null)
-    private data class Seen(val path: String, val method: String, val auth: String?, val cookie: String?, val body: String)
+    private data class Seen(val path: String, val method: String, val auth: String?, val cookie: String?,
+        val body: String, val userId: String?)
     private class Server(val handler: (Seen) -> Reply) : AutoCloseable {
         val requests = Collections.synchronizedList(mutableListOf<Seen>())
         val failures = Collections.synchronizedList(mutableListOf<Throwable>())
@@ -22,7 +23,8 @@ class NewApiAccountClientTest {
             createContext("/") { exchange ->
                 try {
                     val seen = Seen(exchange.requestURI.toString(), exchange.requestMethod, exchange.requestHeaders.getFirst("Authorization"),
-                        exchange.requestHeaders.getFirst("Cookie"), exchange.requestBody.readBytes().toString(Charsets.UTF_8))
+                        exchange.requestHeaders.getFirst("Cookie"), exchange.requestBody.readBytes().toString(Charsets.UTF_8),
+                        exchange.requestHeaders.getFirst("New-Api-User"))
                     requests += seen
                     val reply = handler(seen)
                     reply.cookie?.let { exchange.responseHeaders.add("Set-Cookie", it) }
@@ -45,6 +47,153 @@ class NewApiAccountClientTest {
         JSONObject().put("success", true).put("data", JSONObject().put("access_token", token).put("access_expires_at", expiry)
             .put("user", JSONObject().put("id", 7).put("username", "tester"))).toString()
     private fun success(data: Any? = null) = JSONObject().put("success", true).apply { if (data != null) put("data", data) }.toString()
+
+    @Test fun balanceUsesSiteCurrencyAndSurvivesAnUnavailableStatusEndpoint() {
+        val store = Store()
+        var online = true
+        Server { request ->
+            when (request.path) {
+                "/api/user/login" -> Reply(auth())
+                "/api/user/self" -> Reply(success(JSONObject().put("id", 7).put("quota", 125).put("used_quota", 0)))
+                "/api/status" -> if (online) Reply(success(JSONObject().put("quota_per_unit", 1000)
+                    .put("quota_display_type", "CNY").put("usd_exchange_rate", 8))) else Reply("", 503)
+                else -> error(request.path)
+            }
+        }.use { server ->
+            var client = NewApiAccountClient(store, server.url)
+            client.login("tester", "password")
+            val decimal = java.text.DecimalFormatSymbols.getInstance().decimalSeparator
+            repeat(2) {
+                val user = client.refreshUser()
+                assertEquals("¥1${decimal}00", client.currency?.format(user.opt("quota")))
+                assertEquals("¥0${decimal}00", client.currency?.format(user.opt("used_quota")))
+                assertNull(client.currency?.format(user.opt("absent")))
+                online = false
+                client = NewApiAccountClient(store, server.url)
+            }
+        }
+    }
+
+    @Test fun customAndTokenBalancesUseTheirMonetaryValue() {
+        val decimal = java.text.DecimalFormatSymbols.getInstance().decimalSeparator
+        val status = JSONObject().put("quota_per_unit", 500000)
+        for (mode in listOf("USD", "TOKENS")) {
+            status.put("quota_display_type", mode)
+            assertEquals("$0${decimal}000002", NewApiCurrency.from(status)?.format(1))
+        }
+        status.put("quota_display_type", "CUSTOM").put("custom_currency_exchange_rate", "1.5")
+            .put("custom_currency_symbol", "¤")
+        assertEquals("¤3${decimal}00", NewApiCurrency.from(status)?.format(1000000))
+        assertNull(NewApiCurrency.from(status.put("quota_per_unit", 0)))
+    }
+
+    @Test fun validatedSiteIsSavedAndChangingItDropsPreviousSiteCredentials() {
+        val store = Store()
+        val client = NewApiAccountClient(store)
+        assertNull(client.siteUrl)
+        Server { request ->
+            when (request.path) {
+                "/gateway/api/user/login" -> Reply(auth(), cookie = "refresh=old; Path=/")
+                "/gateway/api/user/auth/logout" -> Reply(success())
+                else -> error(request.path)
+            }
+        }.use { first ->
+            val firstSite = NewApiAccountClient.parseSiteUrl("${first.url}/gateway///")!!
+            client.useSite(firstSite) { client.login("first", "old-password", true, true) }
+            val restored = NewApiAccountClient(store)
+            assertEquals("${first.url}/gateway", restored.siteUrl)
+            assertEquals("newapi:${first.url}/gateway:7", restored.profileId)
+            assertFalse(runCatching {
+                restored.useSite(NewApiAccountClient.parseSiteUrl("${first.url}/different")!!) { }
+            }.isSuccess)
+            restored.logout()
+            assertEquals("old-password", restored.savedLogin?.password)
+
+            Server { request ->
+                assertEquals("/api/user/login", request.path)
+                assertNull(request.auth)
+                assertNull(request.cookie)
+                assertEquals("new-password", JSONObject(request.body).getString("password"))
+                Reply(auth("second"))
+            }.use { second ->
+                val secondSite = NewApiAccountClient.parseSiteUrl(second.url)!!
+                restored.useSite(secondSite) { restored.login("second", "new-password") }
+                assertNull(restored.savedLogin)
+                assertFalse(store.state.contains("old-password"))
+                assertEquals("newapi:${second.url}:7", restored.profileId)
+            }
+        }
+    }
+
+    @Test fun legacySavedSessionRemainsBoundToItsOriginalSite() {
+        val store = Store().apply { state = """{"access_token":"existing","user":{"id":7}}""" }
+        val client = NewApiAccountClient(store)
+        assertEquals("https://api.huanyan.fun", client.siteUrl)
+        assertTrue(client.isLoggedIn)
+        assertEquals("newapi:api.huanyan.fun:7", client.profileId)
+        assertFalse(NewApiAccountClient(store, "https://example.org").isLoggedIn)
+    }
+
+    @Test fun siteUrlsRejectCredentialsQueriesFragmentsAndOtherProtocols() {
+        for (url in listOf("ftp://example.org", "https://user@example.org", "https://example.org?q=1",
+            "https://example.org/#login", "example.org", "https:///example.org")) {
+            assertNull(url, NewApiAccountClient.parseSiteUrl(url))
+        }
+        assertEquals("https://example.org/new-api/", NewApiAccountClient.parseSiteUrl(" https://EXAMPLE.org/new-api/ ")?.toString())
+    }
+
+    @Test fun legacyCookieLoginCompletesTwoFactorAndSyncsUsingTheSiteSession() {
+        val user = JSONObject().put("id", 7).put("username", "tester")
+        val store = Store()
+        Server { request ->
+            when {
+                request.path == "/api/user/login" ->
+                    Reply(success(JSONObject().put("require_2fa", true)), cookie = "session=pending; Path=/")
+                request.path == "/api/user/login/2fa" -> {
+                    assertEquals("session=pending", request.cookie)
+                    val body = JSONObject(request.body)
+                    assertFalse(body.has("flow_token"))
+                    assertEquals("123456", body.getString("code"))
+                    Reply(success(user), cookie = "session=active; Path=/")
+                }
+                request.path == "/api/user/self" -> {
+                    assertEquals("7", request.userId)
+                    assertEquals("session=active", request.cookie)
+                    assertNull(request.auth)
+                    Reply(success(user))
+                }
+                request.path.startsWith("/api/token/?") -> Reply(success(JSONArray().put(
+                    JSONObject().put("id", 11).put("name", "Lyra-12345678-123").put("key", "sk-***"),
+                )))
+                request.path == "/api/token/11/key" -> Reply("Not found", 404)
+                request.path == "/api/token/11" -> Reply(success(JSONObject().put("key", "legacy-key")))
+                request.path == "/v1/models" -> {
+                    assertNull(request.cookie)
+                    assertNull(request.userId)
+                    assertEquals("Bearer sk-legacy-key", request.auth)
+                    Reply("""{"data":[{"id":"model-a"}]}""")
+                }
+                request.path == "/api/user/logout" -> {
+                    assertEquals("GET", request.method)
+                    assertEquals("session=active", request.cookie)
+                    Reply(success())
+                }
+                else -> error(request.path)
+            }
+        }.use { server ->
+            val client = NewApiAccountClient(store, server.url)
+            val result = client.login("tester", "password")
+            assertFalse(client.isLoggedIn)
+            client.verifyTwoFactor(result.flowToken!!, "123456")
+            val restored = NewApiAccountClient(store)
+            assertTrue(restored.isLoggedIn)
+            val profile = restored.synchronizeService(null) {}.profile
+            assertEquals("${server.url}/v1", profile.baseUrl)
+            assertEquals(listOf("model-a"), profile.savedModels)
+            restored.logout()
+            assertFalse(restored.isLoggedIn)
+        }
+    }
 
     @Test fun rememberedCredentialsSurviveRestartAndAnUnrememberedLoginRemovesThem() {
         Server { Reply(auth()) }.use { server ->
@@ -275,6 +424,7 @@ class NewApiAccountClientTest {
                 request.path == "/api/user/login" -> Reply(auth(), cookie = "refresh=local; Path=/; HttpOnly")
                 request.path == "/api/user/auth/logout" -> Reply(success())
                 request.path == "/api/user/self" -> Reply(success(JSONObject().put("id", 7).put("username", "tester").put("quota", 500000)))
+                request.path == "/api/status" -> Reply("", 404)
                 request.path.startsWith("/api/token/?") -> {
                     val items = JSONArray().put(JSONObject().put("id", 10).put("name", "existing").put("key", "sk-***"))
                     created?.let { items.put(JSONObject(it.toString()).put("id", 11)) }

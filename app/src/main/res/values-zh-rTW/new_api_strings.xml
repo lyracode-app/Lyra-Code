@@ -6,8 +6,8 @@
     <string name="provider_remove_key">移除 Key</string>
     <string name="provider_add_secondary">新增副 Key</string>
     <string name="provider_keys_hint">優先使用主 Key；遇到 HTTP 401、402、403、429 時按順序嘗試副 Key。僅在備份中勾選包含金鑰時匯出主副 Key。</string>
-    <string name="new_api_account">夢汐 API 帳號</string>
-    <string name="new_api_privacy">登入完全可選。帳號由 api.huanyan.fun 第三方平台提供，僅同步平台使用者資訊、API Key 與可用模型。本機對話及其他設定留在裝置內，帳號同步不會上傳這些資料。登入及使用其模型服務適用該平台的協議與隱私權政策，模型請求會傳送至該平台。</string>
+    <string name="new_api_account">New API 相容登入</string>
+    <string name="new_api_privacy">使用支援密碼登入的 New API 站點帳號。Lyra Code 會同步帳號資訊、API Key 和可用模型。登入與模型請求由該站點處理，適用其協議與隱私權政策。如站點要求使用其他登入方式，請造訪站點。</string>
     <string name="new_api_view_account">查看平台帳號</string>
     <string name="new_api_sign_in_register">登入 / 註冊</string>
     <string name="new_api_login">登入</string>
@@ -16,11 +16,11 @@
     <string name="new_api_back_to_login">返回登入</string>
     <string name="new_api_username">使用者名稱</string>
     <string name="new_api_password">密碼</string>
-    <string name="new_api_email">電子郵件（不限網域）</string>
+    <string name="new_api_email">電子郵件（如站點要求）</string>
     <string name="new_api_code">驗證碼</string>
     <string name="new_api_send_code">傳送電子郵件驗證碼</string>
     <string name="new_api_invitation">邀請碼（選填）</string>
-    <string name="new_api_2fa_hint">請輸入驗證器中的六位動態驗證碼以完成登入。</string>
+    <string name="new_api_2fa_hint">請輸入驗證器中的動態驗證碼或備用碼。</string>
     <string name="new_api_code_sent">驗證碼已傳送，請檢查電子郵件。</string>
     <string name="new_api_registered">註冊成功，請使用新帳號登入。</string>
     <string name="new_api_synced">平台資訊、API Key 和模型已同步。</string>
@@ -34,26 +34,23 @@
     <string name="new_api_user_id">使用者 ID</string>
     <string name="new_api_display_name">顯示名稱</string>
     <string name="new_api_group">使用者群組</string>
-    <string name="new_api_quota">剩餘額度</string>
-    <string name="new_api_used_quota">已用額度</string>
+    <string name="new_api_balance">帳戶餘額</string>
+    <string name="new_api_amount_used">已用金額</string>
     <string name="new_api_request_count">請求次數</string>
-    <string name="new_api_quota_hint">平台額度單位：500,000 = 1 夢汐幣。應用程式新建 Key 預設無限額度、不限制模型、自動群組；Key 無限額度不會增加帳號餘額。</string>
     <string name="new_api_close">關閉</string>
-    <string name="new_api_account_data">夢汐 API 帳號完全可選，由 api.huanyan.fun 第三方平台提供。僅在註冊、登入、登出、重新整理、同步或已開啟的自動登入檢查、恢復登入狀態時連線至該平台，並按對應操作傳送所需的使用者名稱、密碼、電子郵件、驗證碼、選填邀請碼、帳號存取權杖或更新 Cookie。僅在勾選「記住帳密」後將帳密加密儲存在本機。開啟自動登入後，應用程式啟動時會檢查登入狀態，失效時使用已儲存的帳密再次登入；兩步驟驗證需手動完成。使用者資訊、登入 Cookie 和 API Key 儲存在裝置內；帳號登入狀態及記住的帳密不納入應用程式備份及 Android 雲端備份、裝置移轉。主副模型 Key 僅在備份中勾選包含金鑰時匯出。帳號同步不會上傳本機對話、附件及其他設定。使用該平台模型服務時，模型請求內容會直接傳送至該平台，適用其自身協議與隱私權政策。手動登出會關閉自動登入，保留已記住的帳密供下次手動登入，清除本機登入狀態並嘗試登出目前平台工作階段；已設定的模型服務和 Key 保留至手動移除。</string>
+    <string name="new_api_account_data">New API 登入為選用功能。註冊、登入、登出、重新整理、同步或已開啟的自動登入檢查與恢復登入狀態時，Lyra Code 會連線至你填寫的 New API 站點，並傳送該操作所需的資訊，例如使用者名稱、密碼、電子郵件、驗證碼、選填邀請碼、帳號存取權杖或工作階段 Cookie。勾選「記住帳密」後，帳密會加密儲存在本機。開啟自動登入後，應用程式啟動時會檢查登入狀態，失效時使用已儲存的帳密再次登入。兩步驟驗證需手動完成。使用者資訊、工作階段 Cookie 和 API Key 儲存在裝置內。帳號登入狀態及記住的帳密不納入應用程式備份、Android 雲端備份或裝置移轉。主副模型 Key 僅在備份中勾選包含金鑰時匯出。使用模型服務時，模型請求會直接傳送至該站點，適用其協議與隱私權政策。手動登出會關閉自動登入，保留已記住的帳密供下次手動登入，清除本機登入狀態並嘗試登出站點工作階段。已同步的模型服務與 Key 可在模型服務設定中移除。</string>
     <string name="new_api_email_address">電子郵件</string>
     <string name="new_api_user_refreshed">使用者資訊已重新整理。</string>
-    <string name="mengxi_platform_name">夢汐 API</string>
-    <string name="mengxi_third_party_accounts">第三方帳戶</string>
-    <string name="mengxi_not_signed_in">尚未登入</string>
-    <string name="mengxi_connected">已連線</string>
-    <string name="mengxi_user_details">帳戶資訊</string>
-    <string name="mengxi_quota_units">%1$s 額度 · 500,000 = 1 夢汐幣</string>
-    <string name="mengxi_keys_count">%1$d 個 API Key</string>
-    <string name="mengxi_open_website">造訪夢汐 API 官網</string>
-    <string name="mengxi_coin_amount">%1$s 夢汐幣</string>
+    <string name="third_party_accounts">第三方帳戶</string>
+    <string name="new_api_not_signed_in">尚未登入</string>
+    <string name="new_api_connected">已連線</string>
+    <string name="new_api_keys_count">%1$d 個 API Key</string>
+    <string name="new_api_open_website">造訪站點</string>
     <string name="provider_hold_to_reveal_key">按住顯示此 API Key，放開隱藏</string>
     <string name="new_api_remember_credentials">記住帳密</string>
     <string name="new_api_auto_login">自動登入</string>
     <string name="new_api_saved_login_hint">帳密加密儲存在本機，下次登入時自動填入。自動登入需要先記住帳密；手動登出會關閉自動登入，兩步驟驗證仍需手動完成。</string>
     <string name="new_api_secure_storage_unavailable">本機加密儲存無法使用，仍可登入，但無法記住帳密。</string>
+    <string name="new_api_site_url">New API 站點網址</string>
+    <string name="new_api_invalid_site_url">請輸入以 https:// 或 http:// 開頭的站點網址。</string>
 </resources>

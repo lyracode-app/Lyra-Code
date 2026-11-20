@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Logout
@@ -50,7 +49,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.yukisoffd.lyracode.data.AppSettings
-import com.yukisoffd.lyracode.data.NewApiAccountClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,7 +57,7 @@ import java.text.NumberFormat
 
 /** Content of a Settings child route; account information is never presented in a dialog. */
 @Composable
-internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onServicesChanged: () -> Unit, onSignedOut: () -> Unit) {
+internal fun NewApiAccountPage(settings: AppSettings, initialNotice: String, onServicesChanged: () -> Unit, onSignedOut: () -> Unit) {
     val account = settings.newApiAccount
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -69,6 +67,7 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
     var failed by remember { mutableStateOf(false) }
     var showLogin by remember { mutableStateOf(false) }
     val user = remember(revision) { account.user }
+    val siteUrl = remember(revision) { account.siteUrl }
     val profile = remember(revision) { settings.profiles().firstOrNull { it.id == account.profileId } }
     val loggedIn = remember(revision) { account.isLoggedIn }
     val syncedText = uiText(R.string.new_api_synced)
@@ -101,7 +100,7 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
     }
     if (showLogin) NewApiLoginDialog(settings, onServicesChanged,
         onAuthenticated = { message -> showLogin = false; notice = message; failed = false; revision++ },
-        onDismiss = { showLogin = false })
+        onDismiss = { showLogin = false; revision++ })
 
     if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
     if (notice.isNotBlank()) Surface(
@@ -115,8 +114,8 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
     }
     if (!loggedIn || user == null) {
         KimiCardBox {
-            Icon(Icons.Default.Cloud, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(uiText(R.string.mengxi_not_signed_in), style = MaterialTheme.typography.titleMedium)
+            AiLogoBadge(R.drawable.ai_service_newapi, "New API")
+            Text(uiText(R.string.new_api_not_signed_in), style = MaterialTheme.typography.titleMedium)
             Button(enabled = !busy, onClick = { showLogin = true }) { Text(uiText(R.string.new_api_sign_in_register)) }
         }
     } else {
@@ -137,7 +136,7 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
                     Text(displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                     Text("@$username", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Icon(Icons.Default.CheckCircle, uiText(R.string.mengxi_connected), tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.CheckCircle, uiText(R.string.new_api_connected), tint = MaterialTheme.colorScheme.primary)
             }
             Row(
                 Modifier.fillMaxWidth(),
@@ -159,16 +158,14 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
             Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.AccountBalanceWallet, null, Modifier.size(20.dp))
-                    Text(uiText(R.string.new_api_quota), style = MaterialTheme.typography.labelLarge)
+                    Text(uiText(R.string.new_api_balance), style = MaterialTheme.typography.labelLarge)
                 }
-                AccountQuotaText(uiText(R.string.mengxi_coin_amount, formatMengxiQuota(user.optLong("quota"))))
-                Text(uiText(R.string.mengxi_quota_units, NumberFormat.getIntegerInstance().format(user.optLong("quota"))),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
+                AccountBalanceText(account.currency?.format(user.opt("quota")) ?: "—")
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AccountMetric(uiText(R.string.new_api_used_quota),
-                uiText(R.string.mengxi_coin_amount, formatMengxiQuota(user.optLong("used_quota"))), Modifier.weight(1f))
+            AccountMetric(uiText(R.string.new_api_amount_used),
+                account.currency?.format(user.opt("used_quota")) ?: "—", Modifier.weight(1f))
             AccountMetric(uiText(R.string.new_api_request_count), NumberFormat.getIntegerInstance().format(user.optLong("request_count")), Modifier.weight(1f))
         }
         KimiSectionLabel(uiText(R.string.section_model_service))
@@ -176,7 +173,7 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Key, null, tint = MaterialTheme.colorScheme.primary)
-                    Text(uiText(R.string.mengxi_keys_count, profile?.allApiKeys?.size ?: 0), style = MaterialTheme.typography.bodyMedium)
+                    Text(uiText(R.string.new_api_keys_count, profile?.allApiKeys?.size ?: 0), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.ViewModule, null, tint = MaterialTheme.colorScheme.primary)
@@ -196,12 +193,15 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
             Text(uiText(R.string.new_api_refresh_user))
         }
     }
-    OutlinedButton(onClick = {
-        runCatching { uriHandler.openUri(NewApiAccountClient.PLATFORM_URL) }
-            .onFailure { failed = true; notice = it.message ?: errorText }
-    }, modifier = Modifier.fillMaxWidth()) {
-        Icon(Icons.Default.OpenInNew, null, Modifier.padding(end = 8.dp).size(18.dp))
-        Text(uiText(R.string.mengxi_open_website))
+    if (siteUrl != null) {
+        SelectionContainer { Text(siteUrl, style = MaterialTheme.typography.bodyMedium) }
+        OutlinedButton(onClick = {
+            runCatching { uriHandler.openUri(siteUrl) }
+                .onFailure { failed = true; notice = it.message ?: errorText }
+        }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.OpenInNew, null, Modifier.padding(end = 8.dp).size(18.dp))
+            Text(uiText(R.string.new_api_open_website))
+        }
     }
     if (loggedIn) {
         TextButton(enabled = !busy, modifier = Modifier.fillMaxWidth(), onClick = { runAction(signOut = true) { account.logout(); "" } }) {
@@ -213,7 +213,7 @@ internal fun MengxiAccountPage(settings: AppSettings, initialNotice: String, onS
 }
 
 @Composable
-private fun AccountQuotaText(value: String) {
+private fun AccountBalanceText(value: String) {
     val style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)
     val textMeasurer = rememberTextMeasurer()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -237,8 +237,3 @@ private fun AccountMetric(label: String, value: String, modifier: Modifier) {
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
 }
-
-private fun formatMengxiQuota(quota: Long): String = NumberFormat.getNumberInstance().apply {
-    minimumFractionDigits = 2
-    maximumFractionDigits = 2
-}.format(quota / 500_000.0)
