@@ -21,6 +21,7 @@ internal fun themedAiLogoRes(@DrawableRes logoRes: Int): Int {
         R.drawable.ai_service_anthropic -> R.drawable.ai_service_anthropic_dark
         R.drawable.ai_service_moonshot -> R.drawable.ai_service_moonshot_dark
         R.drawable.ai_service_openai -> R.drawable.ai_service_openai_dark
+        R.drawable.ai_service_opencode -> R.drawable.ai_service_opencode_dark
         R.drawable.ai_service_stepfun -> R.drawable.ai_service_stepfun_dark
         R.drawable.ai_service_xai -> R.drawable.ai_service_xai_dark
         R.drawable.ai_service_xiaomimimo -> R.drawable.ai_service_xiaomimimo_dark

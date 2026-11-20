@@ -165,6 +165,7 @@ class OpenAiAgent(
         .addInterceptor(ChatGptAuthInterceptor { settings.chatGptAccount })
         .addInterceptor(DeepSeekHarnessAuthInterceptor { settings.deepSeekHarnessAccount })
         .addInterceptor(ProviderKeyInterceptor())
+        .addInterceptor(OpenCodeInterceptor("LyraCode/${com.yukisoffd.lyracode.BuildConfig.VERSION_NAME}"))
         .addInterceptor(httpAudit.application)
         .addInterceptor(GzipRequestInterceptor())
         .addNetworkInterceptor(httpAudit.network)
@@ -1064,6 +1065,7 @@ class OpenAiAgent(
             .url(profile.responsesEndpoint)
             .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
             .addHeader("Content-Type", "application/json")
+            .openCodeSession(conversationId)
             .post(body)
             .build()
 
@@ -1250,6 +1252,7 @@ class OpenAiAgent(
             .url(profile.chatEndpoint)
             .apply { if (profile.apiKey.isNotBlank()) addHeader("Authorization", "Bearer ${profile.apiKey}") }
             .addHeader("Content-Type", "application/json")
+            .openCodeSession(conversationId)
             .post(body)
             .build()
 
@@ -1407,6 +1410,7 @@ class OpenAiAgent(
             .apply { if (profile.apiKey.isNotBlank()) addHeader("x-api-key", profile.apiKey) }
             .addHeader("anthropic-version", ANTHROPIC_VERSION)
             .addHeader("Content-Type", "application/json")
+            .openCodeSession(conversationId)
             .post(stableJson(requestJson).toRequestBody("application/json".toMediaType()))
         if (supportsDeepSeekFilesApi(profile, model)) {
             requestBuilder.addHeader("anthropic-beta", DEEPSEEK_ANTHROPIC_FILES_BETA)
@@ -1549,6 +1553,7 @@ class OpenAiAgent(
             .url(profile.geminiGenerateContentEndpoint(model))
             .apply { if (profile.apiKey.isNotBlank()) addHeader("x-goog-api-key", profile.apiKey) }
             .addHeader("Content-Type", "application/json")
+            .openCodeSession(conversationId)
             .post(stableJson(requestJson).toRequestBody("application/json".toMediaType()))
             .build()
         val startedAtNanos = System.nanoTime()
