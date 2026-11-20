@@ -1,3 +1,14 @@
+# Lyra .7 upstream commits
+
+Merged from master on 2026-11-20:
+
+- `7471c713607fbdf65236ba522aca3c0fdc38d1cc` link2symlink: name dup'ed descriptors after their link
+- `52d65a4dc140ca554d241a1438ddd4f6b00c9813` Correct the urls to source code repo (home page)
+- `296227f80d4be1c48c36224954eb8c0380a643cb` binding: free a list of bindings without looking up its tracee
+- `4efb79f980f5d7a6a089a6feeb3e8eedda366277` syscall: give unshare(CLONE_NEWNS) a copy of the bindings
+- `b43244e12de5a46ccc563d6aec8e062437a82f0b` fake_id0: check chroot(2) against the bindings with its guest path
+- `3c6912e7d01c91cba4e7d86a1ef8157fc27bc949` binding: free the bindings that are dropped
+
 # Lyra .6 upstream commits
 
 Integrated on main from 8bf810c through b27d81a, inclusive (40 commits).

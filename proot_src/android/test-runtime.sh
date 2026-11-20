@@ -26,6 +26,22 @@ for MODE in seccomp no-seccomp; do
     test "$("$P" -l "$CASE/lib/original")" = "$CASE/lib/original"
     test "$("$P" -l "$BASE/open_nofollow" "$CASE/lib/link")" = "$CASE/lib/link"
     test "$("$P" -l "$BASE/open_nofollow" "$CASE/lib/link" path)" = "$CASE/lib/link"
+    # A dup'ed descriptor still names the guest hard link when read by a child.
+    FD_PATH=$("$P" -l -b /proc /system/bin/sh -c \
+        'exec 9< "$1"; /system/bin/readlink "/proc/$$/fd/9"' sh "$CASE/lib/link")
+    test "$FD_PATH" = "$CASE/lib/link"
+    # Upstream guest chroot, private mount namespace and binding lifetime checks.
+    for HELPER in test-4c9e2b17 test-7e1d4c2a test-6b2f0d58; do
+        set -- -b /proc
+        if [ "$HELPER" = test-4c9e2b17 ]; then set -- -0 "$@"; fi
+        STATUS=0
+        TMPDIR="$CASE" "$P" "$@" "$BASE/$HELPER" || STATUS=$?
+        if [ "$STATUS" = 125 ]; then
+            echo "$MODE: SKIP $HELPER (host policy)"
+        else
+            test "$STATUS" = 0
+        fi
+    done
     "$P" -l "$BASE/test-fork"
     "$P" -l "$BASE/test-f6b33793"
     echo "$MODE: LINK_EXE_EXECVEAT_NOFOLLOW_FORK_OK"
