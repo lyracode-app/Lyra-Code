@@ -1667,7 +1667,7 @@ class ChatController(
             val topicModel = settings.topicSummaryModel.ifBlank { topicProfile.selectedModel }
             val topicInput = request.rawText.trim().ifBlank { fallbackConversationTitle(request.composedInput, defaultTitle) }
             scope.launch {
-                runCatching { agent.summarizeConversationTopic(topicProfile, topicModel, topicInput) }
+                runCatching { agent.summarizeConversationTopic(conversationId, topicProfile, topicModel, topicInput) }
                     .onSuccess { title ->
                         val current = conversationStore.conversation(conversationId)
                         if (current != null && current.title == topicTitleGuard) {
