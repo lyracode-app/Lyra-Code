@@ -105,7 +105,7 @@ internal class DeviceExtendedTools(private val context: Context, private val set
             if (fullAccess && !DeviceFullAccess.isEnabled(context)) return "ERROR: FULL_ACCESS_REVOKED"
             if (ManualControlController.state.value.latestSnapshot?.uiFingerprint != before.uiFingerprint) return "ERROR: PAGE_CHANGED"
             lastScreenshotAt = android.os.SystemClock.elapsedRealtime()
-            val report = agent.analyzeDeviceScreenshot(profile, model, image.dataUrl,
+            val report = agent.analyzeDeviceScreenshot(conversationId, profile, model, image.dataUrl,
                 "Image ${image.width} x ${image.height}, origin in screen pixels (${image.left}, ${image.top}). Return absolute screen coordinates by adding that origin. Return only JSON with boolean sensitive_flow and string description. Set sensitive_flow=true for visible password/OTP entry, transaction execution (buy/sell/pay/transfer), or permission approval controls. Merely opening finance apps or browsing financial information is NOT sensitive. ${if (fullAccess) "Authenticated full access is enabled; describe the controls needed for the requested operation, including sensitive controls." else "Omit all secret values."} Task: $question",
                 fullAccess = fullAccess).take(12000)
             // Standard mode gates coordinates on vision classification; full access lifts that policy.

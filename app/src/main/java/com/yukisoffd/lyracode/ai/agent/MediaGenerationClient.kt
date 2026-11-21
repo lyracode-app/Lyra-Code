@@ -47,6 +47,7 @@ internal class MediaGenerationClient(
     private val appContext = context.applicationContext
 
     fun generate(
+        conversationId: Long,
         profile: ApiProfile,
         model: String,
         request: MediaGenerationPrompt,
@@ -62,6 +63,7 @@ internal class MediaGenerationClient(
             else -> openAiPayload(profile, model, prompt, references)
         }
         val requestBuilder = Request.Builder()
+            .openCodeSession(conversationId)
             .url(
                 when (profile.apiFormat) {
                     ApiProfile.API_FORMAT_GEMINI -> profile.geminiGenerateContentEndpoint(model)
