@@ -98,11 +98,12 @@ internal class PrivilegedFileOperations(
         if (!isRestricted(file) && file.isFile && file.canRead()) return Result.success(file)
         val stage = newStageFile(file.name)
         val command = """
+            [ -f ${shellQuote(file.absolutePath)} ] &&
             mkdir -p ${shellQuote(stage.parentFile!!.absolutePath)} &&
             cp -f ${shellQuote(file.absolutePath)} ${shellQuote(stage.absolutePath)} &&
             chmod 0644 ${shellQuote(stage.absolutePath)}
         """.trimIndent()
-        return privilegedResult(command) { stage }
+        return privilegedResult(command) { stage }.onFailure { stage.delete() }
     }
 
     suspend fun saveUtf8WithBackup(file: File, text: String): Result<File?> {

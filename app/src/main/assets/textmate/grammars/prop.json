@@ -1,0 +1,22 @@
+{
+  "name": "prop",
+  "scopeName": "source.prop",
+  "patterns": [
+    {
+      "match": "^\\s*[#!].*$",
+      "name": "comment.line.properties"
+    },
+    {
+      "match": "^\\s*(?:\\\\.|[^\\s:=\\\\])+",
+      "name": "variable.other.key.properties"
+    },
+    {
+      "match": "\\\\(?:u[\\da-fA-F]{4}|.)",
+      "name": "constant.character.escape.properties"
+    },
+    {
+      "match": "[:=]",
+      "name": "keyword.operator.properties"
+    }
+  ]
+}

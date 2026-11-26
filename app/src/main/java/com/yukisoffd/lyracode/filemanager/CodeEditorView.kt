@@ -18,6 +18,10 @@ import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolve
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.util.regex.RegexBackrefGrammar
+import android.widget.Toast
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import org.eclipse.tm4e.core.registry.IThemeSource
 import java.io.File
@@ -245,6 +249,8 @@ internal class EditorHandle {
 internal fun SoraCodeEditor(
     file: File,
     initialText: String,
+    languages: EditorLanguages,
+    language: EditorLanguage?,
     wordWrap: Boolean,
     readOnly: Boolean,
     darkTheme: Boolean,
@@ -253,7 +259,7 @@ internal fun SoraCodeEditor(
 ) {
     val contextHolder = androidx.compose.ui.platform.LocalContext.current
     val codeEditor = remember(file.absolutePath) {
-        CodeEditorThemeRegistry.ensure(file, contextHolder)
+        CodeEditorThemeRegistry.ensure(contextHolder)
         CodeEditor(contextHolder).apply {
             typefaceText = Typeface.MONOSPACE
             setTextSize(15f)
@@ -261,12 +267,22 @@ internal fun SoraCodeEditor(
             isWordwrap = wordWrap
             isEditable = !readOnly
             setText(initialText)
-            CodeEditorThemeRegistry.apply(this, file, darkTheme)
         }.also { handle.editor = it }
     }
     LaunchedEffect(wordWrap) { codeEditor.isWordwrap = wordWrap }
     LaunchedEffect(readOnly) { codeEditor.isEditable = !readOnly }
-    LaunchedEffect(darkTheme) { CodeEditorThemeRegistry.apply(codeEditor, file, darkTheme) }
+    LaunchedEffect(codeEditor, darkTheme) { CodeEditorThemeRegistry.applyTheme(codeEditor, darkTheme) }
+    LaunchedEffect(codeEditor, language) {
+        try {
+            if (language != null) withContext(Dispatchers.Default) { languages.load(language) }
+            codeEditor.setEditorLanguage(language?.let { TextMateLanguage.create(it.scope, true) })
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            codeEditor.setEditorLanguage(null)
+            Toast.makeText(contextHolder, error.localizedMessage, Toast.LENGTH_LONG).show()
+        }
+    }
     AndroidView(
         factory = { codeEditor },
         modifier = modifier.fillMaxSize(),
@@ -281,8 +297,8 @@ private object CodeEditorThemeRegistry {
     @Volatile private var initialized = false
 
     @Synchronized
-    fun ensure(file: File, context: Context?) {
-        if (initialized || context == null) return
+    fun ensure(context: Context) {
+        if (initialized) return
         FileProviderRegistry.getInstance().addFileProvider(AssetsFileResolver(context.applicationContext.assets))
         val registry = ThemeRegistry.getInstance()
         listOf("darcula" to true, "quietlight" to false).forEach { (name, dark) ->
@@ -298,28 +314,13 @@ private object CodeEditorThemeRegistry {
                 ).apply { isDark = dark },
             )
         }
-        GrammarRegistry.getInstance().loadGrammars("textmate/languages.json")
+        GrammarRegistry.getInstance()
         initialized = true
     }
 
-    fun apply(editor: CodeEditor, file: File, dark: Boolean) {
+    fun applyTheme(editor: CodeEditor, dark: Boolean) {
         if (!initialized) return
         ThemeRegistry.getInstance().setTheme(if (dark) "darcula" else "quietlight")
         editor.colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
-        scopeFor(file)?.let { scope ->
-            runCatching { editor.setEditorLanguage(TextMateLanguage.create(scope, true)) }
-        }
-    }
-
-    private fun scopeFor(file: File): String? = when (file.extension.lowercase()) {
-        "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "swift" -> "source.java"
-        "kt", "kts" -> "source.kotlin"
-        "py", "pyw" -> "source.python"
-        "js", "mjs", "cjs", "ts", "tsx", "jsx", "json" -> "source.js"
-        "html", "htm", "vue", "svelte", "php" -> "text.html.basic"
-        "xml", "svg", "xhtml", "plist" -> "text.xml"
-        "md", "markdown" -> "text.html.markdown"
-        "lua" -> "source.lua"
-        else -> null
     }
 }

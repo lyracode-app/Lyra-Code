@@ -7,6 +7,34 @@
   "version": "https://github.com/atom/language-java/commit/29f977dc42a7e2568b39bb6fb34c4ef108eb59b3",
   "name": "Java",
   "scopeName": "source.java",
+  "injections": {
+    "L:source.java -comment -string": {
+      "patterns": [
+        {
+          "match": "\\b(fun)\\s+([\\w]+)(?=\\s*\\()",
+          "captures": {
+            "1": {
+              "name": "keyword.other.kotlin"
+            },
+            "2": {
+              "name": "entity.name.function.kotlin"
+            }
+          }
+        },
+        {
+          "match": "\\b(val|var)\\s+([\\w]+)(?=\\s*[:=])",
+          "captures": {
+            "1": {
+              "name": "storage.type.kotlin"
+            },
+            "2": {
+              "name": "variable.other.kotlin"
+            }
+          }
+        }
+      ]
+    }
+  },
   "patterns": [
     {
       "begin": "\\b(package)\\b",

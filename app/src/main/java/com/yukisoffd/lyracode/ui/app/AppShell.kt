@@ -465,7 +465,7 @@ internal fun LyraCodeApp(
         drawerState = drawerState,
         gesturesEnabled = safeSelectedPage != PAGE_FILES,
         drawerContent = {
-            ModalDrawerSheet(
+            if (safeSelectedPage != PAGE_FILES) ModalDrawerSheet(
                 modifier = Modifier.fillMaxWidth(0.86f),
                 drawerContainerColor = MaterialTheme.colorScheme.background,
             ) {

@@ -4,59 +4,639 @@
       "grammar": "textmate/java/syntaxes/java.tmLanguage.json",
       "name": "java",
       "scopeName": "source.java",
-      "languageConfiguration": "textmate/java/language-configuration.json"
+      "languageConfiguration": "textmate/java/language-configuration.json",
+      "label": "Java",
+      "extensions": [
+        "java"
+      ]
     },
     {
       "grammar": "textmate/kotlin/syntaxes/Kotlin.tmLanguage",
       "name": "kotlin",
       "scopeName": "source.kotlin",
-      "languageConfiguration": "textmate/kotlin/language-configuration.json"
+      "languageConfiguration": "textmate/kotlin/language-configuration.json",
+      "label": "Kotlin",
+      "extensions": [
+        "kt",
+        "kts"
+      ]
     },
     {
       "grammar": "textmate/python/syntaxes/python.tmLanguage.json",
       "name": "python",
       "scopeName": "source.python",
-      "languageConfiguration": "textmate/python/language-configuration.json"
+      "languageConfiguration": "textmate/python/language-configuration.json",
+      "label": "Python",
+      "extensions": [
+        "py",
+        "pyw",
+        "pyi"
+      ]
     },
     {
       "grammar": "textmate/lua/syntaxes/lua.tmLanguage.json",
       "name": "lua",
       "scopeName": "source.lua",
-      "languageConfiguration": "textmate/lua/language-configuration.json"
+      "languageConfiguration": "textmate/lua/language-configuration.json",
+      "label": "Lua",
+      "extensions": [
+        "lua"
+      ],
+      "dependencies": [
+        "c"
+      ]
     },
     {
       "grammar": "textmate/xml/syntaxes/xml.tmLanguage.json",
       "name": "xml",
       "scopeName": "text.xml",
-      "languageConfiguration": "textmate/xml/language-configuration.json"
+      "languageConfiguration": "textmate/xml/language-configuration.json",
+      "label": "XML",
+      "extensions": [
+        "xml",
+        "plist",
+        "xhtml",
+        "xsd",
+        "xsl"
+      ],
+      "dependencies": [
+        "java"
+      ]
     },
     {
       "grammar": "textmate/html/syntaxes/html.tmLanguage.json",
       "name": "html",
       "scopeName": "text.html.basic",
       "languageConfiguration": "textmate/html/language-configuration.json",
-      "embeddedLanguages": {
-        "source.js": "javascript"
-      }
+      "label": "HTML",
+      "extensions": [
+        "html",
+        "htm"
+      ],
+      "dependencies": [
+        "css",
+        "javascript"
+      ]
     },
     {
       "grammar": "textmate/javascript/syntaxes/JavaScript.tmLanguage.json",
       "name": "javascript",
       "scopeName": "source.js",
-      "languageConfiguration": "textmate/javascript/language-configuration.json"
+      "languageConfiguration": "textmate/javascript/language-configuration.json",
+      "label": "JavaScript",
+      "extensions": [
+        "js",
+        "mjs",
+        "cjs"
+      ]
     },
     {
       "name": "markdown",
       "scopeName": "text.html.markdown",
       "grammar": "textmate/markdown/syntaxes/markdown.tmLanguage.json",
       "languageConfiguration": "textmate/markdown/language-configuration.json",
-      "embeddedLanguages": {
-        "meta.embedded.block.html": "html",
-        "source.js": "javascript",
-        "meta.embedded.block.java": "java",
-        "meta.embedded.block.xml": "xml",
-        "meta.embedded.block.python": "python"
-      }
+      "label": "Markdown",
+      "extensions": [
+        "md",
+        "markdown",
+        "mdown"
+      ],
+      "dependencies": [
+        "bat",
+        "c",
+        "cpp",
+        "csharp",
+        "css",
+        "dart",
+        "go",
+        "groovy",
+        "html",
+        "html-derivative",
+        "java",
+        "javascript",
+        "json",
+        "latex",
+        "lua",
+        "php",
+        "powershell",
+        "python",
+        "regexp",
+        "ruby",
+        "rust",
+        "shellscript",
+        "sql",
+        "swift",
+        "tsx",
+        "typescript",
+        "vb",
+        "xml",
+        "yaml"
+      ]
+    },
+    {
+      "name": "asm",
+      "scopeName": "source.asm.x86_64",
+      "grammar": "textmate/grammars/asm.json",
+      "label": "Asm",
+      "extensions": [
+        "asm",
+        "s",
+        "nasm"
+      ]
+    },
+    {
+      "name": "bat",
+      "scopeName": "source.batchfile",
+      "grammar": "textmate/grammars/bat.json",
+      "label": "Batch",
+      "extensions": [
+        "bat",
+        "cmd"
+      ]
+    },
+    {
+      "name": "c",
+      "scopeName": "source.c",
+      "grammar": "textmate/grammars/c.json",
+      "label": "C",
+      "extensions": [
+        "c",
+        "h"
+      ]
+    },
+    {
+      "name": "csharp",
+      "scopeName": "source.cs",
+      "grammar": "textmate/grammars/csharp.json",
+      "label": "C#",
+      "extensions": [
+        "cs",
+        "csx"
+      ]
+    },
+    {
+      "name": "cpp",
+      "scopeName": "source.cpp",
+      "grammar": "textmate/grammars/cpp.json",
+      "label": "C++",
+      "extensions": [
+        "cpp",
+        "cxx",
+        "cc",
+        "c++",
+        "hpp",
+        "hxx",
+        "hh",
+        "inl"
+      ],
+      "dependencies": [
+        "cpp-macro",
+        "glsl",
+        "regexp"
+      ]
+    },
+    {
+      "name": "css",
+      "scopeName": "source.css",
+      "grammar": "textmate/grammars/css.json",
+      "label": "CSS",
+      "extensions": [
+        "css"
+      ]
+    },
+    {
+      "name": "csv",
+      "scopeName": "text.csv",
+      "grammar": "textmate/grammars/csv.json",
+      "label": "CSV",
+      "extensions": [
+        "csv"
+      ]
+    },
+    {
+      "name": "dart",
+      "scopeName": "source.dart",
+      "grammar": "textmate/grammars/dart.json",
+      "label": "Dart",
+      "extensions": [
+        "dart"
+      ]
+    },
+    {
+      "name": "gdscript",
+      "scopeName": "source.gdscript",
+      "grammar": "textmate/grammars/gdscript.json",
+      "label": "GDScript",
+      "extensions": [
+        "gd"
+      ]
+    },
+    {
+      "name": "glsl",
+      "scopeName": "source.glsl",
+      "grammar": "textmate/grammars/glsl.json",
+      "label": "GLSL",
+      "extensions": [
+        "glsl",
+        "vert",
+        "frag",
+        "geom",
+        "tesc",
+        "tese",
+        "comp"
+      ],
+      "dependencies": [
+        "c"
+      ]
+    },
+    {
+      "name": "go",
+      "scopeName": "source.go",
+      "grammar": "textmate/grammars/go.json",
+      "label": "Go",
+      "extensions": [
+        "go"
+      ]
+    },
+    {
+      "name": "groovy",
+      "scopeName": "source.groovy",
+      "grammar": "textmate/grammars/groovy.json",
+      "label": "Groovy",
+      "extensions": [
+        "groovy",
+        "gradle",
+        "gvy"
+      ]
+    },
+    {
+      "name": "hlsl",
+      "scopeName": "source.hlsl",
+      "grammar": "textmate/grammars/hlsl.json",
+      "label": "HLSL",
+      "extensions": [
+        "hlsl",
+        "hlsli",
+        "fx"
+      ]
+    },
+    {
+      "name": "json",
+      "scopeName": "source.json",
+      "grammar": "textmate/grammars/json.json",
+      "label": "JSON",
+      "extensions": [
+        "json"
+      ]
+    },
+    {
+      "name": "jsx",
+      "scopeName": "source.js.jsx",
+      "grammar": "textmate/grammars/jsx.json",
+      "label": "JSX",
+      "extensions": [
+        "jsx"
+      ]
+    },
+    {
+      "name": "latex",
+      "scopeName": "text.tex.latex",
+      "grammar": "textmate/grammars/latex.json",
+      "label": "LaTeX",
+      "extensions": [
+        "tex",
+        "latex",
+        "sty",
+        "cls"
+      ],
+      "dependencies": [
+        "css",
+        "html",
+        "java",
+        "javascript",
+        "lua",
+        "python",
+        "ruby",
+        "rust",
+        "shellscript",
+        "tex",
+        "typescript",
+        "xml",
+        "yaml"
+      ]
+    },
+    {
+      "name": "nix",
+      "scopeName": "source.nix",
+      "grammar": "textmate/grammars/nix.json",
+      "label": "Nix",
+      "extensions": [
+        "nix"
+      ]
+    },
+    {
+      "name": "powershell",
+      "scopeName": "source.powershell",
+      "grammar": "textmate/grammars/powershell.json",
+      "label": "PowerShell",
+      "extensions": [
+        "ps1",
+        "psm1",
+        "psd1"
+      ]
+    },
+    {
+      "name": "ruby",
+      "scopeName": "source.ruby",
+      "grammar": "textmate/grammars/ruby.json",
+      "label": "Ruby",
+      "extensions": [
+        "rb",
+        "rake",
+        "gemspec"
+      ],
+      "dependencies": [
+        "c",
+        "cpp",
+        "css",
+        "html",
+        "javascript",
+        "lua",
+        "shellscript",
+        "sql",
+        "xml",
+        "yaml"
+      ]
+    },
+    {
+      "name": "rust",
+      "scopeName": "source.rust",
+      "grammar": "textmate/grammars/rust.json",
+      "label": "Rust",
+      "extensions": [
+        "rs"
+      ]
+    },
+    {
+      "name": "sql",
+      "scopeName": "source.sql",
+      "grammar": "textmate/grammars/sql.json",
+      "label": "SQL",
+      "extensions": [
+        "sql"
+      ]
+    },
+    {
+      "name": "shellscript",
+      "scopeName": "source.shell",
+      "grammar": "textmate/grammars/shellscript.json",
+      "label": "Shell",
+      "extensions": [
+        "sh",
+        "bash",
+        "zsh",
+        "ksh"
+      ]
+    },
+    {
+      "name": "svelte",
+      "scopeName": "source.svelte",
+      "grammar": "textmate/grammars/svelte.json",
+      "label": "Svelte",
+      "extensions": [
+        "svelte"
+      ],
+      "dependencies": [
+        "css",
+        "javascript",
+        "markdown",
+        "typescript"
+      ]
+    },
+    {
+      "name": "swift",
+      "scopeName": "source.swift",
+      "grammar": "textmate/grammars/swift.json",
+      "label": "Swift",
+      "extensions": [
+        "swift"
+      ]
+    },
+    {
+      "name": "toml",
+      "scopeName": "source.toml",
+      "grammar": "textmate/grammars/toml.json",
+      "label": "TOML",
+      "extensions": [
+        "toml"
+      ]
+    },
+    {
+      "name": "typescript",
+      "scopeName": "source.ts",
+      "grammar": "textmate/grammars/typescript.json",
+      "label": "TypeScript",
+      "extensions": [
+        "ts",
+        "mts",
+        "cts"
+      ]
+    },
+    {
+      "name": "tsx",
+      "scopeName": "source.tsx",
+      "grammar": "textmate/grammars/tsx.json",
+      "label": "TSX",
+      "extensions": [
+        "tsx"
+      ]
+    },
+    {
+      "name": "vb",
+      "scopeName": "source.asp.vb.net",
+      "grammar": "textmate/grammars/vb.json",
+      "label": "Visual Basic",
+      "extensions": [
+        "vb",
+        "vbs",
+        "bas"
+      ]
+    },
+    {
+      "name": "vue",
+      "scopeName": "text.html.vue",
+      "grammar": "textmate/grammars/vue.json",
+      "label": "Vue",
+      "extensions": [
+        "vue"
+      ],
+      "dependencies": [
+        "css",
+        "html",
+        "html-derivative",
+        "javascript",
+        "json",
+        "jsx",
+        "markdown",
+        "toml",
+        "tsx",
+        "typescript",
+        "yaml"
+      ]
+    },
+    {
+      "name": "yaml",
+      "scopeName": "source.yaml",
+      "grammar": "textmate/grammars/yaml.json",
+      "label": "YAML",
+      "extensions": [
+        "yaml",
+        "yml"
+      ]
+    },
+    {
+      "name": "zig",
+      "scopeName": "source.zig",
+      "grammar": "textmate/grammars/zig.json",
+      "label": "Zig",
+      "extensions": [
+        "zig",
+        "zon"
+      ]
+    },
+    {
+      "name": "php",
+      "scopeName": "source.php",
+      "grammar": "textmate/grammars/php.json",
+      "dependencies": [
+        "css",
+        "html",
+        "javascript",
+        "json",
+        "sql",
+        "xml"
+      ]
+    },
+    {
+      "name": "tex",
+      "scopeName": "text.tex",
+      "grammar": "textmate/grammars/tex.json"
+    },
+    {
+      "name": "cpp-macro",
+      "scopeName": "source.cpp.embedded.macro",
+      "grammar": "textmate/grammars/cpp-macro.json",
+      "dependencies": [
+        "cpp",
+        "glsl",
+        "regexp"
+      ]
+    },
+    {
+      "name": "html-derivative",
+      "scopeName": "text.html.derivative",
+      "grammar": "textmate/grammars/html-derivative.json",
+      "dependencies": [
+        "html"
+      ]
+    },
+    {
+      "name": "regexp",
+      "scopeName": "source.regexp.python",
+      "grammar": "textmate/grammars/regexp.json"
+    },
+    {
+      "name": "cangjie",
+      "scopeName": "source.cangjie",
+      "grammar": "textmate/grammars/cangjie.json",
+      "label": "Cangjie",
+      "extensions": [
+        "cj"
+      ]
+    },
+    {
+      "name": "dts",
+      "scopeName": "source.dts",
+      "grammar": "textmate/grammars/dts.json",
+      "label": "DTS",
+      "extensions": [
+        "dts",
+        "dtsi",
+        "dtso"
+      ]
+    },
+    {
+      "name": "smali",
+      "scopeName": "source.smali",
+      "grammar": "textmate/grammars/smali.json",
+      "label": "Smali",
+      "extensions": [
+        "smali"
+      ]
+    },
+    {
+      "name": "renpy",
+      "scopeName": "source.renpy",
+      "grammar": "textmate/grammars/renpy.json",
+      "label": "Ren’Py",
+      "extensions": [
+        "rpy",
+        "rpym"
+      ],
+      "dependencies": [
+        "regexp",
+        "sql"
+      ]
+    },
+    {
+      "name": "php-html",
+      "scopeName": "text.html.php",
+      "grammar": "textmate/grammars/php-html.json",
+      "label": "PHP",
+      "extensions": [
+        "php",
+        "phtml",
+        "php3",
+        "php4",
+        "php5"
+      ],
+      "dependencies": [
+        "html",
+        "html-derivative",
+        "php"
+      ]
+    },
+    {
+      "name": "prop",
+      "scopeName": "source.prop",
+      "grammar": "textmate/grammars/prop.json",
+      "label": "Prop",
+      "extensions": [
+        "prop",
+        "properties"
+      ]
+    },
+    {
+      "name": "jasm",
+      "scopeName": "source.jasm",
+      "grammar": "textmate/grammars/jasm.json",
+      "label": "Jasm",
+      "extensions": [
+        "jasm"
+      ]
+    },
+    {
+      "name": "svg",
+      "scopeName": "text.xml",
+      "grammar": "textmate/xml/syntaxes/xml.tmLanguage.json",
+      "languageConfiguration": "textmate/xml/language-configuration.json",
+      "label": "SVG",
+      "extensions": [
+        "svg"
+      ],
+      "dependencies": [
+        "java"
+      ]
     }
   ]
 }
