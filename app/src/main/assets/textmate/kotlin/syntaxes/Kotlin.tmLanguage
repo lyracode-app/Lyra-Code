@@ -1057,6 +1057,27 @@
         </array>
       </dict>
     </dict>
+    <key>injections</key>
+    <dict>
+      <key>L:source.kotlin -comment -string</key>
+      <dict>
+        <key>patterns</key>
+        <array>
+          <dict>
+            <key>match</key>
+            <string>\b(static|synchronized|transient|volatile)\b(?=\s+\w)</string>
+            <key>name</key>
+            <string>storage.modifier.java</string>
+          </dict>
+          <dict>
+            <key>match</key>
+            <string>\b(void|boolean|byte|char|short|int|long|float|double)\b(?=\s+[\w$]+\s*[=(;,])</string>
+            <key>name</key>
+            <string>storage.type.primitive.java</string>
+          </dict>
+        </array>
+      </dict>
+    </dict>
     <key>scopeName</key>
     <string>source.kotlin</string>
     <key>uuid</key>

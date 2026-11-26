@@ -2527,6 +2527,12 @@ Shizuku 与 Root：不属于普通运行时权限，由用户在“系统权限�
     <string name="terminal_font_changed">终端字体已更改为 %1$s</string>
     <string name="terminal_paste">粘贴</string>
     <string name="terminal_clear">清空终端</string>
+    <string name="file_share">分享</string>
+    <string name="file_return_chat">返回对话</string>
+    <string name="file_syntax">语法 · %1$s</string>
+    <string name="file_plain_text">纯文本</string>
+    <string name="file_copy_hash">复制 %1$s</string>
+    <string name="file_hash_error">无法计算校验值：%1$s</string>
 </resources>
 
 

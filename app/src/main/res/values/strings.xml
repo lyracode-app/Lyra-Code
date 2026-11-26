@@ -2444,4 +2444,10 @@ Revocation stops new access through that permission but does not automatically e
     <string name="terminal_font_changed">Terminal font changed to %1$s</string>
     <string name="terminal_paste">Paste</string>
     <string name="terminal_clear">Clear terminal</string>
+    <string name="file_share">Share</string>
+    <string name="file_return_chat">Return to chat</string>
+    <string name="file_syntax">Syntax · %1$s</string>
+    <string name="file_plain_text">Plain text</string>
+    <string name="file_copy_hash">Copy %1$s</string>
+    <string name="file_hash_error">Could not calculate checksums: %1$s</string>
 </resources>

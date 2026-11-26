@@ -57,6 +57,7 @@ PRoot is available without installing Termux; the two modes can coexist. PRoot u
 - SVG previews in AI answers: raw inline SVG, `svg` code fences, and SVG data URLs (percent encoded or Base64), with fullscreen viewing and original `.svg` saving. Static images use AndroidSVG; SMIL and CSS animations play through an isolated WebView image renderer. SVG scripts, external resources, and interactive document events are disabled. Static AndroidSVG previews do not support filters or `foreignObject`.
 - AI charts rendered offline in answers: flowcharts, sequence diagrams, Gantt charts, line/bar/pie charts, mind maps, architecture and relationship diagrams, and electrical circuit schematics, with fullscreen viewing and PNG/SVG/source export. See [inline charts](docs/CHARTS.md).
 - Optional Shizuku and Root tools, each independently switchable.
+- Supports forwarding Linux GUI graphics within PRoot to Android pages, which can assist in debugging and developing Linux projects with a GUI.
 
 ### Device interaction
 

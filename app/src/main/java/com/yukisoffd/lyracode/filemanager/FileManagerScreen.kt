@@ -2,8 +2,14 @@
 
 package com.yukisoffd.lyracode.filemanager
 
-import com.yukisoffd.lyracode.widgets.rememberHtmlOpener
 import com.yukisoffd.lyracode.widgets.readPreviewHtml
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import kotlinx.coroutines.CancellationException
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -543,7 +549,7 @@ private fun DualPaneFileManager(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val openHtml = rememberHtmlOpener()
+    val openPreview = rememberFilePreviewOpener()
     val root = LocalFileOperations.storageRoot.absolutePath
     val privateRoot = prootInstances.firstOrNull()?.rootfsDir ?: prootInstancesDirectory
     val initialPath = if (sharedStorageGranted) root else privateRoot.absolutePath
@@ -559,7 +565,7 @@ private fun DualPaneFileManager(
     var action by remember { mutableStateOf<PaneAction?>(null) }
     var deleteTarget by remember { mutableStateOf<PaneAction?>(null) }
     var renameTarget by remember { mutableStateOf<PaneAction?>(null) }
-    var propertiesTarget by remember { mutableStateOf<File?>(null) }
+    var propertiesTarget by remember { mutableStateOf<LocalFileEntry?>(null) }
     var openWithTarget by remember { mutableStateOf<File?>(null) }
     var createFolderPane by remember { mutableStateOf<Int?>(null) }
     var createFilePane by remember { mutableStateOf<Int?>(null) }
@@ -766,7 +772,7 @@ private fun DualPaneFileManager(
 
     action?.let { selected ->
         FileActionDialog(
-            target = selected.file,
+            target = selected.entry,
             onDismiss = { action = null },
             onCopy = {
                 action = null
@@ -778,15 +784,37 @@ private fun DualPaneFileManager(
                 val destination = File(if (selected.pane == 0) rightPath else leftPath)
                 perform { fileOperations.move(selected.file, destination) }
             },
+            onShare = {
+                action = null
+                scope.launch {
+                    try {
+                        val intent = withContext(Dispatchers.IO) {
+                            fileShareIntent(context, selected.file, fileOperations)
+                        }
+                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.file_share)))
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        showError(context, error)
+                    }
+                }
+            },
             onRename = { action = null; renameTarget = selected },
-            onProperties = { action = null; propertiesTarget = selected.file },
+            onProperties = { action = null; propertiesTarget = selected.entry },
             onOpenWith = {
                 action = null
                 openWithTarget = selected.file
             },
-            onPreviewHtml = {
+            onPreview = {
                 action = null
-                openHtml { fileOperations.prepareReadableCopy(selected.file).getOrThrow().inputStream().readPreviewHtml() }
+                openPreview(previewLanguageFor(selected.file)) {
+                    val readable = fileOperations.prepareReadableCopy(selected.file).getOrThrow()
+                    try {
+                        readable.inputStream().readPreviewHtml()
+                    } finally {
+                        if (readable != selected.file) readable.delete()
+                    }
+                }
             },
             onUnzip = {
                 action = null
@@ -890,7 +918,7 @@ private fun DualPaneFileManager(
         )
     }
     propertiesTarget?.let { file ->
-        FilePropertiesDialog(file = file, fileOperations = fileOperations, onDismiss = { propertiesTarget = null })
+        FilePropertiesDialog(entry = file, fileOperations = fileOperations, onDismiss = { propertiesTarget = null })
     }
     openWithTarget?.let { file ->
         OpenWithDialog(
@@ -909,6 +937,7 @@ private fun DualPaneFileManager(
     ) {
         Column(Modifier.fillMaxSize()) {
             FileManagerHeader(
+                onReturnToChat = onExit,
                 activePane = activePane,
                 activePath = activePath,
                 summary = activeSummary,
@@ -1095,6 +1124,7 @@ private data class PaneSummary(
 
 @Composable
 private fun FileManagerHeader(
+    onReturnToChat: () -> Unit,
     activePane: Int,
     activePath: String,
     summary: PaneSummary,
@@ -1151,7 +1181,11 @@ private fun FileManagerHeader(
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
+            IconButton(onClick = onReturnToChat) {
+                Icon(Icons.Default.Chat, contentDescription = context.getString(R.string.file_return_chat))
+            }
             Box {
+                var sortExpanded by remember(menuOpen) { mutableStateOf(false) }
                 IconButton(onClick = { onMenuOpen(true) }) {
                     Icon(Icons.Default.MoreVert, contentDescription = context.getString(R.string.file_manager_menu))
                 }
@@ -1194,28 +1228,29 @@ private fun FileManagerHeader(
                         onClick = onSearchToggle,
                     )
                     HorizontalDivider()
-                    Text(
-                        context.getString(R.string.file_manager_sort_by),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    DropdownMenuItem(
+                        text = { Text(context.getString(R.string.file_manager_sort_by)) },
+                        trailingIcon = { Icon(if (sortExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null) },
+                        onClick = { sortExpanded = !sortExpanded },
                     )
-                    FileSortMode.entries.forEach { mode ->
+                    if (sortExpanded) {
+                        FileSortMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text(context.getString(mode.labelResource())) },
+                                leadingIcon = {
+                                    if (mode == sortMode) Icon(Icons.Default.CheckCircle, contentDescription = null)
+                                },
+                                onClick = { onSortMode(mode) },
+                            )
+                        }
                         DropdownMenuItem(
-                            text = { Text(context.getString(mode.labelResource())) },
-                            leadingIcon = {
-                                if (mode == sortMode) Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            text = {
+                                Text(context.getString(if (sortDescending) R.string.file_manager_sort_descending else R.string.file_manager_sort_ascending))
                             },
-                            onClick = { onSortMode(mode) },
+                            leadingIcon = { Icon(Icons.Default.UnfoldMore, contentDescription = null) },
+                            onClick = onToggleSortDirection,
                         )
                     }
-                    DropdownMenuItem(
-                        text = {
-                            Text(context.getString(if (sortDescending) R.string.file_manager_sort_descending else R.string.file_manager_sort_ascending))
-                        },
-                        leadingIcon = { Icon(Icons.Default.UnfoldMore, contentDescription = null) },
-                        onClick = onToggleSortDirection,
-                    )
                 }
             }
         }
@@ -1295,7 +1330,7 @@ private fun FilePane(
     onActivate: () -> Unit,
     onNavigate: (File) -> Unit,
     onOpenFile: (File) -> Unit,
-    onLongPress: (File) -> Unit,
+    onLongPress: (LocalFileEntry) -> Unit,
     onToggleSelection: (File) -> Unit,
     onCreateFolder: () -> Unit,
     onCreateFile: () -> Unit,
@@ -1390,7 +1425,7 @@ private fun FilePane(
                             },
                             onLongClick = {
                                 onActivate()
-                                if (selectedPaths.isNotEmpty()) onToggleSelection(entry.file) else onLongPress(entry.file)
+                                if (selectedPaths.isNotEmpty()) onToggleSelection(entry.file) else onLongPress(entry)
                             },
                             onSwipe = {
                                 onActivate()
@@ -1654,14 +1689,15 @@ private val presentationExtensions = setOf("ppt", "pptx", "odp")
 
 @Composable
 private fun FileActionDialog(
-    target: File,
+    target: LocalFileEntry,
+    onShare: () -> Unit,
     onDismiss: () -> Unit,
     onCopy: () -> Unit,
     onMove: () -> Unit,
     onRename: () -> Unit,
     onProperties: () -> Unit,
     onOpenWith: () -> Unit,
-    onPreviewHtml: () -> Unit,
+    onPreview: () -> Unit,
     onUnzip: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -1670,18 +1706,19 @@ private fun FileActionDialog(
         onDismissRequest = onDismiss,
         title = { Text(target.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 DialogAction(Icons.Default.ContentCopy, context.getString(R.string.file_action_copy_other), onCopy)
                 DialogAction(Icons.Default.DriveFileMove, context.getString(R.string.file_action_move_other), onMove)
                 DialogAction(Icons.Default.Edit, context.getString(R.string.file_action_rename), onRename)
                 DialogAction(Icons.Default.Info, context.getString(R.string.file_action_properties), onProperties)
-                if (target.isFile) {
+                if (!target.directory) {
+                    DialogAction(Icons.Default.Share, context.getString(R.string.file_share), onShare)
                     DialogAction(Icons.Default.OpenWith, context.getString(R.string.file_action_open_with), onOpenWith)
                 }
-                if (target.isFile && target.extension.lowercase() in setOf("html", "htm")) {
-                    DialogAction(Icons.Default.OpenInBrowser, context.getString(R.string.file_action_preview_html), onPreviewHtml)
+                if (!target.directory && previewLanguageFor(target.file).isNotEmpty()) {
+                    DialogAction(Icons.Default.OpenInBrowser, context.getString(R.string.ui_preview), onPreview)
                 }
-                if (target.isFile && target.extension.equals("zip", true)) {
+                if (!target.directory && target.file.extension.equals("zip", true)) {
                     DialogAction(Icons.Default.UnfoldMore, context.getString(R.string.file_action_unzip), onUnzip)
                 }
                 DialogAction(Icons.Default.Delete, context.getString(R.string.file_action_delete), onDelete, destructive = true)
@@ -1771,16 +1808,17 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
 
 @Composable
 private fun FilePropertiesDialog(
-    file: File,
+    entry: LocalFileEntry,
     fileOperations: PrivilegedFileOperations,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var totalSize by remember(file.absolutePath, file.lastModified()) {
-        mutableStateOf<Long?>(if (file.isFile) file.length() else null)
+    val file = entry.file
+    var totalSize by remember(entry) {
+        mutableStateOf<Long?>(if (!entry.directory) entry.size else null)
     }
-    LaunchedEffect(file.absolutePath, file.lastModified()) {
-        if (file.isDirectory) {
+    LaunchedEffect(entry) {
+        if (entry.directory) {
             totalSize = withContext(Dispatchers.IO) {
                 fileOperations.totalSize(file).getOrElse { file.length() }
             }
@@ -1795,7 +1833,7 @@ private fun FilePropertiesDialog(
         onDismissRequest = onDismiss,
         title = { Text(context.getString(R.string.file_properties_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -1813,14 +1851,15 @@ private fun FilePropertiesDialog(
                     Spacer(Modifier.width(8.dp))
                     Icon(Icons.Default.ContentCopy, contentDescription = context.getString(R.string.file_property_copy_path))
                 }
-                Text(context.getString(R.string.file_property_type, context.getString(if (file.isDirectory) R.string.file_type_folder else R.string.file_type_file)))
+                Text(context.getString(R.string.file_property_type, context.getString(if (entry.directory) R.string.file_type_folder else R.string.file_type_file)))
                 Text(
                     context.getString(
                         R.string.file_property_size,
                         totalSize?.let(::formatBytes) ?: context.getString(R.string.file_property_calculating_size),
                     ),
                 )
-                Text(context.getString(R.string.file_property_modified, DateFormat.getDateTimeInstance().format(file.lastModified())))
+                if (!entry.directory) FileChecksums(entry, fileOperations)
+                Text(context.getString(R.string.file_property_modified, DateFormat.getDateTimeInstance().format(entry.modifiedAt)))
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(context.getString(android.R.string.ok)) } },
@@ -1839,7 +1878,30 @@ private fun FileEditorScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val openHtml = rememberHtmlOpener()
+    val openPreview = rememberFilePreviewOpener()
+    val languages = remember { EditorLanguages(context.assets) }
+    var syntax by rememberSaveable(file.absolutePath) { mutableStateOf(languages.forFile(file)?.id) }
+    var syntaxDialog by remember { mutableStateOf(false) }
+    val language = languages.byId[syntax]
+    val syntaxLabel = language?.label ?: context.getString(R.string.file_plain_text)
+    if (syntaxDialog) {
+        AlertDialog(
+            onDismissRequest = { syntaxDialog = false },
+            title = { Text(context.getString(R.string.file_syntax, syntaxLabel)) },
+            text = {
+                LazyColumn {
+                    items(listOf(null) + languages.choices) { choice ->
+                        DropdownMenuItem(
+                            text = { Text(choice?.label ?: context.getString(R.string.file_plain_text)) },
+                            trailingIcon = { if (choice?.id == syntax) Icon(Icons.Default.CheckCircle, null) },
+                            onClick = { syntax = choice?.id; syntaxDialog = false },
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { syntaxDialog = false }) { Text(context.getString(android.R.string.cancel)) } },
+        )
+    }
     val handle = remember(file.absolutePath) { EditorHandle() }
     var original by remember(file.absolutePath) { mutableStateOf(loaded.text) }
     var wordWrap by rememberSaveable(file.absolutePath) { mutableStateOf(true) }
@@ -2086,12 +2148,12 @@ private fun FileEditorScreen(
             ) {
                 IconButton(onClick = ::requestClose) { Icon(Icons.Default.ArrowBack, contentDescription = null) }
                 Spacer(Modifier.weight(1f))
-                if (file.extension.lowercase() in setOf("html", "htm")) {
+                if (syntax in setOf("html", "svg", "markdown", "latex")) {
                     IconButton(onClick = {
                         val snapshot = handle.text()
-                        openHtml { snapshot }
+                        openPreview(syntax.orEmpty()) { snapshot }
                     }) {
-                        Icon(Icons.Default.OpenInBrowser, contentDescription = context.getString(R.string.file_action_preview_html))
+                        Icon(Icons.Default.OpenInBrowser, contentDescription = context.getString(R.string.ui_preview))
                     }
                 }
                 IconButton(onClick = handle::undo) { Icon(Icons.Default.Undo, contentDescription = null) }
@@ -2100,6 +2162,10 @@ private fun FileEditorScreen(
                 Box {
                     IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, contentDescription = null) }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(context.getString(R.string.file_syntax, syntaxLabel)) },
+                            onClick = { menuOpen = false; syntaxDialog = true },
+                        )
                         DropdownMenuItem(
                             text = { Text(context.getString(R.string.file_editor_search)) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -2345,6 +2411,8 @@ private fun FileEditorScreen(
             SoraCodeEditor(
                 file = file,
                 initialText = loaded.text,
+                languages = languages,
+                language = language,
                 wordWrap = wordWrap,
                 readOnly = readOnly,
                 darkTheme = darkTheme,
@@ -2435,7 +2503,9 @@ private fun FileEditorScreen(
     }
 }
 
-private data class PaneAction(val pane: Int, val file: File)
+private data class PaneAction(val pane: Int, val entry: LocalFileEntry) {
+    val file get() = entry.file
+}
 
 private data class BatchSelection(val pane: Int, val files: List<File>)
 
