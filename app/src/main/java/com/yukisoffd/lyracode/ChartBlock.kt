@@ -82,7 +82,6 @@ import java.io.ByteArrayInputStream
 private class ChartRenderState {
     var ready by mutableStateOf(false)
     var error by mutableStateOf("")
-    var height by mutableStateOf(240.dp)
     var view: WebView? = null
     var pendingFormat by mutableStateOf<String?>(null)
 }
@@ -219,14 +218,15 @@ private fun ChartPreview(
     document: ChartDocument, dark: Boolean, state: ChartRenderState,
     onSave: (String, ByteArray) -> Unit, modifier: Modifier = Modifier, fullscreen: Boolean = false,
 ) {
+    var heightDp by androidx.compose.runtime.saveable.rememberSaveable(document, dark, fullscreen) { mutableStateOf(240f) }
     val save by rememberUpdatedState(onSave)
     val navigationSwipeGuard = LocalNavigationSwipeGuard.current
-    Box(modifier = modifier.then(if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(state.height))
+    Box(modifier = modifier.then(if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(heightDp.dp))
         .blockNavigationRevealOnTouch(navigationSwipeGuard)) {
         key(state) {
             AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                 createChartWebView(context, document, dark, fullscreen,
-                    onReady = { height -> state.ready = true; state.height = height.dp; state.error = "" },
+                    onReady = { height -> state.ready = true; heightDp = height; state.error = "" },
                     onError = { error -> state.error = error; state.ready = false },
                     onExport = { format, bytes ->
                         if (format == state.pendingFormat) { state.pendingFormat = null; save(format, bytes) }

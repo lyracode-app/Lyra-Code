@@ -1,5 +1,7 @@
 package com.yukisoffd.lyracode
 
+import com.yukisoffd.lyracode.widgets.WidgetHost
+import com.yukisoffd.lyracode.widgets.WidgetAnswer
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -260,7 +262,6 @@ internal fun chatRenderItems(
 @Composable
 internal fun AgentProcessSummary(
     messages: List<ChatRecord>,
-    selectionResetKey: Int,
     active: Boolean = false,
     streamingAnimationMode: String = AppSettings.STREAMING_ANIMATION_TYPEWRITER,
     startedAtOverride: Long? = null,
@@ -321,7 +322,6 @@ internal fun AgentProcessSummary(
                         key(sourceMessageId(message.id)) {
                             MessageCard(
                                 message = message,
-                                selectionResetKey = selectionResetKey,
                                 inProcessRecord = true,
                                 inlineToolDetails = inlineToolDetails,
                                 streamingAnimationMode = streamingAnimationMode,
@@ -910,13 +910,13 @@ internal fun formatTokensPerSecond(value: Double): String {
 @OptIn(ExperimentalFoundationApi::class)
 internal fun MessageCard(
     message: ChatRecord,
-    selectionResetKey: Int = 0,
     inProcessRecord: Boolean = false,
     streamingAnimationMode: String = AppSettings.STREAMING_ANIMATION_TYPEWRITER,
     isStreaming: Boolean = false,
     inlineToolDetails: Boolean = false,
     onEditAndRegenerate: ((Long, String) -> Unit)? = null,
     onCreateBranch: ((Long) -> Unit)? = null,
+    widgetHost: WidgetHost? = null,
 ) {
     val visibleContent = displayMessageContent(message)
     val mediaPreviews = remember(message.content) { uploadedMediaPreviews(message.content) }
@@ -935,7 +935,7 @@ internal fun MessageCard(
     var showThinking by rememberSaveable(sourceMessageId(message.id)) { mutableStateOf(false) }
     var showToolResult by rememberSaveable(message.id) { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
-    var localSelectionResetKey by rememberSaveable(message.id) { mutableStateOf(0) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var editDialogOpen by rememberSaveable(message.id) { mutableStateOf(false) }
     var editText by rememberSaveable(message.id) { mutableStateOf(message.content) }
     val isUser = message.role == "user"
@@ -993,16 +993,14 @@ internal fun MessageCard(
                         Modifier
                             .widthIn(max = 320.dp)
                             .combinedClickable(
-                                onClick = { localSelectionResetKey++ },
+                                onClick = { focusManager.clearFocus() },
                                 onLongClick = {
                                     editText = message.content
                                     menuExpanded = true
                                 },
                             )
                     } else {
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { localSelectionResetKey++ }
+                        Modifier.fillMaxWidth()
                     }
                     Card(
                         colors = CardDefaults.cardColors(containerColor = container),
@@ -1042,16 +1040,14 @@ internal fun MessageCard(
                                     onClick = { showThinking = !showThinking },
                                 )
                                 AnimatedVisibility(showThinking) {
-                                    key(selectionResetKey) {
-                                        SelectionContainer {
-                                            StreamingThinkingContent(
-                                                content = message.thinking,
-                                                isStreaming = isStreaming,
-                                                mode = streamingAnimationMode,
-                                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                                color = contentColor,
-                                            )
-                                        }
+                                    SelectionContainer {
+                                        StreamingThinkingContent(
+                                            content = message.thinking,
+                                            isStreaming = isStreaming,
+                                            mode = streamingAnimationMode,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            color = contentColor,
+                                        )
                                     }
                                 }
                             }
@@ -1067,15 +1063,15 @@ internal fun MessageCard(
                                 )
                             } else {
                                 if (visibleContent.isNotBlank()) {
-                                    key(selectionResetKey) {
-                                        if (isUser) {
-                                            Text(visibleContent, color = contentColor, style = MaterialTheme.typography.bodyLarge)
-                                        } else {
-                                            key(localSelectionResetKey) {
-                                                SelectionContainer {
+                                    if (isUser) {
+                                        Text(visibleContent, color = contentColor, style = MaterialTheme.typography.bodyLarge)
+                                    } else {
+                                        SelectionContainer {
+                                            if (widgetHost != null && message.role == "assistant" && !inProcessRecord) {
+                                                WidgetAnswer(widgetHost, message.id) {
                                                     StreamingAssistantContent(visibleContent, isStreaming, streamingAnimationMode)
                                                 }
-                                            }
+                                            } else StreamingAssistantContent(visibleContent, isStreaming, streamingAnimationMode)
                                         }
                                     }
                                     if (message.role == "assistant" && !inProcessRecord) {
@@ -1227,6 +1223,7 @@ internal fun StreamingAssistantContent(
         modifier = if (smoothHeight) Modifier.smoothStreamingHeight() else Modifier,
         style = style.copy(color = textColor),
         streamingFade = frame.fade,
+        isStreaming = isStreaming,
     )
 }
 

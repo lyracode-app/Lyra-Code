@@ -1,5 +1,6 @@
 package com.yukisoffd.lyracode
 
+import com.yukisoffd.lyracode.widgets.WidgetHost
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -242,7 +243,8 @@ internal fun ChatScreen(
     var attachmentMenuSearch by rememberSaveable { mutableStateOf("") }
     var contextInfoOpen by rememberSaveable { mutableStateOf(false) }
     var cropUploadUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-    var selectionResetKey by remember { mutableIntStateOf(0) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val previewPins = remember(controller.activeConversationId.value) { RichPreviewPins() }
     var selectedWorkspaceFiles by remember { mutableStateOf<List<WorkspaceFileReference>>(emptyList()) }
     var workspaceFileMatches by remember { mutableStateOf<List<WorkspaceFileReference>>(emptyList()) }
     var workspaceFileSearchLoading by remember { mutableStateOf(false) }
@@ -370,7 +372,16 @@ internal fun ChatScreen(
         delay(2600L)
         if (navigationRevealToken == token) navigationVisible = false
     }
-    val isInterrupted = controller.activeConversation()?.status == ConversationStore.STATUS_INTERRUPTED
+    val conversation = controller.activeConversation()
+    val widgetHost = remember(conversation?.id, conversation?.workspaceUri, controller) {
+        conversation?.let { chat ->
+            WidgetHost(
+                readFile = { controller.readHtmlPreview(chat.workspaceUri, it) },
+                repair = { controller.requestWidgetRepair(chat.id, it) },
+            )
+        }
+    }
+    val isInterrupted = conversation?.status == ConversationStore.STATUS_INTERRUPTED
     val showInterruptedAction = showContinueConversation(isInterrupted, runActiveForComposer, messageSnapshot.isNotEmpty())
     // This is the declarative index of the final anchor, independent of the
     // previous LazyColumn measurement kept in listState.layoutInfo.
@@ -578,10 +589,10 @@ internal fun ChatScreen(
                 .clickable(
                     interactionSource = blankTapInteraction,
                     indication = null,
-                    onClick = { selectionResetKey++ },
+                    onClick = { focusManager.clearFocus() },
                 ),
         ) {
-            CompositionLocalProvider(LocalNavigationSwipeGuard provides navigationSwipeGuard) {
+            CompositionLocalProvider(LocalNavigationSwipeGuard provides navigationSwipeGuard, LocalRichPreviewPins provides previewPins) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -615,7 +626,6 @@ internal fun ChatScreen(
                     if (item.process.isNotEmpty()) {
                         AgentProcessSummary(
                             messages = item.process,
-                            selectionResetKey = selectionResetKey,
                             active = item.key == activeProcessKey,
                             streamingAnimationMode = settings.streamingAnimationMode,
                             startedAtOverride = item.processStartedAt,
@@ -624,7 +634,7 @@ internal fun ChatScreen(
                     } else if (item.message != null) {
                         MessageCard(
                             message = item.message,
-                            selectionResetKey = selectionResetKey,
+                            widgetHost = widgetHost,
                             streamingAnimationMode = settings.streamingAnimationMode,
                             isStreaming = isRunning && item.message.id == messageSnapshot.lastOrNull { it.role == "assistant" }?.id,
                             onEditAndRegenerate = controller::editAndRegenerateUserMessage,

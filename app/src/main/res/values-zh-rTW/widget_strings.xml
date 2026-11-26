@@ -1,0 +1,6 @@
+<resources>
+    <string name="widget_title">互動元件</string>
+    <string name="widget_waiting">正在準備預覽…</string>
+    <string name="widget_repair">請 AI 修復</string>
+    <string name="widget_tool_description">在離線 WebView 中試執行互動網頁，將啟動錯誤傳回給 AI。</string>
+</resources>

@@ -1,5 +1,9 @@
 package com.yukisoffd.lyracode
 
+import com.yukisoffd.lyracode.widgets.HTML_FILE_FENCE
+import com.yukisoffd.lyracode.widgets.InteractiveFence
+import com.yukisoffd.lyracode.widgets.LocalWidgetHost
+import com.yukisoffd.lyracode.widgets.WIDGET_FENCE
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Rect
@@ -125,7 +129,6 @@ private val richMarkdownParser by lazy {
 private val inlineLatexRegex = Regex("\\\\\\((.+?)\\\\\\)")
 private val blockLatexRegex = Regex("\\\\\\[(.+?)\\\\\\]", RegexOption.DOT_MATCHES_ALL)
 private val displayLatexRegex = Regex("""\$\$([\s\S]+?)\$\$""")
-private val codeBlockRegex = Regex("```[\\s\\S]*?```|`[^`\n]*`", RegexOption.DOT_MATCHES_ALL)
 private const val latexDrawablePaddingPx = 2
 
 internal data class StreamingTextFade(
@@ -147,6 +150,7 @@ internal data class StreamingTextFade(
     }
 }
 
+private val LocalAnswerStreaming = staticCompositionLocalOf { false }
 private val LocalStreamingTextFade = staticCompositionLocalOf<StreamingTextFade?> { null }
 
 private data class RichMarkdownParseResult(
@@ -161,6 +165,7 @@ internal fun RichMarkdownContent(
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
     streamingFade: StreamingTextFade? = null,
+    isStreaming: Boolean = false,
 ) {
     // Keep the rendered tree alive while new chunks are parsed. Re-keying this
     // state with every chunk rebuilt the whole Markdown subtree synchronously,
@@ -176,7 +181,7 @@ internal fun RichMarkdownContent(
             .collect { data = it }
     }
 
-    CompositionLocalProvider(LocalStreamingTextFade provides streamingFade) {
+    CompositionLocalProvider(LocalStreamingTextFade provides streamingFade, LocalAnswerStreaming provides isStreaming) {
         ProvideTextStyle(style) {
             Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 data.root.children.fastForEach { child ->
@@ -197,7 +202,18 @@ private fun parseRichMarkdown(content: String, fallback: Boolean = false): RichM
 
 private fun preProcessMarkdownLatex(content: String): String {
     val normalizedContent = normalizeMarkdownTableBoundaries(content)
-    val codeRanges = codeBlockRegex.findAll(normalizedContent).map { it.range }.toList()
+    if ("$$" !in normalizedContent && "\\(" !in normalizedContent && "\\[" !in normalizedContent) return normalizedContent
+    if ('`' !in normalizedContent && '~' !in normalizedContent) return preProcessMarkdownLatexChunk(normalizedContent)
+    // Preserve literal JS, including template strings and TeX, inside either kind of Markdown fence.
+    val codeRanges = mutableListOf<IntRange>()
+    fun collectCode(node: ASTNode) {
+        when (node.type) {
+            MarkdownElementTypes.CODE_FENCE, MarkdownElementTypes.CODE_BLOCK, MarkdownElementTypes.CODE_SPAN ->
+                codeRanges += node.startOffset until node.endOffset
+            else -> node.children.forEach(::collectCode)
+        }
+    }
+    collectCode(richMarkdownParser.buildMarkdownTreeFromString(normalizedContent))
     if (codeRanges.isEmpty()) return preProcessMarkdownLatexChunk(normalizedContent)
     val result = StringBuilder(normalizedContent.length)
     var cursor = 0
@@ -472,14 +488,25 @@ private fun RichCodeFence(node: ASTNode, content: String) {
     val raw = node.getTextInNode(content)
     val firstLine = raw.lineSequence().firstOrNull().orEmpty().trimStart()
     val marker = firstLine.takeWhile { it == '`' || it == '~' }
-    val language = firstLine.removePrefix(marker).trim().substringBefore(' ').ifBlank { "text" }
-    val start = node.children.firstOrNull { it.type == MarkdownTokenTypes.CODE_FENCE_CONTENT }?.startOffset ?: return
-    val end = node.children.lastOrNull { it.type == MarkdownTokenTypes.CODE_FENCE_CONTENT }?.endOffset ?: start
-    val code = content.substring(start, end).trimEnd()
-    val closed = raw.lineSequence().lastOrNull()?.trim()?.let { it.length >= marker.length && it.all { char -> char == marker.firstOrNull() } } == true
+    val info = firstLine.removePrefix(marker).trim()
+    val language = info.takeWhile { !it.isWhitespace() }.ifBlank { "text" }
+    val closed = node.children.any { it.type == MarkdownTokenTypes.CODE_FENCE_END }
+    val interactive = LocalWidgetHost.current != null && (language == WIDGET_FENCE || language == HTML_FILE_FENCE)
+    val first = node.children.firstOrNull { it.type == MarkdownTokenTypes.CODE_FENCE_CONTENT }
+    val last = node.children.lastOrNull { it.type == MarkdownTokenTypes.CODE_FENCE_CONTENT }
+    val source = if ((!interactive || closed) && first != null && last != null) {
+        content.substring(first.startOffset, last.endOffset)
+    } else ""
+    if (interactive) {
+        val dynamicHeight = info.substringAfter(language).trim() == "dynamic"
+        RichPreviewItem { InteractiveFence(language, source, closed, LocalAnswerStreaming.current, node.startOffset, dynamicHeight) }
+        return
+    }
+    if (first == null) return
+    val code = source.trimEnd()
     when {
-        isChartLanguage(language) && closed -> ChartBlock(language, code)
-        language.equals("svg", true) && closed && looksLikeSvg(code) -> MarkdownMediaPreview("SVG", code)
+        isChartLanguage(language) && closed -> RichPreviewItem { ChartBlock(language, code) }
+        language.equals("svg", true) && closed && looksLikeSvg(code) -> RichPreviewItem { MarkdownMediaPreview("SVG", code) }
         else -> RichCodeBlock(code, language)
     }
 }
@@ -616,7 +643,7 @@ internal fun Modifier.blockNavigationRevealOnTouch(guard: NavigationSwipeGuard?)
         awaitPointerEventScope {
             while (true) {
                 val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull() ?: continue
-                if (change.pressed && !change.previousPressed) guard.blockCurrentGesture = true
+                if (change.pressed && !change.previousPressed) guard.blockedDownTime = change.uptimeMillis
             }
         }
     }
@@ -732,7 +759,7 @@ private fun RichImage(node: ASTNode, content: String) {
     val alt = node.findChildOfTypeRecursive(MarkdownElementTypes.LINK_TEXT)?.getTextInNode(content)?.trim('[', ']').orEmpty()
     val url = node.findChildOfTypeRecursive(MarkdownElementTypes.LINK_DESTINATION)?.getTextInNode(content).orEmpty()
     if (url.isNotBlank()) {
-        MarkdownMediaPreview(alt.ifBlank { uiText(R.string.label_media_file) }, url)
+        RichPreviewItem { MarkdownMediaPreview(alt.ifBlank { uiText(R.string.label_media_file) }, url) }
     }
 }
 

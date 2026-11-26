@@ -1004,6 +1004,21 @@ class ChatController(
         return candidate.takeIf { it == root || it.path.startsWith(root.path + File.separator) }
     }
 
+    internal fun readHtmlPreview(workspaceUri: String, path: String): String =
+        com.yukisoffd.lyracode.widgets.readWorkspaceHtml(appContext, workspaceManager.rootOf(workspaceUri), path)
+
+    internal fun requestWidgetRepair(conversationId: Long, diagnostic: String): Boolean {
+        if (conversationId != activeConversationId.value || isConversationBusy(conversationId)) {
+            status.value = appContext.getString(R.string.status_message_refused)
+            return false
+        }
+        val profile = currentProfile()
+        val request = captureChatRequest(diagnostic, emptyList(), emptyList(), emptyList(), "")
+        deliverConversationRequest(conversationId, request, profile, activeModel.value.ifBlank { profile.selectedModel },
+            clearComposerUploadsOnPersisted = false)
+        return true
+    }
+
     fun hasWorkspace(): Boolean = workspaceManager.rootUri() != null
 
     fun searchWorkspaceFiles(query: String): List<WorkspaceFileReference> = workspaceManager.searchFiles(query)

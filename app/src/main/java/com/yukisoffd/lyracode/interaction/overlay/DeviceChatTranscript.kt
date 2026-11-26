@@ -104,7 +104,7 @@ internal class DeviceChatTranscript(context: Context) : FrameLayout(context), Li
                     LazyColumn(Modifier.fillMaxSize(), state = list, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(rows, key = { it.key }) { row ->
                             if (row.process.isNotEmpty()) {
-                                com.yukisoffd.lyracode.AgentProcessSummary(row.process, selectionResetKey = 0,
+                                com.yukisoffd.lyracode.AgentProcessSummary(row.process,
                                     active = chat.running && row.key == rows.lastOrNull()?.key,
                                     startedAtOverride = row.processStartedAt, finishedAtOverride = row.processFinishedAt,
                                     inlineToolDetails = true)

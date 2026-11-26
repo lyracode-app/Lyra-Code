@@ -310,7 +310,7 @@ internal fun removeSkillSlashPrefix(input: String): String {
 private val WORKSPACE_FILE_PREFIXES = setOf('#', '@')
 
 internal class NavigationSwipeGuard {
-    var blockCurrentGesture: Boolean = false
+    var blockedDownTime: Long? = null
 }
 
 internal val LocalNavigationSwipeGuard = staticCompositionLocalOf<NavigationSwipeGuard?> { null }
@@ -320,20 +320,22 @@ internal fun Modifier.observeLeftSwipe(
     onLeftSwipe: () -> Unit,
 ): Modifier = pointerInput(key, navigationSwipeGuard, onLeftSwipe) {
     awaitPointerEventScope {
+        var downTime: Long? = null
         var startX: Float? = null
         var startY: Float? = null
         while (true) {
             val change = awaitPointerEvent(PointerEventPass.Final).changes.firstOrNull() ?: continue
             when {
                 change.pressed && !change.previousPressed -> {
+                    downTime = change.uptimeMillis
                     startX = change.position.x
                     startY = change.position.y
                 }
                 !change.pressed && change.previousPressed -> {
                     val originX = startX
                     val originY = startY
-                    val blocked = navigationSwipeGuard.blockCurrentGesture
-                    navigationSwipeGuard.blockCurrentGesture = false
+                    val blocked = navigationSwipeGuard.blockedDownTime == downTime
+                    downTime = null
                     if (!blocked && originX != null && originY != null) {
                         val deltaX = change.position.x - originX
                         val deltaY = change.position.y - originY

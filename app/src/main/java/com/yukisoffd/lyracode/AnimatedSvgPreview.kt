@@ -63,18 +63,20 @@ internal fun AnimatedSvgPreview(
         failed = document == null
     }
     val data = document
+    val frame = modifier.then(previewLoadingHeight(bytes, data == null && !failed))
     if (data == null) {
         Text(uiText(if (failed) R.string.notice_image_decode_failed else R.string.ui_loading_media),
-            modifier = modifier, color = if (failed) MaterialTheme.colorScheme.error else KimiMuted,
+            modifier = frame, color = if (failed) MaterialTheme.colorScheme.error else KimiMuted,
             style = MaterialTheme.typography.bodySmall)
         return
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val visible = fullscreen || LocalPreviewVisible.current
     val holder = remember(data) { mutableStateOf<WebView?>(null) }
-    DisposableEffect(lifecycle, data) {
+    DisposableEffect(lifecycle, data, visible) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> holder.value?.onResume()
+                Lifecycle.Event.ON_START -> if (visible) holder.value?.onResume() else holder.value?.onPause()
                 Lifecycle.Event.ON_STOP -> holder.value?.onPause()
                 else -> Unit
             }
@@ -82,7 +84,7 @@ internal fun AnimatedSvgPreview(
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(frame) {
         val layout = if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
             .height((maxWidth / data.aspectRatio).coerceIn(48.dp, 360.dp))
             .clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
@@ -93,7 +95,7 @@ internal fun AnimatedSvgPreview(
                 AndroidView(modifier = Modifier.fillMaxSize(),
                     factory = { context -> createAnimatedSvgWebView(context, data, onError = { failed = true }).also {
                         holder.value = it
-                        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) it.onPause()
+                        if (!visible || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) it.onPause()
                     } },
                     onRelease = { view -> holder.value = null; releaseAnimatedSvgWebView(view) })
             }
