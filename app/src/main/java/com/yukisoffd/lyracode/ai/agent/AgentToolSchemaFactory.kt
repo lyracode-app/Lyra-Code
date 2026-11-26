@@ -258,6 +258,13 @@ internal class AgentToolSchemaFactory(
             definitions.put(linuxGuiToolDefinition())
         }
         definitions
+        .put(functionWithOptional(
+            "create_widget",
+            "Test a mobile-friendly interactive HTML fragment with inline CSS and vanilla JS. Use for editable charts, calculators and live controls. Fix startup errors and retry. Embed the tested source using the fence header returned by this tool.",
+            required = listOf("source" to "string"),
+            optional = listOf("dynamic_height" to "boolean"),
+            propertyDescriptions = mapOf("dynamic_height" to "Expand inline to content height. Omit or set false for a compact scrollable viewport, including scroll-driven pages."),
+        ))
         .put(chartToolDefinition())
         .put(circuitSymbolsToolDefinition())
         .put(function("web_search", "Search the web using the backend configured in Settings > Web search and return candidate titles, URLs, and snippets. When enabled, DeepSeek Search replaces the built-in engine and ignores the website blacklist; otherwise user-blocked sites are filtered. Use for current or web-specific information, then verify candidates with read_web_page. DeepSeek queries support search operators and must contain 1 to 128 Unicode characters; limit is 1 to 50 (built-in: 1 to 10).", "query" to "string", "limit" to "integer"))

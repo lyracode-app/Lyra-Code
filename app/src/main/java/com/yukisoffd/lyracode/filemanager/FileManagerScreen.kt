@@ -2,6 +2,8 @@
 
 package com.yukisoffd.lyracode.filemanager
 
+import com.yukisoffd.lyracode.widgets.rememberHtmlOpener
+import com.yukisoffd.lyracode.widgets.readPreviewHtml
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -541,6 +543,7 @@ private fun DualPaneFileManager(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val openHtml = rememberHtmlOpener()
     val root = LocalFileOperations.storageRoot.absolutePath
     val privateRoot = prootInstances.firstOrNull()?.rootfsDir ?: prootInstancesDirectory
     val initialPath = if (sharedStorageGranted) root else privateRoot.absolutePath
@@ -783,7 +786,7 @@ private fun DualPaneFileManager(
             },
             onPreviewHtml = {
                 action = null
-                previewHtmlInBrowser(context, selected.file)
+                openHtml { fileOperations.prepareReadableCopy(selected.file).getOrThrow().inputStream().readPreviewHtml() }
             },
             onUnzip = {
                 action = null
@@ -1836,6 +1839,7 @@ private fun FileEditorScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val openHtml = rememberHtmlOpener()
     val handle = remember(file.absolutePath) { EditorHandle() }
     var original by remember(file.absolutePath) { mutableStateOf(loaded.text) }
     var wordWrap by rememberSaveable(file.absolutePath) { mutableStateOf(true) }
@@ -2082,6 +2086,14 @@ private fun FileEditorScreen(
             ) {
                 IconButton(onClick = ::requestClose) { Icon(Icons.Default.ArrowBack, contentDescription = null) }
                 Spacer(Modifier.weight(1f))
+                if (file.extension.lowercase() in setOf("html", "htm")) {
+                    IconButton(onClick = {
+                        val snapshot = handle.text()
+                        openHtml { snapshot }
+                    }) {
+                        Icon(Icons.Default.OpenInBrowser, contentDescription = context.getString(R.string.file_action_preview_html))
+                    }
+                }
                 IconButton(onClick = handle::undo) { Icon(Icons.Default.Undo, contentDescription = null) }
                 IconButton(onClick = handle::redo) { Icon(Icons.Default.Redo, contentDescription = null) }
                 IconButton(enabled = !readOnly, onClick = { save() }) { Icon(Icons.Default.Save, contentDescription = context.getString(R.string.file_editor_save)) }
@@ -2575,17 +2587,6 @@ private fun openExternalFile(context: Context, file: File) {
             Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-    }.onFailure { showError(context, it) }
-}
-
-private fun previewHtmlInBrowser(context: Context, file: File) {
-    runCatching {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, "text/html")
-            .addCategory(Intent.CATEGORY_BROWSABLE)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
     }.onFailure { showError(context, it) }
 }
 

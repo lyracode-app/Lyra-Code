@@ -373,7 +373,7 @@ internal fun SourceImagePreview(source: String) {
     val context = LocalContext.current
     var bitmap by remember(source) { mutableStateOf<Bitmap?>(null) }
     var animatedSvg by remember(source) { mutableStateOf<DecodedDataUrl?>(null) }
-    var status by remember(source) { mutableStateOf(uiText(R.string.ui_loading_media)) }
+    var loading by remember(source) { mutableStateOf(true) }
     var previewOpen by remember(source) { mutableStateOf(false) }
     LaunchedEffect(source) {
         val loaded = withContext(Dispatchers.IO) {
@@ -384,24 +384,27 @@ internal fun SourceImagePreview(source: String) {
         }
         bitmap = loaded?.bitmap
         animatedSvg = loaded?.animatedSvg
-        status = if (bitmap == null && animatedSvg == null) uiText(R.string.notice_image_load_failed) else ""
+        loading = false
     }
-    if (animatedSvg != null) {
-        AnimatedSvgInlinePreview(animatedSvg!!)
-    } else if (bitmap != null) {
-        Image(
-            bitmap = bitmap!!.asImageBitmap(),
-            contentDescription = uiText(R.string.title_image_preview),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 360.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .clickable { previewOpen = true },
-            contentScale = ContentScale.Fit,
-        )
-    } else {
-        Text(status, color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+    Box(previewLoadingHeight(source, loading)) {
+        if (animatedSvg != null) {
+            AnimatedSvgInlinePreview(animatedSvg!!)
+        } else if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = uiText(R.string.title_image_preview),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { previewOpen = true },
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Text(uiText(if (loading) R.string.ui_loading_media else R.string.notice_image_load_failed),
+                color = KimiMuted, style = MaterialTheme.typography.bodySmall)
+        }
     }
     if (previewOpen && bitmap != null) {
         FullscreenMediaPreviewDialog(
@@ -421,6 +424,8 @@ internal fun EmbeddedMediaPlayer(source: String, kind: String) {
     var previewOpen by remember(source) { mutableStateOf(false) }
     val lifecycleOwner = remember(context) { context.findLifecycleOwner() }
     val videoViewHolder = remember(source) { mutableStateOf<VideoView?>(null) }
+    val visible = LocalPreviewVisible.current
+    LaunchedEffect(visible) { if (!visible) videoViewHolder.value?.pause() }
     DisposableEffect(lifecycleOwner, source) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) videoViewHolder.value?.pause()
@@ -494,34 +499,36 @@ internal fun DataUrlInlinePreview(decoded: DecodedDataUrl) {
             bitmap = withContext(Dispatchers.Default) { decodePreviewImage(decoded.bytes, decoded.mimeType) }
             loading = false
         }
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap!!.asImageBitmap(),
-                contentDescription = uiText(R.string.title_image_preview),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .clickable { previewOpen = true },
-                contentScale = ContentScale.Fit,
-            )
-            if (previewOpen) {
-                FullscreenMediaPreviewDialog(
-                    title = uiText(R.string.title_image_preview),
-                    source = "",
-                    kind = "image",
-                    bitmap = bitmap,
-                    decoded = decoded,
-                    onDismiss = { previewOpen = false },
+        Box(previewLoadingHeight(decoded.bytes, loading)) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap!!.asImageBitmap(),
+                    contentDescription = uiText(R.string.title_image_preview),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .clickable { previewOpen = true },
+                    contentScale = ContentScale.Fit,
+                )
+                if (previewOpen) {
+                    FullscreenMediaPreviewDialog(
+                        title = uiText(R.string.title_image_preview),
+                        source = "",
+                        kind = "image",
+                        bitmap = bitmap,
+                        decoded = decoded,
+                        onDismiss = { previewOpen = false },
+                    )
+                }
+            } else {
+                Text(
+                    uiText(if (loading) R.string.ui_loading_media else R.string.notice_image_decode_failed),
+                    color = if (loading) KimiMuted else MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
-        } else {
-            Text(
-                uiText(if (loading) R.string.ui_loading_media else R.string.notice_image_decode_failed),
-                color = if (loading) KimiMuted else MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     } else {
         val kind = mediaKindForSource("", decoded.mimeType)
