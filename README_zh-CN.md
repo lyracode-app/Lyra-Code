@@ -59,6 +59,7 @@ Lyra Code 将 Android 设备变成 AI 辅助的全栈开发环境。它的核心
 - AI 正文中的 SVG 预览：支持原始内联 SVG、`svg` 代码块，以及百分号编码或 Base64 的 SVG data URL，可全屏浏览并保存原始 `.svg`。静态图片使用 AndroidSVG，SMIL 与 CSS 动画使用隔离的 WebView 图片渲染器播放；不执行 SVG 脚本、不加载外部资源，也不响应 SVG 文档交互事件。静态 AndroidSVG 预览仍不支持滤镜及 `foreignObject`。
 - AI 图表工具与正文内离线渲染：流程图、时序图、甘特图、折线图、柱状图、饼图、思维导图、架构图、关系图和电路图，支持全屏浏览及 PNG/SVG/源码另存。详见[图表说明](docs/CHARTS.md)。
 - 可选 Shizuku 和 Root 工具，均可独立开关。
+- 支持 PRoot 内的 Linux GUI 图形转发至 Android 页面，可辅助调试开发有 GUI 的 Linux 项目。
 
 ### 设备交互
 
