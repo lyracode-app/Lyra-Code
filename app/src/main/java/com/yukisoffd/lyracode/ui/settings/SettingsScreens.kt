@@ -180,6 +180,7 @@ internal fun SettingsScreen(
         "device" -> "about"
         "sponsor_development" -> "about"
         "developer_wall" -> "about"
+        "licenses" -> "about"
         CompliancePageIds.INDEX -> "about"
         CompliancePageIds.USER_AGREEMENT,
         CompliancePageIds.PRIVACY_POLICY,
@@ -503,6 +504,7 @@ internal fun SettingsScreen(
                         onUpdateAvailabilityChange = onUpdateAvailabilityChange,
                         onOpenDeviceInfo = { detail = "device" },
                         onOpenServiceAgreements = { detail = CompliancePageIds.INDEX },
+                        onOpenLicenses = { detail = "licenses" },
                         onOpenSponsorDevelopment = { detail = "sponsor_development" },
                         onOpenDeveloperWall = { detail = "developer_wall" },
                         onOpenGitHubAcceleration = { url ->
@@ -599,7 +601,6 @@ internal fun SettingsScreen(
             SettingsMenuEntry(Icons.Default.AdminPanelSettings, context.getString(R.string.menu_system_permissions), context.getString(R.string.menu_system_permissions_desc), "system_permissions"),
             SettingsMenuEntry(Icons.Default.AccessibilityNew, context.getString(R.string.menu_device_interaction), context.getString(R.string.menu_device_interaction_desc), "device_interaction"),
             SettingsMenuEntry(Icons.Default.Security, context.getString(R.string.menu_app_permissions), context.getString(R.string.menu_app_permissions_desc), "permissions"),
-            SettingsMenuEntry(Icons.Default.Description, context.getString(R.string.menu_licenses), context.getString(R.string.menu_licenses_desc), "licenses"),
             SettingsMenuEntry(Icons.Default.Info, context.getString(R.string.menu_about), context.getString(R.string.menu_about_desc), "about"),
         )
         val normalizedQuery = settingsQuery.trim()
@@ -698,6 +699,8 @@ internal fun SettingsScreen(
                             initialState == "about" && targetState == "device" -> true
                             initialState == "developer_wall" && targetState == "about" -> false
                             initialState == "about" && targetState == "developer_wall" -> true
+                            initialState == "licenses" && targetState == "about" -> false
+                            initialState == "about" && targetState == "licenses" -> true
                             initialState == CompliancePageIds.INDEX && targetState == "about" -> false
                             initialState == "about" && targetState == CompliancePageIds.INDEX -> true
                             isComplianceDocument(initialState) && targetState == CompliancePageIds.INDEX -> false

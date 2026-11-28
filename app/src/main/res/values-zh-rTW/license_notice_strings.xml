@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_group_application">應用程式及通用依賴</string>
+    <string name="license_group_editor">程式碼編輯與語法醒目提示</string>
+    <string name="license_group_brands">品牌標誌</string>
+    <string name="license_group_x11">X11 與 Linux 圖形</string>
+    <string name="license_open_externally">在外部開啟 %1$s</string>
+    <string name="license_view_offline">查看離線授權條款</string>
+    <string name="license_offline_unavailable">無法讀取離線授權條款。</string>
+    <string name="license_debian_rootfs_note">此處提供建置工具的授權條款。Debian 套件各自的原文位於已安裝環境的 /usr/share/doc 目錄。</string>
+    <string name="license_lyra_note">應用程式原始碼的授權條款。</string>
+    <string name="license_browser_note">瀏覽器自訂分頁與外部授權。</string>
+    <string name="license_work_note">定時背景工作。</string>
+    <string name="license_media_note">音訊與影片預覽。</string>
+    <string name="license_activation_note">處理郵件附件的 MIME 內容。</string>
+    <string name="license_latex_preview_note">離線預覽 LaTeX 文件。</string>
+    <string name="license_marked_note">在網頁端離線呈現 Markdown。</string>
+    <string name="license_dompurify_note">網頁端的 HTML 清理。</string>
+    <string name="license_shizuku_note">選用的 Shizuku 服務整合。</string>
+    <string name="license_talloc_note">靜態連結到內建 PRoot 執行環境的記憶體配置程式庫。</string>
+    <string name="license_guest_packages_note">依需要下載或透過容器套件管理員安裝，各套件保留自身聲明。</string>
+    <string name="license_unicode_note">用於終端機版面的東亞字元寬度資料。</string>
+    <string name="license_test_only_note">用於本機單元測試。</string>
+    <string name="license_grammar_note">用於離線語法醒目提示的 TextMate 定義。</string>
+    <string name="license_lobe_note">應用程式內使用的部分模型服務商品牌標誌。</string>
+    <string name="license_trademarks_note">名稱與標誌用於識別各項服務，商標權歸各權利人所有。</string>
+    <string name="license_x11_module_note">Android 上的 Linux 圖形工作階段模組。</string>
+    <string name="license_x11_dependency_note">用於內建 X11 伺服器或 Linux 圖形呈現器。</string>
+    <string name="license_markdown_it_note">本機 Markdown 預覽。</string>
+    <string name="license_katex_note">在應用程式與網頁端本機呈現數學公式。</string>
+    <string name="license_tokenizer_note">用於在裝置上計算權杖數量的 DeepSeek V4 斷詞資料改編版。</string>
+</resources>

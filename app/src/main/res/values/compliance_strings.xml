@@ -1,0 +1,644 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compliance_service_agreements">"Service Agreements"</string>
+    <string name="compliance_service_agreements_desc">"User Agreement, Privacy Policy, and disclosures"</string>
+    <string name="compliance_effective_date">"Updated and effective %1$s"</string>
+    <string name="compliance_user_agreement">"User Agreement"</string>
+    <string name="compliance_user_agreement_desc">"Services, terms of use, and responsibilities"</string>
+    <string name="compliance_privacy_policy">"Privacy Policy"</string>
+    <string name="compliance_privacy_policy_desc">"Data handling and your rights"</string>
+    <string name="compliance_personal_info_list">"Personal Information Collection List"</string>
+    <string name="compliance_personal_info_list_desc">"Information used by each feature"</string>
+    <string name="compliance_third_party_list">"Third-Party Information Collection List"</string>
+    <string name="compliance_third_party_list_desc">"External services and what they receive"</string>
+    <string name="compliance_app_permissions">"App Permissions"</string>
+    <string name="compliance_app_permissions_desc">"Permissions and why they are used"</string>
+    <string name="compliance_permission_camera_title">"Camera"</string>
+    <string name="compliance_permission_notifications_title">"Notifications"</string>
+    <string name="compliance_user_summary">"This agreement covers your use of the Lyra Code Android app. The app works without a Lyra Code account. Third-party services are optional."</string>
+    <string name="compliance_privacy_summary">"Lyra Code stores app data locally by default and connects directly to the services used by each feature. It contains no advertising, behavioral analytics, or third-party crash-reporting SDK."</string>
+    <string name="compliance_personal_summary">"“Required” refers to the feature in that row. You can skip optional features and continue using unrelated features."</string>
+    <string name="compliance_third_party_summary">"Lyra Code uses open-source libraries and third-party services. The table identifies which integrations receive information and when. Network recipients can see the connection IP address and request time."</string>
+    <string name="compliance_permissions_summary">"Permissions depend on the Android version and the feature. Android grants normal permissions automatically and asks you to approve runtime permissions and special access separately."</string>
+    <string name="compliance_processing_title">"2. What each feature processes and when"</string>
+    <string name="compliance_feedback_link">"GitHub Issues (public feedback)"</string>
+    <string name="compliance_security_link">"GitHub Security (private vulnerability report)"</string>
+    <string name="compliance_project_license">"Read the Lyra Code source license"</string>
+    <string name="compliance_open_privacy_policy">"Open privacy or data terms"</string>
+    <string name="compliance_table_scroll_hint">"Swipe left or right to read all columns."</string>
+    <string name="compliance_column_feature">"Feature"</string>
+    <string name="compliance_column_purpose">"Purpose"</string>
+    <string name="compliance_column_information">"Specific information"</string>
+    <string name="compliance_column_timing">"How and how often"</string>
+    <string name="compliance_column_permission">"Permission or access"</string>
+    <string name="compliance_column_required">"Required?"</string>
+    <string name="compliance_column_alternative">"Alternative"</string>
+    <string name="compliance_column_retention">"Retention and removal"</string>
+    <string name="compliance_column_impact">"If not provided"</string>
+    <string name="compliance_column_service">"SDK or service"</string>
+    <string name="compliance_column_operator">"Provider"</string>
+    <string name="compliance_column_policy">"Privacy policy"</string>
+    <string-array name="compliance_user_scope">
+        <item>"1. Scope and parties"</item>
+        <item>"This agreement is between you and the Lyra Code project maintainers (GitHub organization lyracode-app). It applies to the Android app and its local and network features. Each service you connect to has its own terms."</item>
+    </string-array>
+    <string-array name="compliance_user_features">
+        <item>"2. Features"</item>
+        <item>"Lyra Code provides model chat, AI Agent tools and scheduled tasks, browser access to the phone, code editing, file management, previews, and local and WebDAV backup. It provides PRoot Linux, terminals, X11 graphical sessions, Termux integration and optional device interaction through Accessibility, Shizuku or Root. It also supports MCP, SSH, WebDAV, FTP/FTPS/SFTP, IMAP/SMTP, web search, local web serving, desktop pets and update checks. You choose your model and service settings."</item>
+    </string-array>
+    <string-array name="compliance_user_rules">
+        <item>"3. Acceptable use"</item>
+        <item>"Use features only on files, devices, accounts and systems you have permission to access. Follow applicable law and the terms of connected services. Do not use the app to invade privacy, infringe intellectual property, send spam, distribute malware, access systems without authorization or disrupt services. Protect passwords and keys, and review Agent actions before granting approval or configuring unattended execution."</item>
+    </string-array>
+    <string-array name="compliance_user_fees">
+        <item>"4. Fees"</item>
+        <item>"This distribution of Lyra Code is free and has no in-app purchases or paid unlocks. Model calls, ChatGPT subscriptions, New API sites, DeepSeek wallet top-ups, hosting, storage and connectivity may carry charges set and billed by their respective providers. You decide whether to use those services and bear the charges you incur. The sponsorship QR code in About can be used for a voluntary donation in WeChat. A donation does not purchase or unlock features."</item>
+    </string-array>
+    <string-array name="compliance_user_intellectual_property">
+        <item>"5. Intellectual property"</item>
+        <item>"Lyra Code original source code is distributed under GNU AGPL v3. The Open Source Licenses page lists third-party components and their own terms. Brand names and trademarks belong to their respective owners. You retain the rights you hold in your input and files. Rights in model output depend on the applicable law, the provider terms and the content used to produce it."</item>
+    </string-array>
+    <string-array name="compliance_user_responsibility">
+        <item>"6. Responsibilities and limitations"</item>
+        <item>"AI output can be inaccurate. Check code, commands and results before using them. To the extent permitted by law, you are responsible for losses caused by your unauthorized use, disclosure of your credentials, decisions based on unverified output, or execution of commands and changes you approve or schedule. PRoot shares the Android kernel and the app’s permissions. Third-party outages, fees and data handling are governed by the relevant service’s terms. This agreement preserves mandatory consumer rights and any liability the law does not allow us to limit."</item>
+    </string-array>
+    <string-array name="compliance_user_disputes">
+        <item>"7. Dispute resolution"</item>
+        <item>"Contact the project maintainers first if you wish to resolve a dispute by discussion. If you cannot reach an agreement, either party may bring the dispute before a court with jurisdiction under applicable law. You may also use any consumer complaint or mediation channel available under applicable law."</item>
+    </string-array>
+    <string-array name="compliance_user_changes">
+        <item>"8. Changes and effective date"</item>
+        <item>"The date shown at the top is the effective date of this revision. Revisions are published under Settings → About → Service Agreements. Material changes will be described in the app or release notes. If the law requires renewed consent, it must be obtained before applying the change to you. If you disagree with a revision, you can stop using the affected feature or uninstall the app."</item>
+    </string-array>
+    <string-array name="compliance_privacy_contact">
+        <item>"1. Maintainers and contact"</item>
+        <item>"The Lyra Code project is maintained by the lyracode-app organization on GitHub. Open a GitHub issue to ask about this policy, report an issue, or request a way to exercise your data rights. GitHub Issues are public. Omit account credentials, personal documents and identifying details. Use GitHub Security for private vulnerability reports."</item>
+    </string-array>
+    <string-array name="compliance_privacy_sensitive">
+        <item>"3. Sensitive information"</item>
+        <item>"Location coordinates and accuracy support the optional location tool. Screen text and screenshots are needed only for device interaction and visual recognition. They can reveal messages, financial information, account details and other private content displayed by another app. Camera images and attachments can contain faces, documents and location metadata. Account passwords, keys and tokens authenticate services. Disclosure can permit access, spending or changes on your behalf. Wallet balances are used for the optional balance display and alerts. Android verifies biometrics or device credentials when you enable full device access. Lyra Code receives the authentication result only. Skip these features, deny the corresponding permissions or use text and manual operation to avoid the associated processing. If you submit sensitive content to a model, a website, a remote endpoint or a browser client, that recipient can process the submitted content."</item>
+    </string-array>
+    <string-array name="compliance_privacy_external">
+        <item>"4. Sharing, transfer, public disclosure and cross-border connections"</item>
+        <item>"The app sends model context and credentials to the selected model provider. Account requests go to OpenAI, DeepSeek or the New API site you entered. Search terms and webpage requests go to the chosen search engine or website. Mail goes to the configured mail server and the recipients you select. MCP calls, remote commands, uploaded files and WebDAV archives go to your configured servers. Active local servers send requested content to connected clients. Update, developer wall and download hosts receive requests for their public resources. The Third-Party Information Collection List identifies providers, fields and triggers.\n\nRecipients may process or store data in another country or region, depending on their infrastructure and your configuration. Lyra Code has no centralized cloud storage for local app data and does not route model and remote requests through a project-operated relay by default. If you enable a GitHub accelerator, that accelerator can receive the routed request. Check the provider’s policy for its locations and retention. The maintainers do not sell, routinely transfer or publicly disclose private app data. If law requires disclosure, the maintainers may provide the information they hold to the competent authority within the scope required by law. Your chosen sharing, publishing or backup destination can retain its own copy. Lyra Code displays its sponsorship QR code locally. If you scan it and pay in WeChat, WeChat Pay handles the payment. The app receives no payment result."</item>
+    </string-array>
+    <string-array name="compliance_privacy_storage">
+        <item>"5. Storage locations, retention and deletion"</item>
+        <item>"App-managed records reside in Android app storage on your device. Workspaces and exported files reside in the locations you choose. Most local records remain until you delete them, clear app data or uninstall. Temporary storage and automatic cleanup are described in the processing table. Deletion removes the affected records or files from the app’s active storage. Files in shared storage, copies in other apps, browser downloads, WebDAV backups and data held by third parties are governed by their respective locations and require separate deletion.\n\nAndroid may back up or migrate eligible app data if you enable those system features. First-use consent, full device access authorization, New API session and remembered credentials, ChatGPT and DeepSeek Harness credentials, and PRoot environments are excluded from Android cloud backup and device transfer. App exports can include eligible settings and content, and can include keys when selected. WebDAV backups are stored at the server you configure. Android backup locations and expiry depend on the system backup provider and account."</item>
+    </string-array>
+    <string-array name="compliance_privacy_security">
+        <item>"6. Security measures"</item>
+        <item>"Lyra Code uses Android’s application sandbox, local encryption for supported credential stores, system permission prompts and approval controls for selected tool actions. ChatGPT and DeepSeek Harness credential stores use Android Keystore. The app verifies bundled distribution downloads and checks update APK checksums when supplied. The web companion uses an access code for authenticated requests. HTTP or FTP connections can expose content and credentials on the network. Encryption depends on the protocol and endpoint you choose."</item>
+    </string-array>
+    <string-array name="compliance_privacy_rights">
+        <item>"7. Your rights and controls"</item>
+        <item>"View conversations, profiles, files and service configurations in the app. Copy or share supported text and files, or export eligible records through Backup. Edit your profile, workspace files and service settings. Delete conversations, caches, files and configurations through their respective screens. To withdraw optional consent, stop the feature, sign out, disable scheduled tasks or revoke Android permissions and special access. Withdrawal stops future use through that authorization.\n\nTo remove app-private data including the initial consent record, use Android Settings → Apps → Lyra Code → Storage → Clear storage, or uninstall the app. Remove shared files, exported backups and remote copies at their destinations. Revoke provider tokens or ask the provider to delete its records or account. Contact the maintainers to request access, a copy, correction, deletion or an explanation of information they hold about you. Use the maintainer contact above for complaints. Provide only the information needed to identify the request."</item>
+    </string-array>
+    <string-array name="compliance_privacy_children">
+        <item>"8. Children and teenagers"</item>
+        <item>"Lyra Code is a general-purpose development tool. If you are a minor, use it with your parent or guardian’s guidance. Children under 14 must obtain consent from a parent or other guardian before using features that process their personal information. The app has no age verification or dedicated child account. Guardians can manage Android permissions, stop connected services, delete local records and contact the maintainers to request deletion of a child’s data held by them. Do not submit children’s identity documents, contact details, school or location to models, websites or remote servers."</item>
+    </string-array>
+    <string-array name="compliance_privacy_changes">
+        <item>"9. Policy changes"</item>
+        <item>"We publish revisions in the app and update the date at the top. If a change materially affects what is processed, why, how or who receives it, we will describe the change in the app or release notes and obtain renewed consent where required by law."</item>
+    </string-array>
+    <string-array name="compliance_permission_control">
+        <item>"Manage permissions"</item>
+        <item>"Use Settings → App Permissions or Android Settings → Apps → Lyra Code → Permissions or Special app access. Accessibility, Shizuku, Root and Termux access are also controlled by the corresponding Android service or authorizing app."</item>
+    </string-array>
+    <string-array name="compliance_info_settings">
+        <item>"Initial consent and settings"</item>
+        <item>"Consent flag, language, appearance and feature settings"</item>
+        <item>"Remember consent and preferences"</item>
+        <item>"Stored when consent is given and when settings are changed. Read on launch and when opening the relevant feature"</item>
+        <item>"None"</item>
+        <item>"Consent is required to enter the app. Customization is optional"</item>
+        <item>"Use defaults for optional settings"</item>
+        <item>"Until reset, app data is cleared or the app is removed. Consent is excluded from backups"</item>
+        <item>"Without initial consent the app closes"</item>
+    </string-array>
+    <string-array name="compliance_info_profile">
+        <item>"Local profile"</item>
+        <item>"Nickname, chosen avatar and local avatar reference"</item>
+        <item>"Show your profile in the interface"</item>
+        <item>"Read from your input or image selection when you change it. Displayed when the profile is shown"</item>
+        <item>"System image or file picker"</item>
+        <item>"No"</item>
+        <item>"Use the default profile"</item>
+        <item>"Until replaced or app data is cleared. Source image stays in its original location"</item>
+        <item>"No custom name or avatar is shown"</item>
+    </string-array>
+    <string-array name="compliance_info_chat">
+        <item>"AI chat, Agent and media generation"</item>
+        <item>"Messages, prompts, conversation titles, history, memory, selected file excerpts, attachments, tool inputs and results, generated text and media"</item>
+        <item>"Generate responses, run tools and show conversation history"</item>
+        <item>"Uses the selected context when you send or retry a turn, an Agent step runs, or a scheduled task triggers. Stores results locally and sends request context to the selected model"</item>
+        <item>"Internet. File or device permission only for the corresponding tool"</item>
+        <item>"Input and a usable model are required for inference. Attachments and memory are optional"</item>
+        <item>"Use text, exclude optional context, or work locally without inference"</item>
+        <item>"Local history until deleted or app data is cleared. Provider retention follows its policy"</item>
+        <item>"Without input or a model, inference is unavailable"</item>
+    </string-array>
+    <string-array name="compliance_info_model">
+        <item>"Model configuration"</item>
+        <item>"API base URL, key, custom request headers, model ID and usage counts"</item>
+        <item>"Authenticate and configure model calls and track usage"</item>
+        <item>"Stored when configured. Read for each model list, test, inference, upload or quota request"</item>
+        <item>"Internet for requests"</item>
+        <item>"Only for the model service you use"</item>
+        <item>"Use another provider or a local model endpoint"</item>
+        <item>"Until removed or app data is cleared. Exported copies require separate deletion"</item>
+        <item>"The corresponding service cannot authenticate or run"</item>
+    </string-array>
+    <string-array name="compliance_info_new_api">
+        <item>"New API account"</item>
+        <item>"Site URL, username, password, email, email code, optional invite code, 2FA code, session cookie, user ID, access token, API keys, model list and quota"</item>
+        <item>"Register, sign in, restore a session, sync models and show account status"</item>
+        <item>"Direct site requests during registration, login, logout, refresh and sync. Checks on app launch if auto-login is enabled and retries with remembered credentials if the session has expired"</item>
+        <item>"Internet"</item>
+        <item>"Only for this integration. Password storage and auto-login are optional"</item>
+        <item>"Use a model API key directly"</item>
+        <item>"Session until logout or clearing app data. Remembered credentials persist until deleted or app data is cleared. Remove synced models and keys separately."</item>
+        <item>"Account access and sync are unavailable"</item>
+    </string-array>
+    <string-array name="compliance_info_chatgpt">
+        <item>"ChatGPT account"</item>
+        <item>"Authorization code, PKCE verifier, access and refresh tokens, account or workspace ID, email, plan, quota, model and conversation context"</item>
+        <item>"Sign in, renew access, show usage and use the selected ChatGPT/Codex model"</item>
+        <item>"Sign-in opens OpenAI in the browser. The app exchanges the code, refreshes credentials when needed and requests profile, quota and inference when the corresponding feature runs."</item>
+        <item>"Internet and system browser"</item>
+        <item>"Only for ChatGPT account integration"</item>
+        <item>"Configure an API key instead"</item>
+        <item>"Local credentials until disconnect or app data is cleared. OAuth credentials are excluded from backups. OpenAI keeps its own records."</item>
+        <item>"Cannot use account-based ChatGPT models or view account usage"</item>
+    </string-array>
+    <string-array name="compliance_info_harness">
+        <item>"DeepSeek Harness account"</item>
+        <item>"Authorization code, device identifier, Harness credential, account ID, profile, wallet currency and balance, alert threshold"</item>
+        <item>"Authorize inference, show profile and balance, and send optional balance alerts"</item>
+        <item>"The app exchanges authorization data at sign-in and requests data during inference and manual refresh. With alerts enabled, Android schedules balance checks about every 15 minutes when online, subject to system scheduling."</item>
+        <item>"Internet, system browser. Notification permission for alerts"</item>
+        <item>"Only for Harness. Alerts are optional"</item>
+        <item>"Use an API key or refresh the balance manually"</item>
+        <item>"Local credentials until disconnect or app data is cleared. Credentials are excluded from backups. DeepSeek keeps its own records."</item>
+        <item>"Harness access and wallet information are unavailable. Denied notifications hide alerts"</item>
+    </string-array>
+    <string-array name="compliance_info_workspace">
+        <item>"Workspaces, file manager and editor"</item>
+        <item>"Selected directory, file name, path, size, modification time, file content and .bak copies"</item>
+        <item>"List, edit, preview, move and copy files, review changes and support Agent tools"</item>
+        <item>"Reads authorized files when you browse, open, modify or explicitly enable a tool to use them"</item>
+        <item>"System directory or file picker. All-files access for broad shared storage. Shizuku or Root only for authorized restricted paths"</item>
+        <item>"Only within the chosen file feature"</item>
+        <item>"Choose a single file or folder, or use a PRoot workspace"</item>
+        <item>"Source files and .bak copies until you delete them at their storage location. App records until removed"</item>
+        <item>"Cannot manage files outside the granted scope"</item>
+    </string-array>
+    <string-array name="compliance_info_attachments">
+        <item>"Attachments and camera"</item>
+        <item>"Selected filename, URI, MIME type, file bytes, photo and any embedded metadata"</item>
+        <item>"Attach, preview or send selected content to the model"</item>
+        <item>"Read when you select or photograph content. Sent when included in a model request"</item>
+        <item>"System picker or media access. Camera permission to take a photo"</item>
+        <item>"Only for attachments or taking a photo"</item>
+        <item>"Use text or pick an existing file"</item>
+        <item>"Conversation attachments remain with stored data. Temporary files can be removed from app storage. Source files remain at their destination until deleted."</item>
+        <item>"Cannot attach or photograph that content"</item>
+    </string-array>
+    <string-array name="compliance_info_automation">
+        <item>"Scheduled tasks and downloads"</item>
+        <item>"Task name, prompt, schedule, model ID, results, error, target URL, filename and progress"</item>
+        <item>"Run tasks and downloads and show results or status"</item>
+        <item>"Stored on creation or edit, read at a user-defined time or download start, and updated on progress and completion"</item>
+        <item>"Internet for remote work. Notification and foreground-service permissions where applicable"</item>
+        <item>"Only for the chosen background feature"</item>
+        <item>"Run the task manually in the foreground"</item>
+        <item>"Task records until deleted or app data is cleared. Saved downloads until removed from their destination."</item>
+        <item>"No automatic run, download or associated notification"</item>
+    </string-array>
+    <string-array name="compliance_info_location">
+        <item>"Location tool"</item>
+        <item>"Last known latitude, longitude, accuracy, provider and timestamp"</item>
+        <item>"Provide location context to the current Agent task"</item>
+        <item>"Reads Android’s last known location on each enabled tool call, and includes the result in the model context for that task"</item>
+        <item>"ACCESS_COARSE_LOCATION or ACCESS_FINE_LOCATION"</item>
+        <item>"Only for automatic location lookup"</item>
+        <item>"Enter a city or location manually"</item>
+        <item>"Read on demand. Stored tool results follow conversation or audit retention. No background location history is created."</item>
+        <item>"Automatic location lookup is unavailable"</item>
+    </string-array>
+    <string-array name="compliance_info_apps">
+        <item>"Installed app identification"</item>
+        <item>"App label, package name, version, app size and certificate fingerprint"</item>
+        <item>"Identify installed applications, inspect packages and detect companion apps"</item>
+        <item>"Reads Android PackageManager during the installed-app tool, app list or companion compatibility check. Tool results can be included in the model context"</item>
+        <item>"QUERY_ALL_PACKAGES or declared package visibility"</item>
+        <item>"Only for app discovery and compatibility features"</item>
+        <item>"Specify an app manually where the feature accepts it"</item>
+        <item>"Read on demand. Saved tool results follow conversation or audit retention"</item>
+        <item>"The app list or compatibility status may be incomplete"</item>
+    </string-array>
+    <string-array name="compliance_info_device">
+        <item>"Device and network diagnostics"</item>
+        <item>"Device maker and model, Android and app version, CPU, RAM, storage size, screen, battery, network type, IP address, interfaces, Bluetooth status, and device time or time zone"</item>
+        <item>"Show diagnostics and support device-aware tools"</item>
+        <item>"Reads Android or local system state when you open device information or call the corresponding tool"</item>
+        <item>"ACCESS_NETWORK_STATE for network state"</item>
+        <item>"Only for the diagnostic or tool used"</item>
+        <item>"Describe the device or environment manually"</item>
+        <item>"Read on demand. Stored tool results follow conversation or audit retention"</item>
+        <item>"Some diagnostic or environment fields are unavailable"</item>
+    </string-array>
+    <string-array name="compliance_info_interaction">
+        <item>"Device interaction and desktop pet"</item>
+        <item>"Foreground package and window, accessible screen text and controls, screenshots, actions and coordinates, authorization result, pet asset files and settings"</item>
+        <item>"Support user-started control and pet display. Recognize the screen using the chosen visual model when invoked"</item>
+        <item>"Reads active windows or captures screenshots on tool calls during an enabled session. Stores pet files on setup and uses them when displayed"</item>
+        <item>"Accessibility, overlay and optional Shizuku/Root. System credential or biometric prompt for full access"</item>
+        <item>"Only for the corresponding optional feature"</item>
+        <item>"Operate the device manually or use text instead of visual recognition"</item>
+        <item>"Live screen data used during the session. Saved outputs, debug records, exports or pet files persist until removed"</item>
+        <item>"Automatic device control, visual analysis or floating pet display may be unavailable"</item>
+    </string-array>
+    <string-array name="compliance_info_local_runtime">
+        <item>"PRoot, Termux and X11"</item>
+        <item>"Commands, working directories, environment variables, output, exit codes, guest files, X11 frames, audio and keyboard or pointer input"</item>
+        <item>"Run local development tools and interactive Linux sessions"</item>
+        <item>"Processes input and output on each command or while the graphical session is running. Sends delegated command data to Termux when chosen"</item>
+        <item>"Local files. Optional Termux RUN_COMMAND, shared storage, foreground service, overlay or network for the selected function"</item>
+        <item>"Only for the selected runtime feature"</item>
+        <item>"Use a different runtime or edit locally without running commands"</item>
+        <item>"Session streams are used during the session. Saved files, logs and PRoot environments remain until removed. Termux retains its own files."</item>
+        <item>"The selected runtime, mounts or graphical session cannot be used"</item>
+    </string-array>
+    <string-array name="compliance_info_remote">
+        <item>"MCP, SSH, WebDAV and file transfer"</item>
+        <item>"Endpoint, port, account, password, token, SSH private key, paths, commands, tool parameters, and transferred content"</item>
+        <item>"Authenticate, use remote tools and manage remote files"</item>
+        <item>"Direct connection for a configured test, listing, command, upload, download or backup"</item>
+        <item>"Internet. Local network permission for applicable LAN access"</item>
+        <item>"Only for the chosen service"</item>
+        <item>"Use local files or another authorized server"</item>
+        <item>"Local settings until removed. Backups and remote records remain under destination control"</item>
+        <item>"The corresponding remote action is unavailable"</item>
+    </string-array>
+    <string-array name="compliance_info_mail">
+        <item>"IMAP and SMTP mail"</item>
+        <item>"Mail endpoints, account and credentials, folders, sender, recipient, CC/BCC, subject, message body and attachments"</item>
+        <item>"Read, organize, draft and send email"</item>
+        <item>"Direct requests on connection, mailbox reads, draft changes and send. Mail servers deliver content to selected recipients"</item>
+        <item>"Internet. File picker for selected local attachments"</item>
+        <item>"Only for mail integration"</item>
+        <item>"Use a separate mail client"</item>
+        <item>"Local settings and downloaded files until removed. The server and recipients keep their own copies"</item>
+        <item>"Cannot read or send through this app"</item>
+    </string-array>
+    <string-array name="compliance_info_web">
+        <item>"Web search, page reads and links"</item>
+        <item>"Query, URL, headers, IP address, user agent, webpage content and site cookies where applicable"</item>
+        <item>"Search, retrieve, show or download Internet resources"</item>
+        <item>"HTTP or WebView requests when you or an enabled Agent searches, reads or downloads. External links open in the browser or target app"</item>
+        <item>"Internet"</item>
+        <item>"Only for the selected network action"</item>
+        <item>"Supply text locally or open the resource separately"</item>
+        <item>"Results saved in a conversation or as files persist until deleted. Website and browser retention follow their settings and policies"</item>
+        <item>"Cannot fetch the requested resource"</item>
+    </string-array>
+    <string-array name="compliance_info_local_servers">
+        <item>"Browser access, local web and MCP servers"</item>
+        <item>"Client IP, access code or authentication token, requests, selected conversation history, settings, uploaded files, published files and tool results"</item>
+        <item>"Provide browser chat, local preview or MCP tools to connected clients"</item>
+        <item>"Processed for each client request only while a server runs. Returned content depends on the service and access granted"</item>
+        <item>"Internet socket access. Android local network permission where required. Foreground service for browser access"</item>
+        <item>"Only for the local server you enable"</item>
+        <item>"Use the app on the device with servers stopped"</item>
+        <item>"Live connection data lasts for the session. Saved uploads, chat, settings or logs remain until removed. Clients can retain copies."</item>
+        <item>"Clients cannot connect to the disabled service"</item>
+    </string-array>
+    <string-array name="compliance_info_diagnostics">
+        <item>"Local logs and usage"</item>
+        <item>"Request and response details, timestamps, model and token usage, tool inputs and outputs, error and session traces"</item>
+        <item>"Review activity, diagnose issues and calculate use"</item>
+        <item>"Written when the corresponding request, tool, session or error occurs. Read on opening its log or statistics page"</item>
+        <item>"None for local review"</item>
+        <item>"Required to show the corresponding records"</item>
+        <item>"Avoid the feature or delete stored records where available"</item>
+        <item>"Stored logs and statistics remain until cleared or app data is cleared"</item>
+        <item>"History for review and troubleshooting is unavailable after removal"</item>
+    </string-array>
+    <string-array name="compliance_info_cache">
+        <item>"Response and preview caches"</item>
+        <item>"Cached model replies, temporary attachment or preview bytes, rendered resources"</item>
+        <item>"Reuse recent responses and load previews"</item>
+        <item>"Written and read during the relevant feature when caching is used"</item>
+        <item>"None for local cache"</item>
+        <item>"No"</item>
+        <item>"Disable model response caching or reload the underlying content"</item>
+        <item>"Model cache entries expire after seven days and are deleted on lookup or pruning. Remaining caches persist until cleared or removed by Android"</item>
+        <item>"Requests or previews may need to run again"</item>
+    </string-array>
+    <string-array name="compliance_info_backup">
+        <item>"Export, import and WebDAV backup"</item>
+        <item>"Selected settings, model profiles, remote service settings, prompts, memories, conversations, Skills files and optionally supported credentials"</item>
+        <item>"Back up and migrate selected data"</item>
+        <item>"Reads selected categories when you export, reads the chosen archive on import, and transfers the archive on WebDAV backup or restore"</item>
+        <item>"System file access. Internet for WebDAV"</item>
+        <item>"No"</item>
+        <item>"Use local export instead of WebDAV, or omit credentials"</item>
+        <item>"Exported archives remain until deleted at the local or remote destination. Restored records follow their own retention rules"</item>
+        <item>"Cannot restore data from the omitted backup or category"</item>
+    </string-array>
+    <string-array name="compliance_info_updates">
+        <item>"Updates and distribution downloads"</item>
+        <item>"IP address, request time and headers, resource URL, APK download client and version code, and local download state"</item>
+        <item>"Check for releases and retrieve APK or PRoot Linux resources"</item>
+        <item>"Update checks on app use until the first successful check of the day, and on manual check. Downloads start when requested."</item>
+        <item>"Internet. Install unknown apps authorization when opening the APK installer"</item>
+        <item>"Only for checking, download or installing from the app"</item>
+        <item>"Install an APK or import a rootfs manually"</item>
+        <item>"Update metadata is refreshed by later checks. APK copies persist until cleaned or removed after replacement. Download hosts set their own retention."</item>
+        <item>"No in-app update or distribution download for that operation"</item>
+    </string-array>
+    <string-array name="compliance_info_wall">
+        <item>"Developer wall and project feedback"</item>
+        <item>"Request IP, time and URL, public contributor names and avatars, and feedback you submit"</item>
+        <item>"Display contributor credits and receive feedback"</item>
+        <item>"Opening the wall fetches configured public metadata subject to a daily refresh limit. Opening feedback uses the external site. Posting occurs when you submit."</item>
+        <item>"Internet"</item>
+        <item>"No"</item>
+        <item>"Use project documentation or skip the feature"</item>
+        <item>"Wall cache until cleared or replaced. Feedback is retained by the issue tracker and subject to its controls"</item>
+        <item>"Contributor updates or submitted feedback are unavailable"</item>
+    </string-array>
+    <string-array name="compliance_third_model_fields">
+        <item>"Authenticate and generate model responses or media"</item>
+        <item>"API key or custom auth headers, model ID, prompts, conversation context, tool calls and results, and attached files or media in the request"</item>
+        <item>"Direct API calls on model listing, testing, inference, media generation and supported upload or quota operations"</item>
+    </string-array>
+    <string-array name="compliance_third_local">
+        <item>"Embedded libraries"</item>
+        <item>"AndroidX, OkHttp, Media3, Sora Editor, JSch, JLaTeXMath, Shizuku API and Lyra X11 contributors"</item>
+        <item>"Provide UI, networking, playback, editing, SSH, rendering and local system integration"</item>
+        <item>"None independently sent to library authors by Lyra Code"</item>
+        <item>"Local library calls. Network operations reach the destinations listed below."</item>
+        <item>"No separate library data collection policy applies"</item>
+    </string-array>
+    <string-array name="compliance_third_custom">
+        <item>"Custom model API"</item>
+        <item>"Operator of the URL you configure"</item>
+        <item>"Generate model responses or media"</item>
+        <item>"API key or configured headers, model ID, prompts, history, tools and results, and attached files or media in the request"</item>
+        <item>"Direct list, test, inference, upload or quota request to your configured URL"</item>
+        <item>"See the selected endpoint’s policy"</item>
+    </string-array>
+    <string-array name="compliance_third_new_api">
+        <item>"New API account site"</item>
+        <item>"Operator of the New API site you enter"</item>
+        <item>"Register, sign in, restore sessions and sync models"</item>
+        <item>"Username, password, email, verification and optional invitation codes, 2FA code, session cookie, access token, API key and model request content"</item>
+        <item>"Direct requests at registration, login, logout, refresh, sync and inference. Also on app launch when auto-login is enabled"</item>
+        <item>"See the New API site’s policy"</item>
+    </string-array>
+    <string-array name="compliance_third_chatgpt">
+        <item>"ChatGPT/Codex account"</item>
+        <item>"OpenAI"</item>
+        <item>"Authorize access, get profile and quota, and run models"</item>
+        <item>"Browser sign-in data, authorization code, PKCE verifier, tokens, account or workspace ID, model and inference content"</item>
+        <item>"Browser authorization followed by direct token exchange or refresh and profile, usage or inference requests"</item>
+    </string-array>
+    <string-array name="compliance_third_harness">
+        <item>"DeepSeek Harness"</item>
+        <item>"DeepSeek"</item>
+        <item>"Authorize models and read profile and wallet"</item>
+        <item>"Browser sign-in data, authorization code, device identifier, Harness credential, profile and wallet queries, model input"</item>
+        <item>"Browser authorization and direct API. If alerts are enabled a balance check is scheduled about every 15 minutes when online"</item>
+    </string-array>
+    <string-array name="compliance_third_ddg">
+        <item>"DuckDuckGo"</item>
+        <item>"DuckDuckGo"</item>
+        <item>"Retrieve search results"</item>
+        <item>"Search terms, IP address and HTTP headers"</item>
+        <item>"Search requests may try this engine when it is enabled by the user’s search settings"</item>
+    </string-array>
+    <string-array name="compliance_third_google">
+        <item>"Google Search"</item>
+        <item>"Google"</item>
+        <item>"Retrieve search results"</item>
+        <item>"Search terms, IP address and HTTP headers"</item>
+        <item>"Search requests may try this engine when it is enabled by the user’s search settings"</item>
+    </string-array>
+    <string-array name="compliance_third_bing">
+        <item>"Bing / Bing China"</item>
+        <item>"Microsoft"</item>
+        <item>"Retrieve search results"</item>
+        <item>"Search terms, IP address and HTTP headers"</item>
+        <item>"Search requests may try this engine when it is enabled by the user’s search settings"</item>
+    </string-array>
+    <string-array name="compliance_third_baidu">
+        <item>"Baidu Search"</item>
+        <item>"Baidu"</item>
+        <item>"Retrieve search results"</item>
+        <item>"Search terms, IP address and HTTP headers"</item>
+        <item>"Search requests may try this engine when it is enabled by the user’s search settings"</item>
+    </string-array>
+    <string-array name="compliance_third_web">
+        <item>"WebView, browser, websites and downloads"</item>
+        <item>"Android WebView provider, installed browser and operators of accessed sites"</item>
+        <item>"Render pages, open links or retrieve files"</item>
+        <item>"URL, IP address, request headers, user agent, and cookies or fields submitted to the site"</item>
+        <item>"Direct HTTP, WebView or external-browser navigation when a page, link or download is opened"</item>
+        <item>"See the site and browser provider’s policies"</item>
+    </string-array>
+    <string-array name="compliance_third_mcp">
+        <item>"Configured MCP servers"</item>
+        <item>"Operator of the chosen MCP endpoint"</item>
+        <item>"Discover and run MCP tools"</item>
+        <item>"Endpoint, auth token or headers, session ID, tool name, arguments and any content included in them"</item>
+        <item>"Direct MCP discovery, connection and tool calls"</item>
+        <item>"See the MCP operator’s policy"</item>
+    </string-array>
+    <string-array name="compliance_third_remote">
+        <item>"SSH, WebDAV and FTP/FTPS/SFTP"</item>
+        <item>"Operator of the server you configure"</item>
+        <item>"Authenticate, run commands, transfer files or back up data"</item>
+        <item>"Username, password or authentication proof, commands, filenames, paths, file content, selected backup data"</item>
+        <item>"Direct connection when testing, listing, executing, transferring or backing up"</item>
+        <item>"See the selected server operator’s policy"</item>
+    </string-array>
+    <string-array name="compliance_third_mail">
+        <item>"IMAP/SMTP service and mail recipients"</item>
+        <item>"Configured mail provider and the recipients you select"</item>
+        <item>"Read and manage messages, save drafts and send mail"</item>
+        <item>"Account credentials, mailbox queries, sender, recipients, CC/BCC, subject, body and attachments"</item>
+        <item>"Direct IMAP/SMTP when operating the mailbox. Delivery to recipients when mail is sent"</item>
+        <item>"See your mail provider’s policy"</item>
+    </string-array>
+    <string-array name="compliance_third_termux">
+        <item>"Termux, Shizuku and Root manager"</item>
+        <item>"Termux and Shizuku projects or the installed Root manager"</item>
+        <item>"Execute user-authorized local operations"</item>
+        <item>"Delegated command, working directory, arguments, file paths, execution output and exit status"</item>
+        <item>"Local calls to the authorized service or process when the feature runs"</item>
+        <item>"Local integration. See the installed app’s disclosures"</item>
+    </string-array>
+    <string-array name="compliance_third_lan">
+        <item>"Browser access, local web and MCP clients"</item>
+        <item>"You or the operator of each connected client"</item>
+        <item>"Serve browser chat, published files or authorized MCP tools"</item>
+        <item>"Client IP, code or token, requests, requested conversations, uploaded or published files and tool results"</item>
+        <item>"Network requests and responses while the corresponding server is enabled"</item>
+        <item>"The client’s own policy or local use by you"</item>
+    </string-array>
+    <string-array name="compliance_third_github">
+        <item>"GitHub release and feedback services"</item>
+        <item>"GitHub"</item>
+        <item>"Check releases, download assets, run route tests or submit feedback"</item>
+        <item>"IP address, request time, headers, resource URL and content you submit through the website"</item>
+        <item>"Release API and asset requests on checks, downloads or connectivity tests. Browser on feedback links"</item>
+    </string-array>
+    <string-array name="compliance_third_release_hosts">
+        <item>"Update manifest, developer wall and GitHub accelerators"</item>
+        <item>"Lyra Code project (lyracode.app), configured download hosts and enabled accelerator operators"</item>
+        <item>"Read release data, fetch APKs and contributor credits, and route GitHub downloads"</item>
+        <item>"IP address, time, headers, requested URLs and APK download client version"</item>
+        <item>"App update checks, developer wall opens, manual downloads or tests. Accelerator routes when enabled"</item>
+        <item>"See the selected host or accelerator’s policy. This policy covers app-side processing"</item>
+    </string-array>
+    <string-array name="compliance_third_debian">
+        <item>"Debian rootfs, package mirrors and Turnip packages"</item>
+        <item>"Debian and the selected distribution or package host"</item>
+        <item>"Download Linux environments, packages and GPU drivers"</item>
+        <item>"IP address, time, resource URL and headers"</item>
+        <item>"On user-requested rootfs, package or driver download, including via the guest package manager"</item>
+    </string-array>
+    <string-array name="compliance_third_android">
+        <item>"Android backup, migration and system pickers"</item>
+        <item>"Android system and the backup or document provider you choose"</item>
+        <item>"Select files, back up eligible records or migrate devices"</item>
+        <item>"Chosen file references or bytes and system-eligible app data"</item>
+        <item>"When you open a system picker or enable backup or device transfer"</item>
+        <item>"See the device’s system backup and document provider policies"</item>
+    </string-array>
+    <string-array name="compliance_third_links">
+        <item>"Project links and community platforms"</item>
+        <item>"Lyra Code project and operators of sites linked from the developer wall"</item>
+        <item>"Show project information, documentation or contributor pages"</item>
+        <item>"Target URL, browser headers, IP address, cookies and content submitted to the site"</item>
+        <item>"Handed to a browser or the target app when you tap the link"</item>
+        <item>"See the destination platform’s privacy policy"</item>
+    </string-array>
+    <string-array name="compliance_perm_internet">
+        <item>"Internet and connectivity"</item>
+        <item>"Connect to selected model, mail, search, update and remote services. Display connectivity and schedule work when online"</item>
+        <item>"INTERNET, ACCESS_NETWORK_STATE"</item>
+    </string-array>
+    <string-array name="compliance_perm_lan">
+        <item>"LAN and local servers"</item>
+        <item>"Reach local endpoints, serve browser access, local web pages and MCP, and support Wi-Fi multicast"</item>
+        <item>"ACCESS_LOCAL_NETWORK (Android 17+ runtime permission), CHANGE_WIFI_MULTICAST_STATE"</item>
+    </string-array>
+    <string-array name="compliance_perm_location">
+        <item>"Location tool"</item>
+        <item>"Read Android’s last-known position when the tool is used"</item>
+        <item>"ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION"</item>
+    </string-array>
+    <string-array name="compliance_perm_camera">
+        <item>"Photo attachment"</item>
+        <item>"Take a photo at your request to attach to a conversation"</item>
+        <item>"CAMERA"</item>
+    </string-array>
+    <string-array name="compliance_perm_media">
+        <item>"Image, video and legacy file access"</item>
+        <item>"Read authorized images, videos and shared files. Save shared files on supported older systems"</item>
+        <item>"READ_MEDIA_IMAGES, READ_MEDIA_VIDEO. READ_EXTERNAL_STORAGE (Android 12 and below). WRITE_EXTERNAL_STORAGE (Android 9 and below). Optional system picker grants"</item>
+    </string-array>
+    <string-array name="compliance_perm_files">
+        <item>"Shared storage and workspaces"</item>
+        <item>"Choose specific files or directories. Manage shared files broadly and mount shared storage in PRoot when authorized"</item>
+        <item>"System file/directory grants. MANAGE_EXTERNAL_STORAGE (Android 11+) for all-files access"</item>
+    </string-array>
+    <string-array name="compliance_perm_packages">
+        <item>"App list and compatibility"</item>
+        <item>"Find installed apps, show package information, and locate Termux and compatible browsers"</item>
+        <item>"QUERY_ALL_PACKAGES and declared package visibility"</item>
+    </string-array>
+    <string-array name="compliance_perm_notifications">
+        <item>"Task and session notifications"</item>
+        <item>"Show download, background task, Agent, web, device interaction, X11 and balance-alert status"</item>
+        <item>"POST_NOTIFICATIONS (Android 13+)"</item>
+    </string-array>
+    <string-array name="compliance_perm_install">
+        <item>"APK installation"</item>
+        <item>"Ask Android to open the package installer for a user-selected APK, including an app update"</item>
+        <item>"REQUEST_INSTALL_PACKAGES and Android’s install-unknown-apps authorization"</item>
+    </string-array>
+    <string-array name="compliance_perm_foreground">
+        <item>"Foreground tasks and X11"</item>
+        <item>"Keep user-started Agent, web, floating control and Linux GUI sessions running. Maintain X11 media playback when used"</item>
+        <item>"FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, WAKE_LOCK"</item>
+    </string-array>
+    <string-array name="compliance_perm_overlay">
+        <item>"Floating windows"</item>
+        <item>"Show floating device controls, desktop pets and X11 preview windows as selected"</item>
+        <item>"SYSTEM_ALERT_WINDOW"</item>
+    </string-array>
+    <string-array name="compliance_perm_accessibility">
+        <item>"Android device interaction"</item>
+        <item>"Read accessible window content, perform authorized gestures and actions, and capture the screen on demand for the current task"</item>
+        <item>"Enable Lyra Code Accessibility Service. Android binds using BIND_ACCESSIBILITY_SERVICE"</item>
+    </string-array>
+    <string-array name="compliance_perm_biometric">
+        <item>"Full device access"</item>
+        <item>"Require Android authentication before enabling full device interaction"</item>
+        <item>"USE_BIOMETRIC or system lock-screen credentials"</item>
+    </string-array>
+    <string-array name="compliance_perm_commands">
+        <item>"Termux and privileged operations"</item>
+        <item>"Delegate Termux commands or use authorized Shizuku or Root for shell and restricted file operations"</item>
+        <item>"com.termux.permission.RUN_COMMAND, moe.shizuku.manager.permission.API_V23 with Shizuku authorization, and separate Root authorization"</item>
+    </string-array>
+    <string-array name="compliance_perm_boot">
+        <item>"Restore scheduled work"</item>
+        <item>"Let Android WorkManager reschedule eligible work after the device restarts"</item>
+        <item>"RECEIVE_BOOT_COMPLETED"</item>
+    </string-array>
+    <string-array name="compliance_perm_receiver">
+        <item>"Internal event delivery"</item>
+        <item>"Keep non-exported AndroidX broadcast receivers restricted to the application"</item>
+        <item>"App signature permission ending in .DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"</item>
+    </string-array>
+    <string name="compliance_open_provider_site">"Provider site (policy link unavailable)"</string>
+    <string name="compliance_column_third_timing">"Collection method and trigger"</string>
+    <string-array name="compliance_third_gitee">
+        <item>"Gitee project mirror"</item>
+        <item>"Gitee"</item>
+        <item>"Open the project mirror"</item>
+        <item>"URL, IP address, browser headers and site cookies"</item>
+        <item>"Browser navigation when you tap the Gitee link"</item>
+    </string-array>
+    <string-array name="compliance_third_sponsor">
+        <item>"WeChat Pay sponsorship"</item>
+        <item>"WeChat Pay / Tenpay"</item>
+        <item>"Optional donation to support development"</item>
+        <item>"Payment account, amount, transaction and device data are processed by the payment provider. Lyra Code receives no transaction data."</item>
+        <item>"Only if you scan the displayed QR code and pay in WeChat. Lyra Code displays or exports the public QR image locally."</item>
+    </string-array>
+    <string-array name="compliance_third_deepseek_web">
+        <item>"DeepSeek Search / Fetch"</item>
+        <item>"DeepSeek or the operator of the configured endpoint"</item>
+        <item>"Search the web or retrieve readable page content"</item>
+        <item>"API key, search terms, requested result count and page URL"</item>
+        <item>"Direct API request for each search or page read when the backend is enabled"</item>
+    </string-array>
+    <string-array name="compliance_info_deepseek_web">
+        <item>"DeepSeek Search and Fetch settings"</item>
+        <item>"Configured base URL and API key, search terms, result count and page URL"</item>
+        <item>"Authenticate, search and retrieve web page content"</item>
+        <item>"Stores settings when you save them. Sends the key and applicable fields with each search or page read while enabled."</item>
+        <item>"Internet"</item>
+        <item>"Only for this optional backend"</item>
+        <item>"Use built-in search or webpage reading"</item>
+        <item>"Local settings until removed. Saved results follow conversation or audit retention. The service retains its own copies."</item>
+        <item>"Cannot use the selected Search or Fetch backend"</item>
+    </string-array>
+</resources>

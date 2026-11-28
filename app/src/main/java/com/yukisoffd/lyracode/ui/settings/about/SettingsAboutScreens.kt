@@ -22,21 +22,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,12 +56,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -84,156 +76,9 @@ import kotlin.math.max
 
 
 
-internal data class LicenseNotice(
-    val name: String,
-    val license: String,
-    val note: String,
-    val licenseText: String,
-)
-
 private enum class UpdateManifestEasterEggPrompt {
     FIRST_WARNING,
     CHOICE,
-}
-
-@Composable
-internal fun OpenSourceLicensesScreen() {
-    val context = LocalContext.current
-    var selectedNotice by remember { mutableStateOf<LicenseNotice?>(null) }
-    val gpl3Text = remember(context) {
-        runCatching {
-            context.assets.open("org/scilab/forge/jlatexmath/licences/GPL-3.0.txt")
-                .bufferedReader()
-                .use { it.readText() }
-        }.getOrElse { "GNU GPL version 3: https://www.gnu.org/licenses/gpl-3.0.txt" }
-    }
-    val notices = remember(context) {
-        listOf(
-            LicenseNotice("AndroidX Core KTX", "Apache License 2.0", uiText(R.string.ui_android_kotlin_extensions_and_compatibility_layer), LicenseTexts.APACHE_2_0),
-            LicenseNotice("AndroidX Activity Compose", "Apache License 2.0", uiText(R.string.ui_compose_activity_integration), LicenseTexts.APACHE_2_0),
-            LicenseNotice("Jetpack Compose UI", "Apache License 2.0", uiText(R.string.ui_declarative_ui_framework), LicenseTexts.APACHE_2_0),
-            LicenseNotice("Jetpack Compose Material 3", "Apache License 2.0", uiText(R.string.ui_material_design_3_components), LicenseTexts.APACHE_2_0),
-            LicenseNotice("Jetpack Compose Material Icons Extended", "Apache License 2.0", uiText(R.string.ui_ui_icon_library), LicenseTexts.APACHE_2_0),
-            LicenseNotice("AndroidX DocumentFile", "Apache License 2.0", uiText(R.string.ui_saf_workspace_file_access), LicenseTexts.APACHE_2_0),
-            LicenseNotice("AndroidX Security Crypto", "Apache License 2.0", uiText(R.string.ui_local_encrypted_storage_for_sensitive_configuration), LicenseTexts.APACHE_2_0),
-            LicenseNotice("Kotlinx Coroutines", "Apache License 2.0", uiText(R.string.ui_async_tasks_and_streaming_requests), LicenseTexts.APACHE_2_0),
-            LicenseNotice("OkHttp", "Apache License 2.0", uiText(R.string.ui_http_sse_compatible_reading_and_mcp_streamable_http_communication), LicenseTexts.APACHE_2_0),
-            LicenseNotice(
-                "Android Mail / Jakarta Mail for Android 1.6.7",
-                "Eclipse Public License 2.0",
-                uiText(R.string.ui_provides_imap_message_reading_folder_and_draft_management_smtp),
-                LicenseTexts.EPL_2_0,
-            ),
-            LicenseNotice("JetBrains Markdown / RikkaHub Markdown fork", "Apache License 2.0", uiText(R.string.ui_markdown_gfm_ast_parsing_with_tables_lists_and_math), LicenseTexts.APACHE_2_0),
-            LicenseNotice("AndroidSVG 1.4", "Apache License 2.0", uiText(R.string.ui_native_svg_rendering),
-                "Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.\n\n" + LicenseTexts.APACHE_2_0),
-            LicenseNotice("Mermaid 11.17.2", "MIT", uiText(R.string.tool_create_chart_desc),
-                context.assets.open("charts/MERMAID-LICENSE").bufferedReader().use { it.readText() }),
-            LicenseNotice("Schemdraw 0.23 symbol geometry", "MIT", uiText(R.string.tool_get_circuit_symbols_desc),
-                context.assets.open("charts/SCHEMDRAW-LICENSE").bufferedReader().use { it.readText() }),
-            LicenseNotice("Apache ECharts 6.1.0", "Apache License 2.0 / BSD", uiText(R.string.tool_create_chart_desc),
-                listOf("ECHARTS-LICENSE", "ECHARTS-NOTICE", "ECHARTS-D3-LICENSE").joinToString("\n\n") { name ->
-                    context.assets.open("charts/$name").bufferedReader().use { it.readText() }
-                }),
-            LicenseNotice(
-                "Sora Editor / language-textmate",
-                "GNU LGPL 2.1 or later",
-                context.getString(R.string.license_sora_editor_note),
-                LicenseTexts.LGPL_2_1,
-            ),
-            LicenseNotice(
-                "Sora Editor demo TextMate grammars and themes",
-                "Individual upstream licenses",
-                context.getString(R.string.license_textmate_assets_note),
-                LicenseTexts.TEXTMATE_ASSET_NOTICES,
-            ),
-            LicenseNotice("Android Gradle Plugin", "Apache License 2.0", uiText(R.string.ui_android_build_toolchain), LicenseTexts.APACHE_2_0),
-            LicenseNotice("Kotlin", "Apache License 2.0", uiText(R.string.ui_main_development_language_and_compiler), LicenseTexts.APACHE_2_0),
-            LicenseNotice("JSch / mwiede fork", "BSD 3-Clause License", uiText(R.string.ui_ssh_connections_and_remote_command_execution), LicenseTexts.BSD_3_CLAUSE),
-            LicenseNotice(
-                "PRoot for Android / Soffd fork",
-                "GPL-2.0-or-later; GPLv3 selected",
-                context.getString(R.string.license_proot_note),
-                LicenseTexts.PROOT_GPL_NOTICE + "\n\n" + gpl3Text,
-            ),
-            LicenseNotice("JLatexMath Android / Soffd fork", "GPL v2 or later with linking exception; GPL v3 selected", uiText(R.string.ui_local_latex_math_rendering_source_is_kept_under_third), LicenseTexts.JLATEXMATH_GPL_WITH_EXCEPTION),
-            LicenseNotice("JLatexMath core fonts", "OFL / Knuth / permissive terms / Public Domain", uiText(R.string.ui_math_rendering_fonts_full_font_licenses_are_distributed_under), LicenseTexts.JLATEXMATH_FONT_LICENSES),
-            LicenseNotice("JSON-java / org.json", "JSON License", uiText(R.string.ui_json_parsing_and_serialization), LicenseTexts.JSON_LICENSE),
-            LicenseNotice("JUnit", "Eclipse Public License 1.0", uiText(R.string.ui_unit_test_framework_used_only_for_test_builds), LicenseTexts.EPL_1_0),
-            LicenseNotice("Simple Icons", "CC0 1.0 Universal", uiText(R.string.ui_repository_svg_icons_on_the_about_page), LicenseTexts.CC0_1_0),
-        )
-    }
-    selectedNotice?.let { notice ->
-        Dialog(
-            onDismissRequest = { selectedNotice = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-                    .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 34.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
-            ) {
-                Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(notice.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(notice.license, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
-                        }
-                        IconButton(onClick = { selectedNotice = null }) {
-                            Icon(Icons.Default.Close, contentDescription = uiText(R.string.cd_close))
-                        }
-                    }
-                    KimiDivider()
-                    SelectionContainer {
-                        Text(
-                            notice.licenseText,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(bottom = 18.dp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                        )
-                    }
-                }
-            }
-        }
-    }
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            KimiCardBox {
-                Text(uiText(R.string.title_licenses), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    uiText(R.string.licenses_desc),
-                    color = KimiMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-        items(notices) { notice ->
-            KimiCardBox(
-                modifier = Modifier.clickable { selectedNotice = notice },
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(notice.name, style = MaterialTheme.typography.titleSmall)
-                        Text(notice.license, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(notice.note, color = KimiMuted, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = KimiMuted)
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -242,6 +87,7 @@ internal fun AboutSoftwareScreen(
     onUpdateAvailabilityChange: (Boolean) -> Unit,
     onOpenDeviceInfo: () -> Unit,
     onOpenServiceAgreements: () -> Unit,
+    onOpenLicenses: () -> Unit,
     onOpenGitHubAcceleration: (String) -> Unit,
     onOpenUpdateManagement: () -> Unit,
     onOpenSponsorDevelopment: () -> Unit = {},
@@ -523,6 +369,13 @@ internal fun AboutSoftwareScreen(
                     context.getString(R.string.compliance_service_agreements),
                     context.getString(R.string.compliance_service_agreements_desc),
                     onClick = onOpenServiceAgreements,
+                )
+                KimiDivider()
+                KimiMenuRow(
+                    Icons.Default.Description,
+                    context.getString(R.string.menu_licenses),
+                    context.getString(R.string.menu_licenses_desc),
+                    onClick = onOpenLicenses,
                 )
             }
             KimiSectionLabel(uiText(R.string.section_build_info))
