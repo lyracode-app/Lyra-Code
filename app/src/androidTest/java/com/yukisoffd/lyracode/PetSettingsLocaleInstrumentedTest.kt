@@ -73,6 +73,7 @@ class PetSettingsLocaleInstrumentedTest {
         } finally { settings.languageMode = old; AppStrings.initialize(context.localizedContext(old)) }
     }
     @Test fun permissionShortcutsHaveOwnTargetsAndDisclosuresExistInEachLanguage() {
+        AppStrings.initialize(context.localizedContext(settings.languageMode))
         val audit = com.yukisoffd.lyracode.data.AuditLogStore(context)
         try {
             val termux = com.yukisoffd.lyracode.termux.TermuxExecutor(context, audit)
@@ -88,11 +89,12 @@ class PetSettingsLocaleInstrumentedTest {
             assertEquals(listOf(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS), launched.map { it.action })
             for (language in listOf(AppSettings.LANGUAGE_ZH_CN, AppSettings.LANGUAGE_ZH_TW, AppSettings.LANGUAGE_EN)) {
                 val localized = context.localizedContext(language)
-                for (id in listOf(R.string.compliance_user_device_body, R.string.compliance_privacy_device_body,
-                    R.string.compliance_personal_screen_body, R.string.compliance_third_pets_body,
-                    R.string.compliance_permission_overlay_body, R.string.compliance_permission_accessibility_body)) {
-                    assertTrue(localized.getString(id).length > 100)
-                }
+                fun disclosure(id: Int) = localized.resources.getStringArray(id).joinToString(" ")
+                assertTrue(disclosure(R.array.compliance_user_features).contains("Shizuku"))
+                assertTrue(disclosure(R.array.compliance_privacy_sensitive).contains("Lyra Code"))
+                assertTrue(disclosure(R.array.compliance_info_interaction).contains("Shizuku"))
+                assertTrue(disclosure(R.array.compliance_perm_overlay).contains("SYSTEM_ALERT_WINDOW"))
+                assertTrue(disclosure(R.array.compliance_perm_accessibility).contains("BIND_ACCESSIBILITY_SERVICE"))
             }
         } finally { audit.close() }
     }

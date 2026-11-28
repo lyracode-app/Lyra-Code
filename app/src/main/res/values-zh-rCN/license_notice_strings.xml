@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_group_application">应用及通用依赖</string>
+    <string name="license_group_editor">代码编辑与语法高亮</string>
+    <string name="license_group_brands">品牌标志</string>
+    <string name="license_group_x11">X11 与 Linux 图形</string>
+    <string name="license_open_externally">在外部打开 %1$s</string>
+    <string name="license_view_offline">查看离线许可证</string>
+    <string name="license_offline_unavailable">无法读取离线许可证。</string>
+    <string name="license_debian_rootfs_note">此处提供构建工具的许可证。Debian 软件包各自的原文位于已安装环境的 /usr/share/doc 目录。</string>
+    <string name="license_lyra_note">应用原创源代码的许可证。</string>
+    <string name="license_browser_note">浏览器自定义标签页与外部授权。</string>
+    <string name="license_work_note">定时后台任务。</string>
+    <string name="license_media_note">音频和视频预览。</string>
+    <string name="license_activation_note">处理邮件附件的 MIME 内容。</string>
+    <string name="license_latex_preview_note">离线预览 LaTeX 文档。</string>
+    <string name="license_marked_note">在网页端离线渲染 Markdown。</string>
+    <string name="license_dompurify_note">网页端的 HTML 清理。</string>
+    <string name="license_shizuku_note">可选的 Shizuku 服务接入。</string>
+    <string name="license_talloc_note">静态链接到内置 PRoot 运行时的内存分配库。</string>
+    <string name="license_guest_packages_note">按需下载或通过容器包管理器安装，各软件包保留自身声明。</string>
+    <string name="license_unicode_note">用于终端布局的东亚字符宽度数据。</string>
+    <string name="license_test_only_note">用于本机单元测试。</string>
+    <string name="license_grammar_note">用于离线语法高亮的 TextMate 语法定义。</string>
+    <string name="license_lobe_note">应用内使用的部分模型服务商品牌标志。</string>
+    <string name="license_trademarks_note">名称与标志用于识别相应服务，商标权归各权利人。</string>
+    <string name="license_x11_module_note">Android 上的 Linux 图形会话模块。</string>
+    <string name="license_x11_dependency_note">用于内置 X11 服务端或 Linux 图形渲染器。</string>
+    <string name="license_markdown_it_note">本地 Markdown 预览。</string>
+    <string name="license_katex_note">在应用和网页端本地渲染数学公式。</string>
+    <string name="license_tokenizer_note">用于本机令牌计数的 DeepSeek V4 分词数据改编版。</string>
+</resources>

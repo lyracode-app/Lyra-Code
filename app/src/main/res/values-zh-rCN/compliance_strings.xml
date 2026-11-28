@@ -1,0 +1,644 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compliance_service_agreements">"服务协议"</string>
+    <string name="compliance_service_agreements_desc">"用户协议、隐私政策与合规清单"</string>
+    <string name="compliance_effective_date">"更新及生效日期：%1$s"</string>
+    <string name="compliance_user_agreement">"用户协议"</string>
+    <string name="compliance_user_agreement_desc">"服务范围、使用规范与责任"</string>
+    <string name="compliance_privacy_policy">"隐私政策"</string>
+    <string name="compliance_privacy_policy_desc">"个人信息处理与用户权利"</string>
+    <string name="compliance_personal_info_list">"个人信息收集清单"</string>
+    <string name="compliance_personal_info_list_desc">"各功能处理的信息及保存期限"</string>
+    <string name="compliance_third_party_list">"第三方信息收集清单"</string>
+    <string name="compliance_third_party_list_desc">"第三方服务及其接收的信息"</string>
+    <string name="compliance_app_permissions">"应用权限"</string>
+    <string name="compliance_app_permissions_desc">"各项权限及其用途"</string>
+    <string name="compliance_permission_camera_title">"相机"</string>
+    <string name="compliance_permission_notifications_title">"通知"</string>
+    <string name="compliance_user_summary">"本协议适用于 Lyra Code Android 应用。使用应用无需注册 Lyra Code 账号。第三方服务可按需接入。"</string>
+    <string name="compliance_privacy_summary">"Lyra Code 默认在本机保存应用数据。各项联网功能直接连接相应的服务。应用未集成广告、行为分析或第三方崩溃上报 SDK。"</string>
+    <string name="compliance_personal_summary">"“是否必须”以所在行的功能为准。可跳过可选功能并继续使用与其无关的功能。"</string>
+    <string name="compliance_third_party_summary">"Lyra Code 使用开源库和第三方服务。下表列明各项接入是否接收信息、接收内容和方式。网络接收方可获知连接 IP 地址和请求时间。"</string>
+    <string name="compliance_permissions_summary">"权限受 Android 版本及功能影响。普通权限由系统授予，运行时权限和特殊访问权限由系统单独授权。"</string>
+    <string name="compliance_processing_title">"二、各功能处理的信息及触发频率"</string>
+    <string name="compliance_feedback_link">"GitHub Issues（公开反馈）"</string>
+    <string name="compliance_security_link">"GitHub Security（私密漏洞报告）"</string>
+    <string name="compliance_project_license">"查看 Lyra Code 源码许可证"</string>
+    <string name="compliance_open_privacy_policy">"查看隐私政策或数据处理条款"</string>
+    <string name="compliance_table_scroll_hint">"左右滑动查看完整表格。"</string>
+    <string name="compliance_column_feature">"应用功能"</string>
+    <string name="compliance_column_purpose">"使用目的"</string>
+    <string name="compliance_column_information">"具体信息"</string>
+    <string name="compliance_column_timing">"处理方式及频率"</string>
+    <string name="compliance_column_permission">"调用权限"</string>
+    <string name="compliance_column_required">"是否必须"</string>
+    <string name="compliance_column_alternative">"有无替代"</string>
+    <string name="compliance_column_retention">"保存期限及处理"</string>
+    <string name="compliance_column_impact">"不提供的影响"</string>
+    <string name="compliance_column_service">"SDK 或服务名称"</string>
+    <string name="compliance_column_operator">"提供方"</string>
+    <string name="compliance_column_policy">"隐私协议链接"</string>
+    <string-array name="compliance_user_scope">
+        <item>"一、适用范围与协议双方"</item>
+        <item>"本协议由你与 Lyra Code 项目维护组织（GitHub 组织 lyracode-app）订立，适用于本 Android 应用及其本地和联网功能。你所连接的服务适用其各自的条款。"</item>
+    </string-array>
+    <string-array name="compliance_user_features">
+        <item>"二、应用功能"</item>
+        <item>"应用提供模型对话、AI Agent 工具和定时任务、手机端网页访问、代码编辑、文件管理、内容预览、本地备份和 WebDAV 备份。支持 PRoot Linux、终端、X11 图形会话、Termux 集成，以及按需启用无障碍、Shizuku 或 Root 的设备交互。还提供 MCP、SSH、WebDAV、FTP/FTPS/SFTP、IMAP/SMTP、联网检索、本地网页托管、桌面宠物和更新检查。你自行选择模型和连接配置。"</item>
+    </string-array>
+    <string-array name="compliance_user_rules">
+        <item>"三、使用规范"</item>
+        <item>"仅处理你有权访问的文件、设备、账号和系统，并遵守适用法律及接入服务的条款。不得侵害隐私或知识产权、发送垃圾邮件、传播恶意软件、未经授权访问系统或干扰服务。请妥善保管密码和密钥，在批准 Agent 操作或设置无人值守任务前核对其执行范围。"</item>
+    </string-array>
+    <string-array name="compliance_user_fees">
+        <item>"四、费用"</item>
+        <item>"本版本免费提供，无应用内购买或付费解锁。模型调用、ChatGPT 订阅、New API 站点服务、DeepSeek 钱包充值、主机、存储和网络接入可能由各提供方定价和收费。你自行决定是否使用，并承担由此产生的费用。关于软件中的赞助二维码可在微信中用于自愿赞助，不用于购买或解锁功能。"</item>
+    </string-array>
+    <string-array name="compliance_user_intellectual_property">
+        <item>"五、知识产权"</item>
+        <item>"Lyra Code 原创源代码按 GNU AGPL v3 发布。第三方组件及其许可见“开源许可证”。品牌名称及商标归各权利人所有。你保留对输入和文件依法享有的权利。模型输出的权利依适用法律、服务方条款和生成时使用的内容确定。"</item>
+    </string-array>
+    <string-array name="compliance_user_responsibility">
+        <item>"六、责任与免责"</item>
+        <item>"模型输出可能有误，使用前请检查代码、命令与结果。在法律允许的范围内，因你未经授权操作、泄露凭据、依赖未经核实的输出作出决定，或执行你批准、设定的命令和变更而产生的损失，由你自行承担。PRoot 共享 Android 内核并使用应用已有权限。第三方服务的中断、收费和数据处理按对应服务条款处理。本条保留依法享有的消费者权利及法律规定不得免除或限制的责任。"</item>
+    </string-array>
+    <string-array name="compliance_user_disputes">
+        <item>"七、争议解决"</item>
+        <item>"如发生争议，可先联系项目维护者协商。协商不成，任何一方均可向依适用法律有管辖权的法院起诉。你也可使用适用法律提供的消费者投诉或调解渠道。"</item>
+    </string-array>
+    <string-array name="compliance_user_changes">
+        <item>"八、协议变更与生效"</item>
+        <item>"本页顶部日期为本次修订的生效日期。修订文本发布在“设置 → 关于软件 → 服务协议”。重大变更通过应用内提示或版本说明告知。依法须重新取得同意的，须在将变更适用于你之前取得同意。若不同意变更，你可停用受影响的功能或卸载应用。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_contact">
+        <item>"一、开发组织与联系渠道"</item>
+        <item>"Lyra Code 由 GitHub 上的 lyracode-app 组织维护。政策咨询、问题反馈或个人信息权利请求可通过 GitHub Issues 联系维护者。Issues 为公开渠道，请勿提交账号凭据、个人证件或可识别身份的内容。软件漏洞可通过 GitHub Security 私密报告。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_sensitive">
+        <item>"三、敏感个人信息"</item>
+        <item>"位置坐标和精度服务于可选的定位工具。屏幕文字与截图用于设备交互和视觉识别，可能暴露其他应用中的私密消息、金融信息或账号资料。相机图片和附件可能包含人脸、证件和位置元数据。密码、密钥和令牌仅用于对应服务的身份验证，泄露后可能导致账号被访问、产生费用或被冒用执行操作。钱包余额用于可选的余额展示与告警。开启设备交互完全权限时，Android 验证生物识别或锁屏凭据，Lyra Code 只获得验证结果。你可以跳过相关功能、拒绝授权，或改用文本和手动操作。向模型、网站、远程端点或网页客户端提交敏感内容时，接收方可以处理你提交的内容。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_external">
+        <item>"四、共享、转让、公开披露与跨境"</item>
+        <item>"应用将模型上下文和鉴权凭据发送给你选择的模型服务商。账号请求发往 OpenAI、DeepSeek 或你填写的 New API 站点。搜索词、网页请求发往对应的搜索引擎或网站。邮件发送给你配置的邮件服务器和指定收件人。MCP 调用、远程命令、上传文件与 WebDAV 备份发送到你配置的服务器。已运行的本机服务向连接的客户端返回其请求的内容。更新、开发者墙和下载主机收到相应资源的访问请求。各接收方、字段与触发方式见“第三方信息收集清单”。\n\n接收方可能根据其基础设施及你的配置，在设备所在国家或地区以外处理或保存数据。Lyra Code 未设置集中保存应用本地数据的云服务，默认不通过项目维护者的中转服务器转发模型和远程服务请求。开启 GitHub 加速后，加速服务会接收被转发的请求。处理地域和保存期限以各接收方公布的规则为准。维护者不出售个人信息，也不常规转让或公开披露应用私有数据。依法必须披露时，维护者可在法定范围内向有权机关提供其实际持有的信息。你选择分享、公开发布或备份的目的地可以保留副本。赞助二维码在应用内本地展示。若在微信扫码付款，付款信息由微信支付处理，应用不接收付款结果。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_storage">
+        <item>"五、存储地域、保存期限与到期处理"</item>
+        <item>"应用管理的记录保存在你设备的 Android 应用存储内。工作区和导出文件保存在你选择的位置。大多数本机记录保留至你删除、清除应用数据或卸载。临时数据和自动清理规则见本页表格。删除操作从应用正在使用的存储中移除相应记录或文件。共享存储文件、其他应用中的副本、浏览器下载、WebDAV 备份和第三方保存的数据须在相应位置另行删除。\n\n开启 Android 系统备份或设备迁移后，由系统备份符合条件的应用数据。首次使用同意记录、设备交互完全权限授权、New API 会话及记住的账密、ChatGPT 与 DeepSeek Harness 凭据、PRoot 环境不参与 Android 云备份和设备迁移。应用导出可包含所选的设置和内容，选择包含密钥时可导出符合条件的密钥。WebDAV 备份位于你配置的服务器。Android 备份的地域与到期时间取决于系统备份提供方和账号设置。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_security">
+        <item>"六、安全措施"</item>
+        <item>"应用使用 Android 沙箱、受支持凭据存储的本机加密、系统权限提示和部分工具操作的批准机制。ChatGPT 和 DeepSeek Harness 凭据由 Android Keystore 保护。应用校验内置来源的发行版下载，以及提供了校验值的更新 APK。网页访问通过访问码验证请求。HTTP 或 FTP 连接可能向网络中的其他方暴露内容和凭据，传输是否加密取决于所选协议和端点。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_rights">
+        <item>"七、查阅、复制、分享、更正、删除与撤回"</item>
+        <item>"你可在应用查看对话、个人资料、文件及服务配置，复制或分享受支持的文本和文件，也可通过备份导出符合条件的记录。修改资料、工作区文件和服务设置，或在相应页面删除对话、缓存、文件和配置。可通过停用功能、退出账号、关闭定时任务，或撤回 Android 权限及特殊访问授权来撤回对应的可选同意。撤回后应用停止基于该授权的新处理。\n\n如需彻底清除应用私有数据及首次使用同意记录，可在“Android 设置 → 应用 → Lyra Code → 存储”清除存储，或卸载应用。共享文件、导出备份和远程副本须在对应位置另行删除。第三方令牌可向服务商撤销，远端记录或账号的删除可向服务商申请。对维护者实际持有的个人信息，你可提出查阅、复制、更正、删除及解释请求，也可通过本页联系渠道投诉。请仅提交处理请求所需的信息。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_children">
+        <item>"八、未成年人保护"</item>
+        <item>"Lyra Code 是通用开发工具。未成年人请在父母或其他监护人指导下使用。不满十四周岁的儿童，在使用会处理其个人信息的功能前，须取得父母或其他监护人同意。应用未设置年龄验证或儿童专用账号。监护人可管理 Android 权限、停用已连接的服务、删除本地记录，也可联系维护者要求删除其持有的儿童个人信息。请勿向模型、网站或远程服务器提交儿童证件、联系方式、学校及位置。"</item>
+    </string-array>
+    <string-array name="compliance_privacy_changes">
+        <item>"九、政策更新"</item>
+        <item>"政策修订后在应用内发布，并同步更新本页日期。信息类型、处理目的、处理方式或接收方发生重大变化时，通过应用内提示或版本说明告知。依法须重新取得同意时，在处理前再次取得同意。"</item>
+    </string-array>
+    <string-array name="compliance_permission_control">
+        <item>"管理权限"</item>
+        <item>"可前往“设置 → 应用权限”或“Android 设置 → 应用 → Lyra Code → 权限／特殊应用权限”。无障碍、Shizuku、Root 和 Termux 授权还可由对应的 Android 服务或授权应用管理。"</item>
+    </string-array>
+    <string-array name="compliance_info_settings">
+        <item>"首次同意与设置"</item>
+        <item>"同意标记、语言、外观、功能设置"</item>
+        <item>"记录同意并保留个人设置"</item>
+        <item>"首次同意或修改设置时写入。启动应用或打开相应功能时读取"</item>
+        <item>"无"</item>
+        <item>"首次同意为进入应用所需。自定义可选"</item>
+        <item>"可使用默认设置"</item>
+        <item>"保留至重置、清除应用数据或卸载。同意记录不参与备份"</item>
+        <item>"不同意首次协议将退出应用"</item>
+    </string-array>
+    <string-array name="compliance_info_profile">
+        <item>"本机个人资料"</item>
+        <item>"昵称、所选头像和本机头像引用"</item>
+        <item>"在界面展示个人资料"</item>
+        <item>"修改资料时读取输入或选择的图片。显示资料时读取记录"</item>
+        <item>"系统图片或文件选择授权"</item>
+        <item>"否"</item>
+        <item>"使用默认资料"</item>
+        <item>"保留至替换或清除应用数据。源图片保留在原位置"</item>
+        <item>"不展示自定义昵称或头像"</item>
+    </string-array>
+    <string-array name="compliance_info_chat">
+        <item>"AI 对话、Agent 与媒体生成"</item>
+        <item>"消息、提示词、会话标题、历史、记忆、所选文件片段、附件、工具参数及结果、生成的文本和媒体"</item>
+        <item>"生成回复、运行工具、查看会话历史"</item>
+        <item>"发送、重试、运行 Agent 步骤或触发定时任务时，向选定模型发送所需上下文并在本机保存结果"</item>
+        <item>"网络。工具按功能使用文件或设备权限"</item>
+        <item>"推理需要输入及可用模型。附件与记忆可选"</item>
+        <item>"使用文本、移除可选上下文，或使用本地工具"</item>
+        <item>"本机历史保留至删除或清除应用数据。接收方按其政策保存"</item>
+        <item>"无输入或模型时不能推理"</item>
+    </string-array>
+    <string-array name="compliance_info_model">
+        <item>"模型服务配置"</item>
+        <item>"API 基础地址、密钥、自定义请求头、模型标识和用量统计"</item>
+        <item>"验证身份、配置模型调用并查看用量"</item>
+        <item>"配置时保存。获取模型列表、测试连接、推理、上传或查询额度时读取"</item>
+        <item>"请求时使用网络"</item>
+        <item>"仅为使用对应模型服务所需"</item>
+        <item>"改用其他提供方或本地模型接口"</item>
+        <item>"保留至删除或清除应用数据。导出副本需另行删除"</item>
+        <item>"无法验证或调用对应的服务"</item>
+    </string-array>
+    <string-array name="compliance_info_new_api">
+        <item>"New API 账号"</item>
+        <item>"站点地址、用户名、密码、邮箱、邮箱验证码、可选邀请码、二步验证码、会话 Cookie、用户 ID、访问令牌、API 密钥、模型清单和额度"</item>
+        <item>"注册、登录、恢复会话、同步模型并展示账号状态"</item>
+        <item>"注册、登录、退出、刷新或同步时直接请求站点。开启自动登录后在应用启动时检查，失效时使用已记住的账密重试"</item>
+        <item>"网络"</item>
+        <item>"仅为此接入所需。记住账密与自动登录可选"</item>
+        <item>"直接配置模型 API 密钥"</item>
+        <item>"会话保留至退出或清除应用数据。记住的账密保留至删除或清除应用数据。已同步的模型和密钥须另行移除。"</item>
+        <item>"不能登录账号或同步"</item>
+    </string-array>
+    <string-array name="compliance_info_chatgpt">
+        <item>"ChatGPT 账号"</item>
+        <item>"授权码、PKCE 验证值、访问与刷新令牌、账号或工作区 ID、邮箱、套餐、额度、模型与会话上下文"</item>
+        <item>"登录、续期、查询用量并使用所选 ChatGPT／Codex 模型"</item>
+        <item>"登录时在浏览器打开 OpenAI。应用交换授权码、按需刷新凭据，在相应功能触发时查询资料、额度或发起推理。"</item>
+        <item>"网络、系统浏览器"</item>
+        <item>"仅为 ChatGPT 账号接入所需"</item>
+        <item>"改用 API 密钥配置模型"</item>
+        <item>"本机凭据保留至断开账号或清除应用数据。OAuth 凭据不参与备份。OpenAI 独立保存其记录。"</item>
+        <item>"不能使用账号模型或查看账号用量"</item>
+    </string-array>
+    <string-array name="compliance_info_harness">
+        <item>"DeepSeek Harness 账号"</item>
+        <item>"授权码、设备标识、Harness 凭据、账号 ID、用户资料、钱包币种和余额、告警阈值"</item>
+        <item>"授权推理、展示资料和余额，并按需发送余额告警"</item>
+        <item>"登录时交换授权信息，推理和手动刷新时发起请求。开启告警后，系统在联网条件下按约 15 分钟的周期安排余额查询，实际时间受系统调度影响。"</item>
+        <item>"网络、系统浏览器。告警需要通知权限"</item>
+        <item>"仅为 Harness 所需。告警可选"</item>
+        <item>"使用 API 密钥。余额可手动刷新"</item>
+        <item>"本机凭据保留至断开账号或清除应用数据，凭据不参与备份。DeepSeek 独立保存其记录。"</item>
+        <item>"不能使用 Harness 或查看钱包信息。拒绝通知会隐藏告警"</item>
+    </string-array>
+    <string-array name="compliance_info_workspace">
+        <item>"工作区、文件管理与编辑器"</item>
+        <item>"所选目录、文件名、路径、大小、修改时间、文件内容和 .bak 副本"</item>
+        <item>"浏览、编辑、预览、移动、复制文件、审查变更及支持 Agent 工具"</item>
+        <item>"浏览、打开、修改文件或启用相关工具时读取已授权的内容"</item>
+        <item>"系统文件或目录授权。完整共享存储需所有文件访问。受限路径按需使用 Shizuku 或 Root"</item>
+        <item>"仅为所选文件功能所需"</item>
+        <item>"选择单个文件、目录或 PRoot 工作区"</item>
+        <item>"源文件及 .bak 副本保留至在存储位置删除。应用记录保留至移除"</item>
+        <item>"无法管理授权范围外的文件"</item>
+    </string-array>
+    <string-array name="compliance_info_attachments">
+        <item>"附件与拍照"</item>
+        <item>"所选文件名、URI、MIME 类型、文件字节、照片及其内含元数据"</item>
+        <item>"添加、预览附件或向模型发送所选内容"</item>
+        <item>"选取文件或拍照时读取。内容被加入模型请求时发送"</item>
+        <item>"系统选择授权或媒体读取。拍照使用相机权限"</item>
+        <item>"仅为添加附件或拍照所需"</item>
+        <item>"使用文本或选择已有文件"</item>
+        <item>"会话附件随已存数据保留。临时文件可从应用存储清理。源文件须在原位置删除"</item>
+        <item>"无法附加或拍摄对应内容"</item>
+    </string-array>
+    <string-array name="compliance_info_automation">
+        <item>"定时任务与下载"</item>
+        <item>"任务名称、提示词、执行计划、模型标识、结果、错误、下载地址、文件名与进度"</item>
+        <item>"执行任务和下载并展示结果或状态"</item>
+        <item>"创建或修改时写入。在设定时间或下载启动时读取，随进度与结果更新"</item>
+        <item>"联网任务使用网络。按功能使用通知和前台服务权限"</item>
+        <item>"仅为所选后台功能所需"</item>
+        <item>"可在前台手动执行任务"</item>
+        <item>"任务记录保留至删除或清除应用数据。下载成品保留至从保存位置删除"</item>
+        <item>"不能自动执行、下载或接收对应通知"</item>
+    </string-array>
+    <string-array name="compliance_info_location">
+        <item>"位置工具"</item>
+        <item>"系统最后一次记录的经纬度、精度、定位来源和时间戳"</item>
+        <item>"为当前 Agent 任务提供地理上下文"</item>
+        <item>"已启用的位置工具被调用时读取 Android 最近位置，并将结果纳入该任务的模型上下文"</item>
+        <item>"ACCESS_COARSE_LOCATION 和／或 ACCESS_FINE_LOCATION"</item>
+        <item>"仅为自动获取位置所需"</item>
+        <item>"手动填写城市或地理位置"</item>
+        <item>"按需读取。已保存的工具结果随会话或审查日志保留。不建立后台定位记录。"</item>
+        <item>"无法自动获取位置"</item>
+    </string-array>
+    <string-array name="compliance_info_apps">
+        <item>"已安装应用识别"</item>
+        <item>"应用名称、包名、版本、应用大小和签名指纹"</item>
+        <item>"识别已安装应用、查看安装包信息、查找协作应用"</item>
+        <item>"打开应用列表、调用工具或检查协作兼容性时读取 Android 软件包管理器。工具结果可纳入模型上下文"</item>
+        <item>"QUERY_ALL_PACKAGES 或清单声明的应用可见性"</item>
+        <item>"仅为应用发现和兼容性功能所需"</item>
+        <item>"支持指定应用的功能可手动填写"</item>
+        <item>"按需读取。已保存的工具结果随会话或审查日志保留"</item>
+        <item>"应用列表或兼容性状态可能不完整"</item>
+    </string-array>
+    <string-array name="compliance_info_device">
+        <item>"设备与网络诊断"</item>
+        <item>"设备厂商和型号、Android 及应用版本、CPU、内存、存储容量、屏幕、电池、网络类型、IP 地址、接口、蓝牙状态、设备时间或时区"</item>
+        <item>"展示诊断信息并支持设备感知工具"</item>
+        <item>"查看手机信息或调用相关工具时读取 Android 或本机系统状态"</item>
+        <item>"查看网络状态使用 ACCESS_NETWORK_STATE"</item>
+        <item>"仅为所用诊断或工具所需"</item>
+        <item>"手动描述设备或环境"</item>
+        <item>"按需读取。已保存的工具结果随会话或审查日志保留"</item>
+        <item>"无法取得部分诊断或环境字段"</item>
+    </string-array>
+    <string-array name="compliance_info_interaction">
+        <item>"设备交互与桌面宠物"</item>
+        <item>"前台应用包名和窗口、可访问的屏幕文字及控件、截图、操作和坐标、验证结果、宠物资源文件和设置"</item>
+        <item>"执行用户启动的设备操作、显示宠物，按需用选定视觉模型识别屏幕"</item>
+        <item>"已开启交互会话内按工具调用读取活动窗口或截图。配置宠物时保存其资源，展示时读取"</item>
+        <item>"无障碍、悬浮窗、可选 Shizuku／Root。完全权限使用系统锁屏凭据或生物验证"</item>
+        <item>"仅为对应可选功能所需"</item>
+        <item>"手动操作设备，或用文本替代视觉识别"</item>
+        <item>"实时屏幕数据用于当前会话。已保存的输出、调试记录、导出文件或宠物资源保留至删除"</item>
+        <item>"无法使用自动设备操作、视觉分析或悬浮宠物"</item>
+    </string-array>
+    <string-array name="compliance_info_local_runtime">
+        <item>"PRoot、Termux 与 X11"</item>
+        <item>"命令、工作目录、环境变量、输出、退出码、容器文件、X11 画面、音频、键盘或指针输入"</item>
+        <item>"运行本地开发工具和交互式 Linux 会话"</item>
+        <item>"每次执行命令或图形会话运行期间处理输入和输出。选择 Termux 时向其发送委托命令数据"</item>
+        <item>"本机文件访问。按功能使用 Termux RUN_COMMAND、共享存储、前台服务、悬浮或网络权限"</item>
+        <item>"仅为所选运行环境功能所需"</item>
+        <item>"切换运行环境，或仅编辑文件"</item>
+        <item>"会话流数据用于会话期间。保存的文件、日志或 PRoot 环境保留至删除。Termux 管理自身文件"</item>
+        <item>"不能使用所选环境、挂载或图形会话"</item>
+    </string-array>
+    <string-array name="compliance_info_remote">
+        <item>"MCP、SSH、WebDAV 与文件传输"</item>
+        <item>"端点、端口、账号、密码、令牌、SSH 私钥、路径、命令、工具参数和传输内容"</item>
+        <item>"认证、运行远程工具和管理远程文件"</item>
+        <item>"测试、浏览、执行命令、上传、下载或备份时直连已配置服务"</item>
+        <item>"网络。局域访问按系统要求授权"</item>
+        <item>"仅为所选服务所需"</item>
+        <item>"使用本地文件或其他已授权服务器"</item>
+        <item>"本机配置保留至移除。远程记录及备份由相应目标管理"</item>
+        <item>"无法执行对应远程操作"</item>
+    </string-array>
+    <string-array name="compliance_info_mail">
+        <item>"IMAP 与 SMTP 邮件"</item>
+        <item>"邮件端点、账号与凭据、文件夹、发件人、收件人、抄送与密送、主题、正文及附件"</item>
+        <item>"读取、整理、撰写和发送邮件"</item>
+        <item>"连接、读取邮箱、更改草稿或发送时直连邮件服务器。邮件服务器将内容送达指定收件人"</item>
+        <item>"网络。本地附件使用文件选择授权"</item>
+        <item>"仅为邮件接入所需"</item>
+        <item>"使用其他邮件客户端"</item>
+        <item>"本机配置和已下载文件保留至删除。邮件服务及收件人独立保存副本"</item>
+        <item>"无法在本应用收发邮件"</item>
+    </string-array>
+    <string-array name="compliance_info_web">
+        <item>"联网搜索、读网页与外链"</item>
+        <item>"搜索词、网址、请求头、IP 地址、客户端标识、网页内容及站点使用的 Cookie"</item>
+        <item>"搜索、读取、展示或下载互联网内容"</item>
+        <item>"用户或已启用的 Agent 搜索、读取或下载时通过 HTTP 或 WebView 请求。外链交给浏览器或目标应用"</item>
+        <item>"网络"</item>
+        <item>"仅为所选联网操作所需"</item>
+        <item>"本机提供文本，或单独打开资源"</item>
+        <item>"已保存的会话结果或文件保留至删除。站点及浏览器按各自设置与政策保存"</item>
+        <item>"无法获取所请求的资源"</item>
+    </string-array>
+    <string-array name="compliance_info_local_servers">
+        <item>"网页访问、本地网页与 MCP 服务端"</item>
+        <item>"客户端 IP、访问码或认证令牌、请求、所选会话历史、设置、上传文件、发布文件与工具结果"</item>
+        <item>"为已连接客户端提供网页对话、本地预览或 MCP 工具"</item>
+        <item>"服务运行期间按客户端请求处理。返回内容取决于启用的服务及授权范围"</item>
+        <item>"网络套接字。按 Android 要求使用局域网权限。网页访问使用前台服务"</item>
+        <item>"仅为启用的本机服务所需"</item>
+        <item>"关闭服务并在设备上直接使用应用"</item>
+        <item>"实时连接数据用于会话期间。已保存的上传文件、对话、设置或日志保留至删除。客户端可保存副本。"</item>
+        <item>"客户端无法连接相应服务"</item>
+    </string-array>
+    <string-array name="compliance_info_diagnostics">
+        <item>"本机日志与用量"</item>
+        <item>"请求及响应详情、时间戳、模型与令牌用量、工具参数和结果、错误与会话日志"</item>
+        <item>"审查操作、排查问题和统计用量"</item>
+        <item>"发生相应请求、工具调用、会话或错误时写入。打开对应日志或用量页面时读取"</item>
+        <item>"本机查看无需额外权限"</item>
+        <item>"展示对应记录所需"</item>
+        <item>"不使用对应功能，或使用相应入口清理记录"</item>
+        <item>"已保存的日志和统计保留至清理或清除应用数据"</item>
+        <item>"清理后无法查看历史审查及诊断记录"</item>
+    </string-array>
+    <string-array name="compliance_info_cache">
+        <item>"响应与预览缓存"</item>
+        <item>"已缓存的模型回复、临时附件或预览字节、已渲染资源"</item>
+        <item>"复用近期响应并加载预览"</item>
+        <item>"使用缓存时在相应功能运行期间读写"</item>
+        <item>"本机缓存无需额外权限"</item>
+        <item>"否"</item>
+        <item>"可停用模型响应缓存或重新加载源内容"</item>
+        <item>"模型响应缓存七天后失效，在查询或清理时删除。其他缓存保留至手动清理或由系统移除"</item>
+        <item>"可能需要重新请求或生成预览"</item>
+    </string-array>
+    <string-array name="compliance_info_backup">
+        <item>"导出、导入和 WebDAV 备份"</item>
+        <item>"所选设置、模型配置、远程服务配置、提示词、记忆、会话、Skills 文件和可选的受支持凭据"</item>
+        <item>"备份和迁移所选数据"</item>
+        <item>"导出时读取所选类别。导入时读取选定归档。WebDAV 备份或还原时传输归档"</item>
+        <item>"系统文件访问。WebDAV 使用网络"</item>
+        <item>"否"</item>
+        <item>"改用本机导出，或排除凭据"</item>
+        <item>"导出包保留至从本机或远端删除。还原后的记录按各自期限保留"</item>
+        <item>"无法从未生成的备份或未选的类别恢复数据"</item>
+    </string-array>
+    <string-array name="compliance_info_updates">
+        <item>"更新与发行资源下载"</item>
+        <item>"IP 地址、请求时间及请求头、资源地址、APK 下载客户端和应用版本号、本机下载状态"</item>
+        <item>"检查发布版本，获取 APK 或 PRoot Linux 资源"</item>
+        <item>"使用应用时在每日首次检查成功前检查更新，也可手动检查。下载由用户发起。"</item>
+        <item>"网络。打开 APK 安装器使用安装未知应用授权"</item>
+        <item>"仅为应用内相应检查、下载或安装所需"</item>
+        <item>"自行安装 APK 或导入 rootfs"</item>
+        <item>"更新记录随后续检查刷新。APK 副本保留至清理或应用替换后的清理。网络接收方自行决定期限"</item>
+        <item>"无法完成该项应用内更新或资源下载"</item>
+    </string-array>
+    <string-array name="compliance_info_wall">
+        <item>"开发者墙与项目反馈"</item>
+        <item>"请求 IP、时间及网址、公开的贡献者名称和头像、你提交的反馈内容"</item>
+        <item>"展示贡献者并接收反馈"</item>
+        <item>"打开开发者墙时按每日刷新限制获取已配置的公开资料。点击反馈打开外部站点，由你在站点提交。"</item>
+        <item>"网络"</item>
+        <item>"否"</item>
+        <item>"查阅项目文档或跳过"</item>
+        <item>"开发者墙缓存保留至清理或覆盖。反馈由议题平台按其规则保留"</item>
+        <item>"无法获取贡献者更新或提交反馈"</item>
+    </string-array>
+    <string-array name="compliance_third_model_fields">
+        <item>"鉴权、生成模型回复或媒体"</item>
+        <item>"API 密钥或自定义鉴权请求头、模型标识、提示词、会话上下文、工具调用及结果，以及随请求发送的文件或媒体"</item>
+        <item>"获取模型列表、测试、推理、生成媒体及受支持的上传或额度操作时直连 API"</item>
+    </string-array>
+    <string-array name="compliance_third_local">
+        <item>"内置开源库"</item>
+        <item>"AndroidX、OkHttp、Media3、Sora Editor、JSch、JLaTeXMath、Shizuku API、Lyra X11 的贡献者"</item>
+        <item>"界面、联网、播放、编辑、SSH、渲染与本机系统集成"</item>
+        <item>"应用不会向库作者单独发送字段"</item>
+        <item>"本机调用库。联网操作按下表各自目的地发送"</item>
+        <item>"无单独的库收集政策"</item>
+    </string-array>
+    <string-array name="compliance_third_custom">
+        <item>"自定义模型 API"</item>
+        <item>"你配置的地址所对应的运营者"</item>
+        <item>"生成模型回复或媒体"</item>
+        <item>"API 密钥或配置的请求头、模型标识、提示词、历史、工具及结果，以及随请求发送的文件或媒体"</item>
+        <item>"获取列表、测试、推理、上传或查额度时直连所填地址"</item>
+        <item>"查看所选端点的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_new_api">
+        <item>"New API 账号站点"</item>
+        <item>"所填 New API 站点的运营者"</item>
+        <item>"注册、登录、恢复会话及同步模型"</item>
+        <item>"用户名、密码、邮箱、验证码、可选邀请码、二步验证码、会话 Cookie、访问令牌、API 密钥与模型请求内容"</item>
+        <item>"注册、登录、退出、刷新、同步和推理时直连。开启自动登录后也在应用启动时连接"</item>
+        <item>"查看所选 New API 站点的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_chatgpt">
+        <item>"ChatGPT／Codex 账号"</item>
+        <item>"OpenAI"</item>
+        <item>"授权、查询资料和额度、运行模型"</item>
+        <item>"浏览器登录数据、授权码、PKCE 验证值、令牌、账号或工作区 ID、模型与推理内容"</item>
+        <item>"浏览器授权后直连换取或刷新令牌。按需请求资料、额度或推理"</item>
+    </string-array>
+    <string-array name="compliance_third_harness">
+        <item>"DeepSeek Harness"</item>
+        <item>"深度求索"</item>
+        <item>"授权模型并查询资料和钱包"</item>
+        <item>"浏览器登录数据、授权码、设备标识、Harness 凭据、资料和钱包查询、模型输入"</item>
+        <item>"通过浏览器授权及直连 API。开启告警且联网时约每 15 分钟安排余额查询"</item>
+    </string-array>
+    <string-array name="compliance_third_ddg">
+        <item>"DuckDuckGo"</item>
+        <item>"DuckDuckGo"</item>
+        <item>"获取搜索结果"</item>
+        <item>"搜索词、IP 地址及 HTTP 请求头"</item>
+        <item>"按搜索设置尝试已启用的搜索引擎时发送查询"</item>
+    </string-array>
+    <string-array name="compliance_third_google">
+        <item>"Google Search"</item>
+        <item>"Google"</item>
+        <item>"获取搜索结果"</item>
+        <item>"搜索词、IP 地址及 HTTP 请求头"</item>
+        <item>"按搜索设置尝试已启用的搜索引擎时发送查询"</item>
+    </string-array>
+    <string-array name="compliance_third_bing">
+        <item>"Bing / Bing China"</item>
+        <item>"微软"</item>
+        <item>"获取搜索结果"</item>
+        <item>"搜索词、IP 地址及 HTTP 请求头"</item>
+        <item>"按搜索设置尝试已启用的搜索引擎时发送查询"</item>
+    </string-array>
+    <string-array name="compliance_third_baidu">
+        <item>"Baidu Search"</item>
+        <item>"百度"</item>
+        <item>"获取搜索结果"</item>
+        <item>"搜索词、IP 地址及 HTTP 请求头"</item>
+        <item>"按搜索设置尝试已启用的搜索引擎时发送查询"</item>
+    </string-array>
+    <string-array name="compliance_third_web">
+        <item>"WebView、浏览器、网站与下载"</item>
+        <item>"Android WebView 提供方、所用浏览器及访问站点的运营者"</item>
+        <item>"渲染网页、打开链接或获取文件"</item>
+        <item>"网址、IP 地址、请求头、客户端标识、Cookie 或提交给网站的字段"</item>
+        <item>"打开网页、链接或下载时使用 HTTP、WebView 或外部浏览器直连"</item>
+        <item>"查看所用浏览器及站点的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_mcp">
+        <item>"已配置的 MCP 服务"</item>
+        <item>"所选 MCP 端点的运营者"</item>
+        <item>"发现及调用 MCP 工具"</item>
+        <item>"端点、认证令牌或请求头、会话 ID、工具名称、参数及参数所含内容"</item>
+        <item>"发现工具、连接或调用时直接发送 MCP 请求"</item>
+        <item>"查看 MCP 运营者的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_remote">
+        <item>"SSH、WebDAV 和 FTP／FTPS／SFTP"</item>
+        <item>"你配置的服务器运营者"</item>
+        <item>"鉴权、执行命令、传输文件或备份"</item>
+        <item>"用户名、密码或认证证明、命令、文件名和路径、文件内容及所选备份数据"</item>
+        <item>"测试、浏览、执行、传输或备份时直连"</item>
+        <item>"查看所选服务器运营者的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_mail">
+        <item>"IMAP／SMTP 服务及邮件收件人"</item>
+        <item>"所配置的邮件服务商及你指定的收件人"</item>
+        <item>"读取和管理邮件、保存草稿及发送邮件"</item>
+        <item>"账号凭据、邮箱查询、发件人、收件人、抄送与密送、主题、正文及附件"</item>
+        <item>"操作邮箱时直连 IMAP／SMTP。发送邮件后内容由邮件服务投递"</item>
+        <item>"查看所选邮件服务商的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_termux">
+        <item>"Termux、Shizuku 和 Root 管理器"</item>
+        <item>"Termux、Shizuku 项目或已安装的 Root 管理器"</item>
+        <item>"执行经用户授权的本机操作"</item>
+        <item>"委托的命令、工作目录、参数、路径、执行输出与退出状态"</item>
+        <item>"执行相应功能时在本机调用已授权服务或进程"</item>
+        <item>"本机接入。查看所安装应用的说明"</item>
+    </string-array>
+    <string-array name="compliance_third_lan">
+        <item>"网页、本地网站和 MCP 客户端"</item>
+        <item>"你或连接客户端的运营者"</item>
+        <item>"提供网页对话、已发布文件或经授权的 MCP 工具"</item>
+        <item>"客户端 IP、访问码或令牌、请求、所请求的对话、上传或发布文件及工具结果"</item>
+        <item>"对应服务运行时处理客户端请求和响应"</item>
+        <item>"由你在本机使用，或查看客户端自身政策"</item>
+    </string-array>
+    <string-array name="compliance_third_github">
+        <item>"GitHub 发布与反馈服务"</item>
+        <item>"GitHub"</item>
+        <item>"检查版本、下载资源、测试线路或反馈"</item>
+        <item>"IP 地址、请求时间、请求头、资源地址及你在网站提交的内容"</item>
+        <item>"检查、下载或线路测试时访问发布 API 或资源。反馈链接通过浏览器打开"</item>
+    </string-array>
+    <string-array name="compliance_third_release_hosts">
+        <item>"更新清单、开发者墙及 GitHub 加速"</item>
+        <item>"Lyra Code 项目（lyracode.app）、下载地址运营者及启用的加速服务方"</item>
+        <item>"读取版本、获取 APK 和贡献者资料，以及转发 GitHub 下载"</item>
+        <item>"IP 地址、时间、请求头、资源网址及 APK 下载客户端版本号"</item>
+        <item>"检查更新、打开开发者墙、手动下载或测试时发送。启用加速后可经其线路转发"</item>
+        <item>"查看所用主机或加速服务政策。应用端处理见本隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_debian">
+        <item>"Debian 根文件系统、软件包镜像及 Turnip 包"</item>
+        <item>"Debian 与所选发行版或软件包主机的运营者"</item>
+        <item>"下载 Linux 环境、软件包及图形驱动"</item>
+        <item>"IP 地址、时间、资源网址及请求头"</item>
+        <item>"发起根文件系统、软件包或驱动下载时请求。也可通过容器包管理器请求"</item>
+    </string-array>
+    <string-array name="compliance_third_android">
+        <item>"Android 备份、迁移及系统选择器"</item>
+        <item>"Android 系统以及所选备份或文档提供方"</item>
+        <item>"选择文件、备份符合条件的记录或迁移设备"</item>
+        <item>"所选文件引用或字节，以及系统允许备份的数据"</item>
+        <item>"打开系统选择器或开启系统备份、设备迁移时由系统处理"</item>
+        <item>"查看系统备份方或文档提供方的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_third_links">
+        <item>"项目外链和社区平台"</item>
+        <item>"Lyra Code 项目、开发者墙链接所指向的站点运营者"</item>
+        <item>"查看项目资料、文档或贡献者主页"</item>
+        <item>"目标地址、浏览器请求头、IP 地址、Cookie 及在站点提交的内容"</item>
+        <item>"点击链接时交给浏览器或目标应用"</item>
+        <item>"查看目标平台的隐私政策"</item>
+    </string-array>
+    <string-array name="compliance_perm_internet">
+        <item>"互联网与连接状态"</item>
+        <item>"连接模型、邮件、搜索、更新及远程服务。展示网络状态、调度联网任务"</item>
+        <item>"INTERNET、ACCESS_NETWORK_STATE"</item>
+    </string-array>
+    <string-array name="compliance_perm_lan">
+        <item>"局域网与本地服务"</item>
+        <item>"访问局域端点，提供网页访问、本地网页、MCP 服务，并支持 Wi-Fi 多播"</item>
+        <item>"ACCESS_LOCAL_NETWORK（Android 17 起按需申请）、CHANGE_WIFI_MULTICAST_STATE"</item>
+    </string-array>
+    <string-array name="compliance_perm_location">
+        <item>"位置工具"</item>
+        <item>"调用工具时读取 Android 最近位置"</item>
+        <item>"ACCESS_COARSE_LOCATION、ACCESS_FINE_LOCATION"</item>
+    </string-array>
+    <string-array name="compliance_perm_camera">
+        <item>"拍照附件"</item>
+        <item>"按你发起的操作拍照并附加至对话"</item>
+        <item>"CAMERA"</item>
+    </string-array>
+    <string-array name="compliance_perm_media">
+        <item>"图片、视频和旧版文件访问"</item>
+        <item>"读取已授权的图片、视频、共享文件。在适用的旧版系统保存共享文件"</item>
+        <item>"READ_MEDIA_IMAGES、READ_MEDIA_VIDEO。READ_EXTERNAL_STORAGE（Android 12 及以下）。WRITE_EXTERNAL_STORAGE（Android 9 及以下）。可使用系统选择授权"</item>
+    </string-array>
+    <string-array name="compliance_perm_files">
+        <item>"共享存储和工作区"</item>
+        <item>"选择文件或目录。授权后完整管理共享存储，并可将其挂载到 PRoot"</item>
+        <item>"系统文件／目录授权。MANAGE_EXTERNAL_STORAGE（Android 11 起的所有文件访问）"</item>
+    </string-array>
+    <string-array name="compliance_perm_packages">
+        <item>"应用列表与兼容性"</item>
+        <item>"查找已安装应用、展示软件包信息，并发现 Termux 和兼容浏览器"</item>
+        <item>"QUERY_ALL_PACKAGES 和清单声明的应用可见性"</item>
+    </string-array>
+    <string-array name="compliance_perm_notifications">
+        <item>"任务和会话通知"</item>
+        <item>"展示下载、后台任务、Agent、网页访问、设备交互、X11 与余额告警状态"</item>
+        <item>"POST_NOTIFICATIONS（Android 13 起）"</item>
+    </string-array>
+    <string-array name="compliance_perm_install">
+        <item>"APK 安装"</item>
+        <item>"请求 Android 为用户选定的 APK 打开安装器，包括应用更新"</item>
+        <item>"REQUEST_INSTALL_PACKAGES 及 Android 安装未知应用授权"</item>
+    </string-array>
+    <string-array name="compliance_perm_foreground">
+        <item>"前台任务和 X11"</item>
+        <item>"在用户启动后维持 Agent、网页访问、悬浮控制与 Linux 图形会话。使用时维持 X11 媒体播放"</item>
+        <item>"FOREGROUND_SERVICE、FOREGROUND_SERVICE_SPECIAL_USE、FOREGROUND_SERVICE_MEDIA_PLAYBACK、WAKE_LOCK"</item>
+    </string-array>
+    <string-array name="compliance_perm_overlay">
+        <item>"悬浮界面"</item>
+        <item>"按用户选择显示悬浮设备控制、桌面宠物和 X11 预览"</item>
+        <item>"SYSTEM_ALERT_WINDOW"</item>
+    </string-array>
+    <string-array name="compliance_perm_accessibility">
+        <item>"Android 设备交互"</item>
+        <item>"读取可访问窗口内容，执行经授权的手势和操作，按需为当前任务截图"</item>
+        <item>"开启 Lyra Code 无障碍服务。系统使用 BIND_ACCESSIBILITY_SERVICE 绑定"</item>
+    </string-array>
+    <string-array name="compliance_perm_biometric">
+        <item>"设备交互完全权限"</item>
+        <item>"开启完全权限前由 Android 验证操作者"</item>
+        <item>"USE_BIOMETRIC 或系统锁屏凭据"</item>
+    </string-array>
+    <string-array name="compliance_perm_commands">
+        <item>"Termux 与特权操作"</item>
+        <item>"委托 Termux 命令，或使用授权的 Shizuku／Root 执行 Shell 和受限文件操作"</item>
+        <item>"com.termux.permission.RUN_COMMAND。moe.shizuku.manager.permission.API_V23 及 Shizuku 授权。Root 需单独授权"</item>
+    </string-array>
+    <string-array name="compliance_perm_boot">
+        <item>"恢复已安排的任务"</item>
+        <item>"允许 Android WorkManager 在设备重启后重新安排符合条件的任务"</item>
+        <item>"RECEIVE_BOOT_COMPLETED"</item>
+    </string-array>
+    <string-array name="compliance_perm_receiver">
+        <item>"应用内部事件传递"</item>
+        <item>"限制 AndroidX 非导出广播接收器的访问范围"</item>
+        <item>"以 .DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION 结尾的应用签名权限"</item>
+    </string-array>
+    <string name="compliance_open_provider_site">"提供方官网（暂未核实政策链接）"</string>
+    <string name="compliance_column_third_timing">"收集方式及触发时机"</string>
+    <string-array name="compliance_third_gitee">
+        <item>"Gitee 项目镜像"</item>
+        <item>"Gitee（码云）"</item>
+        <item>"打开项目镜像"</item>
+        <item>"网址、IP 地址、浏览器请求头和站点 Cookie"</item>
+        <item>"点击 Gitee 链接后由浏览器访问"</item>
+    </string-array>
+    <string-array name="compliance_third_sponsor">
+        <item>"微信支付赞助"</item>
+        <item>"微信支付／财付通"</item>
+        <item>"自愿赞助开发"</item>
+        <item>"支付账号、金额、交易记录和设备信息由支付方处理。Lyra Code 不接收交易信息。"</item>
+        <item>"仅在你通过微信扫二维码并付款时由微信支付处理。Lyra Code 在本机展示或导出公开二维码。"</item>
+    </string-array>
+    <string-array name="compliance_third_deepseek_web">
+        <item>"DeepSeek Search／Fetch"</item>
+        <item>"深度求索或自定义端点运营者"</item>
+        <item>"检索网页或读取网页正文"</item>
+        <item>"API 密钥、搜索词、请求的结果数量和网页网址"</item>
+        <item>"启用对应后端后，每次搜索或读取网页时直连 API"</item>
+    </string-array>
+    <string-array name="compliance_info_deepseek_web">
+        <item>"DeepSeek Search 与 Fetch 设置"</item>
+        <item>"配置的基础地址和 API 密钥、搜索词、结果数量和网页网址"</item>
+        <item>"鉴权、搜索和读取网页内容"</item>
+        <item>"保存配置时写入本机。启用后每次搜索或读取网页时发送密钥及适用字段。"</item>
+        <item>"网络"</item>
+        <item>"仅为此可选后端所需"</item>
+        <item>"使用内置搜索或网页读取"</item>
+        <item>"本机配置保留至移除。已保存的结果随会话或审查日志保留。服务方独立保存其副本。"</item>
+        <item>"无法使用选定的 Search 或 Fetch 后端"</item>
+    </string-array>
+</resources>

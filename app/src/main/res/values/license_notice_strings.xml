@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_group_application">Application and libraries</string>
+    <string name="license_group_editor">Code editor and syntax highlighting</string>
+    <string name="license_group_brands">Brand icons</string>
+    <string name="license_group_x11">X11 and Linux graphics</string>
+    <string name="license_open_externally">Open %1$s externally</string>
+    <string name="license_view_offline">View offline license</string>
+    <string name="license_offline_unavailable">The offline license could not be loaded.</string>
+    <string name="license_debian_rootfs_note">The tool license is provided here. Each Debian package includes its own notice under /usr/share/doc in the installed environment.</string>
+    <string name="license_lyra_note">License for the original application source code.</string>
+    <string name="license_browser_note">Browser Custom Tabs and external authorization.</string>
+    <string name="license_work_note">Scheduled background work.</string>
+    <string name="license_media_note">Audio and video previews.</string>
+    <string name="license_activation_note">MIME content handling for email attachments.</string>
+    <string name="license_latex_preview_note">Offline LaTeX document preview.</string>
+    <string name="license_marked_note">Offline Markdown rendering in the web companion.</string>
+    <string name="license_dompurify_note">HTML sanitization in the web companion.</string>
+    <string name="license_shizuku_note">Optional integration with the Shizuku service.</string>
+    <string name="license_talloc_note">Memory allocation library statically linked into the bundled PRoot runtime.</string>
+    <string name="license_guest_packages_note">Downloaded on demand or installed through the guest package manager. Individual packages retain their notices.</string>
+    <string name="license_unicode_note">East Asian character widths for terminal layout.</string>
+    <string name="license_test_only_note">Used by local unit tests.</string>
+    <string name="license_grammar_note">Offline TextMate definitions for code highlighting.</string>
+    <string name="license_lobe_note">Selected model provider logos used in the app.</string>
+    <string name="license_trademarks_note">Brand names and marks identify their respective services. Trademark rights remain with their owners.</string>
+    <string name="license_x11_module_note">Android integration for Linux graphical sessions.</string>
+    <string name="license_x11_dependency_note">Used by the embedded X11 server or Linux graphics renderer.</string>
+    <string name="license_markdown_it_note">Local Markdown preview.</string>
+    <string name="license_katex_note">Local math rendering in the app and web companion.</string>
+    <string name="license_tokenizer_note">Adapted DeepSeek V4 vocabulary used for on-device token counting.</string>
+</resources>

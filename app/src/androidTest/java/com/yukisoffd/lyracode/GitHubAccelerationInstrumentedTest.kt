@@ -247,7 +247,7 @@ class GitHubAccelerationInstrumentedTest {
                         }
                     }
                 } else {
-                    AboutSoftwareScreen(false, {}, {}, {}, onOpenGitHubAcceleration = { url ->
+                    AboutSoftwareScreen(false, {}, {}, {}, onOpenLicenses = {}, onOpenGitHubAcceleration = { url ->
                         selectedUrl.value = url
                         accelerationPage.value = true
                     }, onOpenUpdateManagement = {}, updateInfoState = infoState)
